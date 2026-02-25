@@ -6,7 +6,7 @@ import io
 import PyPDF2
 import docx
 from datetime import datetime, timezone
-from sqlmodel import select
+from sqlmodel import select, Field
 
 from .models import Persona, Interview, Opportunity, InterviewOpportunityLink
 from schema import InterviewSnapshot, DedupeResult
@@ -50,6 +50,12 @@ class InterviewHistoryItem(rx.Base):
     persona: str
     date_logged: str
     snippet: str
+
+class PersonaPrep(rx.Model, table=True):
+    """Stores the latest generated prep script for a specific persona."""
+    persona: str = Field(primary_key=True) # The persona name acts as the ID
+    content: str
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
     
 # --- THE STATE (BACKEND LOGIC) ---
 class State(rx.State):
@@ -60,6 +66,7 @@ class State(rx.State):
     interview_history: list[InterviewHistoryItem] = [] 
     target_persona: str = ""
     prep_questions: str = ""
+    prep_last_updated: str = ""
     persona_input: str = ""
     transcript_text: str = ""
     current_view: str = "synthesize"
@@ -322,28 +329,70 @@ feedback=result.get("quality_check", {}).get("feedback", "No feedback generated.
     def generate_hostile_questions(self):
         if not self.target_persona:
             return rx.window_alert("No persona selected.")
+            
         self.is_prepping = True
         yield
+        
         try:
-            # Safely extract all opportunities where this persona is affected
+            # 1. Gather opportunities (same logic as before)
             target_opps = []
             for item in self.ledger_data:
-                # Check if our target persona name matches any of the badges on this row
                 if any(p.name == self.target_persona for p in item.personas_affected):
                     target_opps.append(item.opportunity)
                     
             if not target_opps:
-                self.prep_questions = "No previously identified opportunities found for this persona. You are starting from a blank slate. Focus on broad, open-ended discovery!"
+                self.prep_questions = "No identified opportunities. Start fresh!"
+                self.prep_last_updated = ""
                 return
                 
+            # 2. Generate the content
             prep_template = load_prompt("prep.txt")
             prep_prompt = prep_template.format(
                 target_persona=self.target_persona,
                 target_opps=target_opps
             )
+            generated_text = flash_model.generate_content(prep_prompt).text
             
-            self.prep_questions = flash_model.generate_content(prep_prompt).text
+            # 3. SAVE TO DATABASE
+            with rx.session() as session:
+                # specific logic: insert or update if exists
+                existing_entry = session.get(PersonaPrep, self.target_persona)
+                
+                if existing_entry:
+                    existing_entry.content = generated_text
+                    existing_entry.updated_at = datetime.utcnow()
+                    session.add(existing_entry)
+                else:
+                    new_entry = PersonaPrep(
+                        persona=self.target_persona, 
+                        content=generated_text,
+                        updated_at=datetime.utcnow()
+                    )
+                    session.add(new_entry)
+                session.commit()
+
+            # 4. Update UI
+            self.prep_questions = generated_text
+            self.prep_last_updated = datetime.now().strftime("%Y-%m-%d %H:%M")
+            
         except Exception as e:
             self.prep_questions = f"Failed to generate: {str(e)}"
         finally:
             self.is_prepping = False
+
+    # --- NEW: LOAD SCRIPT ON SELECTION ---
+    def load_prep_for_persona(self, persona: str):
+        """Sets the target persona and tries to load an existing script from DB."""
+        self.target_persona = persona
+        
+        with rx.session() as session:
+            # Try to find a saved script for this persona
+            saved_prep = session.get(PersonaPrep, persona)
+            
+            if saved_prep:
+                self.prep_questions = saved_prep.content
+                # Format the date nicely
+                self.prep_last_updated = saved_prep.updated_at.strftime("%Y-%m-%d %H:%M")
+            else:
+                self.prep_questions = ""
+                self.prep_last_updated = ""
