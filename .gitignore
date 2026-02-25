@@ -1,30 +1,25 @@
-# Environment & secrets
+# --- Security & Secrets ---
 .env
-.env.local
-.env.*.local
 
-# Python
+# --- Database ---
+# (We explicitly track the /alembic folder, so it is NOT listed here)
+reflex.db
+*.sqlite3
+*.db
+
+# --- Reflex Build Files ---
+.web/
+.states/
+
+# --- Python Environments ---
+.venv/
+venv/
+env/
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
-venv/
-.venv/
-env/
-*.egg-info/
-.eggs/
-dist/
-build/
 
-# Streamlit
-.streamlit/secrets.toml
-
-# IDE & OS
-.idea/
-.vscode/
-*.swp
-*.swo
+# --- OS Junk Files ---
 .DS_Store
 Thumbs.db
 
