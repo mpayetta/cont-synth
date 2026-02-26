@@ -38,24 +38,29 @@ class LedgerStateMixin(rx.State, mixin=True):
     def load_outcomes(self):
         """Loads all business outcomes for the global dropdowns."""
         with rx.session() as session:
-            db_outcomes = session.exec(select(Outcome)).all()
+            db_outcomes = session.exec(
+                select(Outcome).where(Outcome.product_id == int(self.active_product_id))
+            ).all()
             self.outcomes = [OutcomeItem(id=o.id, name=o.name) for o in db_outcomes]
-            self.outcome_names = (
-                ["All Outcomes", "Unmapped Opportunities"]
-                + [o.name for o in self.outcomes]
-            )
+            self.outcome_names = ["All Outcomes", "Unmapped Opportunities"] + [
+                o.name for o in self.outcomes
+            ]
 
     def load_ledger(self):
         """Loads the global opportunity ledger with evidence, solutions, and outcomes."""
         self.load_outcomes()
         with rx.session() as session:
-            opportunities = session.exec(select(Opportunity)).all()
+            opportunities = session.exec(
+                select(Opportunity).where(
+                    Opportunity.product_id == int(self.active_product_id)
+                )
+            ).all()
             opp_dict = {opp.id: opp for opp in opportunities}
-            
+
             # 1. BULLETPROOF FLATTENING (Handles Cycles & Orphans)
             opp_children_map = {}
             opp_top_level = []
-            
+
             for opp in opportunities:
                 # Only treat as a child if the parent actually exists in the DB
                 if opp.parent_id and opp.parent_id in opp_dict:
@@ -65,11 +70,12 @@ class LedgerStateMixin(rx.State, mixin=True):
 
             flat_opps: list[tuple[Opportunity, int]] = []
             visited_nodes = set()
-            
+
             def append_opp_children(opp_id: int, current_level: int) -> None:
-                if opp_id in visited_nodes: return # Break infinite loops
+                if opp_id in visited_nodes:
+                    return  # Break infinite loops
                 visited_nodes.add(opp_id)
-                
+
                 if opp_id in opp_children_map:
                     for child in opp_children_map[opp_id]:
                         if child.id not in visited_nodes:
@@ -81,7 +87,7 @@ class LedgerStateMixin(rx.State, mixin=True):
                 if opp.id not in visited_nodes:
                     flat_opps.append((opp, 0))
                     append_opp_children(opp.id, 1)
-                    
+
             # RECOVERY: If any nodes are left over (they are trapped in a cycle A->B->A),
             # force them to render at the top level so they don't disappear from the UI!
             for opp in opportunities:
@@ -120,9 +126,7 @@ class LedgerStateMixin(rx.State, mixin=True):
                     affected_personas.add(persona.name)
                     personas_set.add(persona.name)
 
-                    color_index = sum(ord(c) for c in persona.name) % len(
-                        safe_colors
-                    )
+                    color_index = sum(ord(c) for c in persona.name) % len(safe_colors)
                     p_color = safe_colors[color_index]
 
                     evidence_list.append(
@@ -255,9 +259,10 @@ class LedgerStateMixin(rx.State, mixin=True):
 
             # Generate choices for the Parent Select dropdown
             self.parent_opp_choices = ["None"] + [
-                f"{item.opportunity_id} - {item.opportunity[:50]}..." for item in new_ledger
+                f"{item.opportunity_id} - {item.opportunity[:50]}..."
+                for item in new_ledger
             ]
-            
+
             self.available_personas = list(personas_set)
             if self.available_personas and not self.target_persona:
                 self.target_persona = self.available_personas[0]
@@ -366,9 +371,7 @@ class LedgerStateMixin(rx.State, mixin=True):
                 new_sol = Solution(
                     opportunity_id=opportunity_id,
                     parent_id=(
-                        self.target_parent_id
-                        if self.target_parent_id != -1
-                        else None
+                        self.target_parent_id if self.target_parent_id != -1 else None
                     ),
                     name=self.new_solution_name.strip(),
                     description=self.new_solution_desc.strip(),
@@ -385,85 +388,6 @@ class LedgerStateMixin(rx.State, mixin=True):
         self.load_ledger()
         self._sync_drawer()
 
-    def generate_competing_solutions(self, opportunity_id: int):
-        """Uses Gemini to read the evidence and propose distinct solutions."""
-        from .core import load_prompt, flash_model, genai  # <-- Added genai here!
-
-        self.is_generating_solutions = True
-        yield
-        try:
-            with rx.session() as session:
-                opp = session.get(Opportunity, opportunity_id)
-                if not opp:
-                    return
-
-                links = session.exec(
-                    select(InterviewOpportunityLink).where(
-                        InterviewOpportunityLink.opportunity_id == opportunity_id
-                    )
-                ).all()
-                evidence_texts = [link.source_quote for link in links]
-                context = "\n".join(evidence_texts)
-
-                prompt_template = load_prompt("solutions.txt")
-                prompt = prompt_template.format(
-                    opportunity_statement=opp.statement,
-                    context=context,
-                )
-
-                # 1. FORCE STRICT JSON MODE
-                response = flash_model.generate_content(
-                    prompt,
-                    generation_config=genai.GenerationConfig(
-                        response_mime_type="application/json"
-                    )
-                )
-                
-                # 2. Clean markdown wrappers just in case
-                cleaned_response = response.text.replace("```json", "").replace("```", "").strip()
-                solutions_data = json.loads(cleaned_response)
-
-                # 3. SAFETY NET: If Gemini wrapped the list in a dict (e.g. {"solutions": [...]})
-                if isinstance(solutions_data, dict):
-                    # Find the first array inside the dictionary and extract it
-                    for val in solutions_data.values():
-                        if isinstance(val, list):
-                            solutions_data = val
-                            break
-                    else:
-                        solutions_data = [solutions_data] # Fallback
-                        
-                # 4. SAFETY NET: If Gemini returned a raw string somehow
-                if not isinstance(solutions_data, list):
-                    solutions_data = []
-
-                # 5. Extract keys safely, ignoring case variations
-                for s_data in solutions_data:
-                    if isinstance(s_data, str):
-                        name = s_data
-                        desc = "No description provided."
-                    else:
-                        # Case-insensitive key fetching to prevent KeyErrors
-                        name = s_data.get("name", s_data.get("Name", s_data.get("title", "Untitled Idea")))
-                        desc = s_data.get("description", s_data.get("Description", s_data.get("desc", "No description")))
-
-                    new_sol = Solution(
-                        opportunity_id=opportunity_id,
-                        name=str(name),
-                        description=str(desc),
-                    )
-                    session.add(new_sol)
-                session.commit()
-
-            self.load_ledger()
-            self._sync_drawer()
-
-        except Exception as e:
-            # Added repr() so if it fails, it prints the EXACT error type
-            print(f"Failed to generate solutions: {repr(e)}") 
-        finally:
-            self.is_generating_solutions = False
-
     # Outcomes
     def create_outcome(self):
         """Creates a new top-level business outcome."""
@@ -473,6 +397,7 @@ class LedgerStateMixin(rx.State, mixin=True):
             new_out = Outcome(
                 name=self.new_outcome_name.strip(),
                 description="",
+                product_id=int(self.active_product_id),
             )
             session.add(new_out)
             session.commit()
@@ -495,9 +420,7 @@ class LedgerStateMixin(rx.State, mixin=True):
         self.selected_opp_outcome_name = outcome_name
         opp_id = self.selected_opportunity.opportunity_id
 
-        selected_out = next(
-            (o for o in self.outcomes if o.name == outcome_name), None
-        )
+        selected_out = next((o for o in self.outcomes if o.name == outcome_name), None)
 
         with rx.session() as session:
             existing_links = session.exec(
@@ -538,11 +461,13 @@ class LedgerStateMixin(rx.State, mixin=True):
     def close_opp_dialog(self):
         self.is_opp_dialog_open = False
 
-    def start_edit_opportunity(self, opp_id: int, theme: str, statement: str, parent_id: int):
+    def start_edit_opportunity(
+        self, opp_id: int, theme: str, statement: str, parent_id: int
+    ):
         self.editing_opp_id = opp_id
         self.manual_opp_theme = theme
         self.manual_opp_statement = statement
-        
+
         # Match the parent ID to the string choice
         self.manual_opp_parent_id = "None"
         if parent_id != -1:
@@ -550,7 +475,7 @@ class LedgerStateMixin(rx.State, mixin=True):
                 if choice.startswith(f"{parent_id} -"):
                     self.manual_opp_parent_id = choice
                     break
-                    
+
         self.is_opp_dialog_open = True
 
     def save_manual_opportunity(self):
@@ -572,7 +497,11 @@ class LedgerStateMixin(rx.State, mixin=True):
             # Check if we are setting a new parent to inherit outcomes
             parent_outcome_ids = []
             if parent_id_val:
-                parent_links = session.exec(select(OutcomeOpportunityLink).where(OutcomeOpportunityLink.opportunity_id == parent_id_val)).all()
+                parent_links = session.exec(
+                    select(OutcomeOpportunityLink).where(
+                        OutcomeOpportunityLink.opportunity_id == parent_id_val
+                    )
+                ).all()
                 parent_outcome_ids = [link.outcome_id for link in parent_links]
 
             if self.editing_opp_id != -1:
@@ -582,12 +511,20 @@ class LedgerStateMixin(rx.State, mixin=True):
                     opp.statement = self.manual_opp_statement.strip()
                     opp.parent_id = parent_id_val
                     session.add(opp)
-                    
+
                     # Inherit outcomes if we just assigned a parent and it currently has none
-                    existing_outcomes = session.exec(select(OutcomeOpportunityLink).where(OutcomeOpportunityLink.opportunity_id == opp.id)).all()
+                    existing_outcomes = session.exec(
+                        select(OutcomeOpportunityLink).where(
+                            OutcomeOpportunityLink.opportunity_id == opp.id
+                        )
+                    ).all()
                     if len(existing_outcomes) == 0 and parent_outcome_ids:
                         for out_id in parent_outcome_ids:
-                            session.add(OutcomeOpportunityLink(opportunity_id=opp.id, outcome_id=out_id))
+                            session.add(
+                                OutcomeOpportunityLink(
+                                    opportunity_id=opp.id, outcome_id=out_id
+                                )
+                            )
             else:
                 new_opp = Opportunity(
                     theme=self.manual_opp_theme.strip() or "Uncategorized",
@@ -597,11 +534,15 @@ class LedgerStateMixin(rx.State, mixin=True):
                 session.add(new_opp)
                 session.commit()
                 session.refresh(new_opp)
-                
+
                 # Automatically inherit outcomes from parent on creation
                 for out_id in parent_outcome_ids:
-                    session.add(OutcomeOpportunityLink(opportunity_id=new_opp.id, outcome_id=out_id))
-                    
+                    session.add(
+                        OutcomeOpportunityLink(
+                            opportunity_id=new_opp.id, outcome_id=out_id
+                        )
+                    )
+
             session.commit()
 
         self.close_opp_dialog()
@@ -661,13 +602,8 @@ class LedgerStateMixin(rx.State, mixin=True):
     # Evidence mapping
     def add_real_evidence(self, opportunity_id: int):
         """Links a missed quote from a real interview to this opportunity."""
-        if (
-            not self.selected_interview_choice
-            or not self.manual_quote_text.strip()
-        ):
-            return rx.window_alert(
-                "Please select an interview and enter a quote."
-            )
+        if not self.selected_interview_choice or not self.manual_quote_text.strip():
+            return rx.window_alert("Please select an interview and enter a quote.")
 
         try:
             inv_id = int(self.selected_interview_choice.split(" - ")[0])
@@ -675,9 +611,7 @@ class LedgerStateMixin(rx.State, mixin=True):
             return rx.window_alert("Invalid interview selection.")
 
         with rx.session() as session:
-            existing = session.get(
-                InterviewOpportunityLink, (inv_id, opportunity_id)
-            )
+            existing = session.get(InterviewOpportunityLink, (inv_id, opportunity_id))
             if existing:
                 return rx.window_alert(
                     "This interview is already linked here. Edit the transcript instead."
@@ -699,13 +633,10 @@ class LedgerStateMixin(rx.State, mixin=True):
     def delete_evidence(self, opportunity_id: int, interview_id: int):
         """Unlinks an interview quote from an opportunity."""
         with rx.session() as session:
-            link = session.get(
-                InterviewOpportunityLink, (interview_id, opportunity_id)
-            )
+            link = session.get(InterviewOpportunityLink, (interview_id, opportunity_id))
             if link:
                 session.delete(link)
                 session.commit()
 
         self.load_ledger()
         self._sync_drawer()
-

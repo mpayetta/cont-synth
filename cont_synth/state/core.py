@@ -23,6 +23,11 @@ def load_prompt(filename: str) -> str:
 
 
 # --- UI DATA MODELS ---
+class ProductItem(rx.Base):
+    id: int
+    name: str
+
+
 class PersonaBadge(rx.Base):
     name: str
     color: str
@@ -58,8 +63,8 @@ class InterviewHistoryItem(rx.Base):
 
 class LedgerItem(rx.Base):
     opportunity_id: int
-    parent_id: int = -1     
-    indent_level: int = 0   
+    parent_id: int = -1
+    indent_level: int = 0
     theme: str
     personas_affected: list[PersonaBadge]
     opportunity: str
@@ -92,5 +97,5 @@ __all__ = [
     "InterviewHistoryItem",
     "LedgerItem",
     "PersonaPrep",
+    "ProductItem",
 ]
-

@@ -33,7 +33,7 @@ class InterviewStateMixin(rx.State, mixin=True):
     def load_history(self):
         """Loads all past interviews for the management tab."""
         with rx.session() as session:
-            interviews = session.exec(select(Interview)).all()
+            interviews = session.exec(select(Interview).where(Interview.product_id == int(self.active_product_id))).all()
             history: list[InterviewHistoryItem] = []
             for inv in interviews:
                 persona = session.get(Persona, inv.persona_id)
@@ -154,13 +154,14 @@ class InterviewStateMixin(rx.State, mixin=True):
                         "feedback", "No feedback generated."
                     ),
                     memorable_quote=result["memorable_quote"],
+                    product_id=int(self.active_product_id),
                 )
                 session.add(interview)
                 session.commit()
                 session.refresh(interview)
 
                 # 2. Fetch all existing Master Opportunities
-                existing_opps = session.exec(select(Opportunity)).all()
+                existing_opps = session.exec(select(Opportunity).where(Opportunity.product_id == int(self.active_product_id))).all()
                 existing_opps_dict = {opp.id: opp.statement for opp in existing_opps}
 
                 matched_results: list[dict] = []
@@ -235,6 +236,7 @@ class InterviewStateMixin(rx.State, mixin=True):
                         master_opp = Opportunity(
                             theme=item["theme"],
                             statement=item["new_opportunity_statement"],
+                            product_id=int(self.active_product_id),
                         )
                         session.add(master_opp)
                         session.commit()

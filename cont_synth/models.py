@@ -4,11 +4,17 @@ from datetime import datetime, timezone
 from typing import Optional
 
 
+class Product(rx.Model, table=True):
+    name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class Persona(rx.Model, table=True):
     name: str = Field(unique=True, index=True)
 
 
 class Interview(rx.Model, table=True):
+    product_id: int | None = Field(default=1, foreign_key="product.id")
     persona_id: int = Field(foreign_key="persona.id")
     transcript: str
     quality_score: int
@@ -20,6 +26,7 @@ class Interview(rx.Model, table=True):
 class Opportunity(rx.Model, table=True):
     """The Master Opportunity that spans multiple interviews/personas."""
 
+    product_id: int | None = Field(default=1, foreign_key="product.id") 
     theme: str = Field(default="Uncategorized")
     statement: str
     parent_id: int | None = Field(
@@ -42,6 +49,7 @@ class InterviewOpportunityLink(rx.Model, table=True):
 class Outcome(rx.Model, table=True):
     """The root of the tree: The business or product goal we are driving."""
 
+    product_id: int | None = Field(default=1, foreign_key="product.id")
     name: str
     description: str
     target_metric: str = ""  # e.g., "Reduce churn by 5%"

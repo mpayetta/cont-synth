@@ -8,6 +8,7 @@ from .core import (
     InterviewHistoryItem,
     LedgerItem,
     PersonaPrep,
+    ProductItem,
 )
 from .navigation import NavigationStateMixin
 from .interviews import InterviewStateMixin
@@ -24,6 +25,12 @@ class State(
 
     # --- Navigation ---
     current_view: str = "synthesize"
+
+    # --- Products ---
+    products: list[ProductItem] = []
+    active_product_id: str = "1"
+    new_product_name: str = ""
+    edit_product_name: str = ""
 
     # --- Interview & prep state ---
     is_processing: bool = False
