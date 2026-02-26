@@ -28,8 +28,6 @@ class InterviewOpportunityLink(rx.Model, table=True):
     opportunity_id: int = Field(foreign_key="opportunity.id", primary_key=True)
     source_quote: str
 
-# --- NEW OST DATABASE MODELS ---
-
 class Outcome(rx.Model, table=True):
     """The root of the tree: The business or product goal we are driving."""
     name: str

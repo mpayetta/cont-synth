@@ -103,6 +103,254 @@ def show_ledger_row(item: LedgerItem):
         style=rx.cond(item.is_cross_functional, {"backgroundColor": "var(--amber-2)"}, {})
     )
 
+# --- OPPORTUNITY DRAWER SUBSECTIONS ---
+def render_drawer_header() -> rx.Component:
+    return rx.vstack(
+        rx.flex(
+            rx.badge(
+                State.selected_opportunity.theme,
+                color_scheme="gray",
+                variant="solid",
+                size="3",
+            ),
+            rx.drawer.close(
+                rx.button(
+                    rx.icon("x", size=18),
+                    variant="ghost",
+                    color_scheme="gray",
+                    on_click=State.close_drawer,
+                )
+            ),
+            justify="between",
+            width="100%",
+            align="center",
+        ),
+        rx.text(
+            State.selected_opportunity.opportunity,
+            weight="bold",
+            size="6",
+            margin_top="2",
+            margin_bottom="4",
+        ),
+        width="100%",
+    )
+
+
+def render_primary_outcome_mapping() -> rx.Component:
+    return rx.box(
+        rx.text(
+            "Primary Business Outcome:",
+            size="1",
+            weight="bold",
+            color="gray",
+            margin_bottom="8px",
+        ),
+        rx.cond(
+            State.outcomes.length() == 0,
+            rx.text(
+                "No outcomes defined yet. Create one in the Global Ledger.",
+                size="1",
+                color="gray",
+            ),
+            rx.select(
+                State.selectable_outcomes,
+                placeholder="Select an Outcome...",
+                value=State.selected_opp_outcome_name,
+                on_change=State.set_primary_outcome,
+                size="2",
+                width="100%",
+            ),
+        ),
+        padding="12px",
+        background_color="var(--gray-3)",
+        border_radius="6px",
+        margin_bottom="6",
+        width="100%",
+    )
+
+
+def render_evidence_tab() -> rx.Component:
+    return rx.tabs.content(
+        rx.vstack(
+            rx.flex(
+                rx.cond(
+                    State.selected_opportunity.evidence.length() > 0,
+                    rx.foreach(State.selected_opportunity.evidence, render_quote),
+                    rx.text("No evidence logged yet.", color="gray", size="2"),
+                ),
+                direction="column",
+                spacing="4",
+                width="100%",
+                margin_top="8px",
+            ),
+            rx.box(
+                rx.vstack(
+                    rx.text("🔗 Map Missed Evidence", size="2", weight="bold", color="gray"),
+                    rx.select(
+                        State.interview_choices,
+                        value=State.selected_interview_choice,
+                        on_change=State.set_selected_interview_choice,
+                        placeholder="Select Source Interview...",
+                        width="100%",
+                    ),
+                    rx.text_area(
+                        placeholder="Paste the exact verbatim quote here...",
+                        value=State.manual_quote_text,
+                        on_change=State.set_manual_quote_text,
+                        width="100%",
+                    ),
+                    rx.button(
+                        "Map Evidence",
+                        on_click=lambda: State.add_real_evidence(
+                            State.selected_opportunity.opportunity_id
+                        ),
+                        color_scheme="blue",
+                        variant="soft",
+                        width="100%",
+                    ),
+                    spacing="3",
+                ),
+                padding="16px",
+                background_color="var(--gray-3)",
+                border_radius="8px",
+                margin_top="6",
+                width="100%",
+            ),
+            width="100%",
+            margin_top="4",
+            padding_bottom="40px",
+        ),
+        value="evidence",
+    )
+
+
+def render_solutions_tab() -> rx.Component:
+    return rx.tabs.content(
+        rx.vstack(
+            rx.flex(
+                rx.cond(
+                    State.selected_opportunity.solutions.length() > 0,
+                    rx.foreach(State.selected_opportunity.solutions, render_solution),
+                    rx.text("No solutions brainstormed yet.", color="gray", size="2"),
+                ),
+                direction="column",
+                spacing="4",
+                width="100%",
+                margin_top="8px",
+            ),
+            rx.box(
+                rx.vstack(
+                    rx.text(
+                        rx.cond(
+                            State.editing_solution_id != -1,
+                            "✏️ Editing Solution",
+                            rx.cond(
+                                State.target_parent_id != -1,
+                                f"🌿 Branching under: {State.target_parent_name}",
+                                "💡 Ideate Top-Level Solution",
+                            ),
+                        ),
+                        size="2",
+                        weight="bold",
+                        color=rx.cond(
+                            State.target_parent_id != -1, "var(--green-11)", "gray"
+                        ),
+                    ),
+                    rx.input(
+                        placeholder="Solution Name",
+                        value=State.new_solution_name,
+                        on_change=State.set_new_solution_name,
+                        width="100%",
+                    ),
+                    rx.text_area(
+                        placeholder="Description",
+                        value=State.new_solution_desc,
+                        on_change=State.set_new_solution_desc,
+                        width="100%",
+                    ),
+                    rx.flex(
+                        rx.flex(
+                            rx.button(
+                                rx.cond(
+                                    State.editing_solution_id != -1,
+                                    "Update Idea",
+                                    rx.cond(
+                                        State.target_parent_id != -1,
+                                        "Save Sub-Solution",
+                                        "Save Idea",
+                                    ),
+                                ),
+                                on_click=lambda: State.add_manual_solution(
+                                    State.selected_opportunity.opportunity_id
+                                ),
+                                color_scheme="green",
+                                variant="solid",
+                            ),
+                            rx.cond(
+                                (State.editing_solution_id != -1)
+                                | (State.target_parent_id != -1),
+                                rx.button(
+                                    "Cancel & Return to Top-Level",
+                                    on_click=State.cancel_edit,
+                                    color_scheme="gray",
+                                    variant="soft",
+                                ),
+                                rx.fragment(),
+                            ),
+                            spacing="2",
+                        ),
+                        rx.cond(
+                            (State.editing_solution_id == -1)
+                            & (State.target_parent_id == -1),
+                            rx.button(
+                                rx.icon("sparkles", size=14),
+                                "AI Brainstorm",
+                                on_click=lambda: State.generate_competing_solutions(
+                                    State.selected_opportunity.opportunity_id
+                                ),
+                                loading=State.is_generating_solutions,
+                                color_scheme="amber",
+                                variant="soft",
+                            ),
+                            rx.fragment(),
+                        ),
+                        justify="between",
+                        width="100%",
+                    ),
+                    spacing="3",
+                ),
+                padding="16px",
+                background_color="var(--gray-3)",
+                border_radius="8px",
+                margin_top="6",
+                width="100%",
+            ),
+            width="100%",
+            margin_top="4",
+            padding_bottom="40px",
+        ),
+        value="solutions",
+    )
+
+
+def render_drawer_tabs() -> rx.Component:
+    return rx.tabs.root(
+        rx.tabs.list(
+            rx.tabs.trigger("Verbatim Evidence", value="evidence"),
+            rx.tabs.trigger("Solutions Backlog", value="solutions"),
+            rx.tabs.trigger(
+                "Experiments (Soon)", value="experiments", disabled=True
+            ),
+            width="100%",
+        ),
+        render_evidence_tab(),
+        render_solutions_tab(),
+        default_value="evidence",
+        margin_top="4",
+        width="100%",
+    )
+
+
 # --- MAIN COMPONENTS ---
 def opportunity_drawer() -> rx.Component:
     """The master workspace for a single opportunity."""
@@ -113,156 +361,9 @@ def opportunity_drawer() -> rx.Component:
                 State.is_drawer_open,
                 rx.box(
                     rx.vstack(
-                        # --- DRAWER HEADER ---
-                        rx.flex(
-                            rx.badge(State.selected_opportunity.theme, color_scheme="gray", variant="solid", size="3"),
-                            rx.drawer.close(rx.button(rx.icon("x", size=18), variant="ghost", color_scheme="gray", on_click=State.close_drawer)),
-                            justify="between", width="100%", align="center"
-                        ),
-                        rx.text(State.selected_opportunity.opportunity, weight="bold", size="6", margin_top="2", margin_bottom="4"),
-                        
-                        # --- PRIMARY OUTCOME MAPPING ---
-                        rx.box(
-                            rx.text("Primary Business Outcome:", size="1", weight="bold", color="gray", margin_bottom="8px"),
-                            rx.cond(
-                                State.outcomes.length() == 0,
-                                rx.text("No outcomes defined yet. Create one in the Global Ledger.", size="1", color="gray"),
-                                rx.select(
-                                    State.selectable_outcomes,
-                                    placeholder="Select an Outcome...",
-                                    value=State.selected_opp_outcome_name,
-                                    on_change=State.set_primary_outcome,
-                                    size="2", width="100%"
-                                )
-                            ),
-                            padding="12px", background_color="var(--gray-3)", border_radius="6px", margin_bottom="6", width="100%"
-                        ),
-                        
-                        # --- INTERNAL TABS (The Tree Workspace) ---
-                        rx.tabs.root(
-                            rx.tabs.list(
-                                rx.tabs.trigger("Verbatim Evidence", value="evidence"),
-                                rx.tabs.trigger("Solutions Backlog", value="solutions"),
-                                rx.tabs.trigger("Experiments (Soon)", value="experiments", disabled=True), 
-                                width="100%"
-                            ),
-                            
-                            # TAB A: EVIDENCE
-                            rx.tabs.content(
-                                rx.vstack(
-                                    # The Evidence List
-                                    rx.flex(
-                                        rx.cond(
-                                            State.selected_opportunity.evidence.length() > 0,
-                                            rx.foreach(State.selected_opportunity.evidence, render_quote),
-                                            rx.text("No evidence logged yet.", color="gray", size="2")
-                                        ),
-                                        direction="column", spacing="4", width="100%", margin_top="8px"
-                                    ),
-                                    
-                                    # The Real Evidence Mapping Engine
-                                    rx.box(
-                                        rx.vstack(
-                                            rx.text("🔗 Map Missed Evidence", size="2", weight="bold", color="gray"),
-                                            
-                                            # Dropdown containing real interviews from the DB
-                                            rx.select(
-                                                State.interview_choices, 
-                                                value=State.selected_interview_choice, 
-                                                on_change=State.set_selected_interview_choice, 
-                                                placeholder="Select Source Interview...",
-                                                width="100%"
-                                            ),
-                                            
-                                            rx.text_area(
-                                                placeholder='Paste the exact verbatim quote here...', 
-                                                value=State.manual_quote_text, 
-                                                on_change=State.set_manual_quote_text, 
-                                                width="100%"
-                                            ),
-                                            
-                                            rx.button(
-                                                "Map Evidence", 
-                                                on_click=lambda: State.add_real_evidence(State.selected_opportunity.opportunity_id), 
-                                                color_scheme="blue", variant="soft", width="100%"
-                                            ),
-                                            spacing="3"
-                                        ),
-                                        padding="16px", background_color="var(--gray-3)", border_radius="8px", margin_top="6", width="100%"
-                                    ),
-                                    width="100%", margin_top="4", padding_bottom="40px" 
-                                ),
-                                value="evidence"
-                            ),
-                            
-                            # TAB B: SOLUTIONS
-                            rx.tabs.content(
-                                rx.vstack(
-                                    # The Solutions List
-                                    rx.flex(
-                                        rx.cond(
-                                            State.selected_opportunity.solutions.length() > 0,
-                                            rx.foreach(State.selected_opportunity.solutions, render_solution),
-                                            rx.text("No solutions brainstormed yet.", color="gray", size="2")
-                                        ),
-                                        direction="column", spacing="4", width="100%", margin_top="8px"
-                                    ),
-                                    
-                                    # The Ideation & Editing Engine
-                                    rx.box(
-                                        rx.vstack(
-                                            # DYNAMIC TITLE
-                                            rx.text(
-                                                rx.cond(
-                                                    State.editing_solution_id != -1, "✏️ Editing Solution", 
-                                                    rx.cond(
-                                                        State.target_parent_id != -1, 
-                                                        f"🌿 Branching under: {State.target_parent_name}", # <--- EXPLICIT NAMING
-                                                        "💡 Ideate Top-Level Solution"
-                                                    )
-                                                ), 
-                                                size="2", weight="bold", 
-                                                color=rx.cond(State.target_parent_id != -1, "var(--green-11)", "gray")
-                                            ),
-                                            
-                                            rx.input(placeholder="Solution Name", value=State.new_solution_name, on_change=State.set_new_solution_name, width="100%"),
-                                            rx.text_area(placeholder="Description", value=State.new_solution_desc, on_change=State.set_new_solution_desc, width="100%"),
-                                            
-                                            rx.flex(
-                                                rx.flex(
-                                                    # DYNAMIC SAVE BUTTON
-                                                    rx.button(
-                                                        rx.cond(State.editing_solution_id != -1, "Update Idea", rx.cond(State.target_parent_id != -1, "Save Sub-Solution", "Save Idea")), 
-                                                        on_click=lambda: State.add_manual_solution(State.selected_opportunity.opportunity_id), 
-                                                        color_scheme="green", variant="solid"
-                                                    ),
-                                                    # EXPLICIT CANCEL BUTTON
-                                                    rx.cond(
-                                                        (State.editing_solution_id != -1) | (State.target_parent_id != -1),
-                                                        rx.button("Cancel & Return to Top-Level", on_click=State.cancel_edit, color_scheme="gray", variant="soft"),
-                                                        rx.fragment()
-                                                    ),
-                                                    spacing="2"
-                                                ),
-                                                
-                                                # AI BUTTON (Hide when branching or editing)
-                                                rx.cond(
-                                                    (State.editing_solution_id == -1) & (State.target_parent_id == -1),
-                                                    rx.button(rx.icon("sparkles", size=14), "AI Brainstorm", on_click=lambda: State.generate_competing_solutions(State.selected_opportunity.opportunity_id), loading=State.is_generating_solutions, color_scheme="amber", variant="soft"),
-                                                    rx.fragment()
-                                                ),
-                                                justify="between", width="100%"
-                                            ),
-                                            spacing="3"
-                                        ),
-                                        padding="16px", background_color="var(--gray-3)", border_radius="8px", margin_top="6", width="100%"
-                                    ),
-                                    width="100%", margin_top="4", padding_bottom="40px" 
-                                ),
-                                value="solutions"
-                            ),
-                            default_value="evidence", margin_top="4", width="100%"
-                        ),
+                        render_drawer_header(),
+                        render_primary_outcome_mapping(),
+                        render_drawer_tabs(),
                         width="100%", padding="24px"
                     ),
                     height="100vh", width="600px", max_width="90vw", bg="var(--gray-1)", position="fixed", top="0", right="0", overflow_y="auto", box_shadow="-10px 0 30px rgba(0,0,0,0.1)"
