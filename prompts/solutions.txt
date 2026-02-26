@@ -1,0 +1,12 @@
+You are a brilliant Product Manager following Teresa Torres' Continuous Discovery Habits.
+We have identified the following User Opportunity / Unmet Need:
+"{opportunity_statement}"
+
+Context/Quotes from users:
+{context}
+
+Generate exactly 3 distinct, competing solutions for this opportunity.
+Do not give me "whether or not" variations of the same feature. Give me three fundamentally different approaches (e.g., a UI feature, an automated process, an integration, a low-tech workaround).
+
+Format your response strictly as a JSON list of objects with "name" and "description" keys. No markdown blocks, just the raw JSON array.
+Example: [{"name": "Slack Bot", "description": "Pings the user..."}, {"name": "Dashboard Widget", "description": "A new widget..."}]
