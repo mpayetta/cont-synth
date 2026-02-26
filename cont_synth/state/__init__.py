@@ -60,7 +60,9 @@ class State(
     editing_opp_id: int = -1
     manual_opp_theme: str = "Uncategorized"
     manual_opp_statement: str = ""
+    manual_opp_parent_id: str = "None"
     is_opp_dialog_open: bool = False
+    parent_opp_choices: list[str] = []
 
     # --- Evidence tracking ---
     interview_choices: list[str] = []
@@ -93,4 +95,3 @@ __all__ = [
     "LedgerItem",
     "PersonaPrep",
 ]
-

@@ -12,7 +12,6 @@ from ..models import (
     Persona,
     Interview,
     Opportunity,
-    InterviewOpportunityLink,
 )
 from .core import (
     InterviewHistoryItem,
@@ -44,9 +43,7 @@ class InterviewStateMixin(rx.State, mixin=True):
                     else "Unknown"
                 )
                 snippet = (
-                    inv.transcript[:80] + "..."
-                    if inv.transcript
-                    else "No transcript."
+                    inv.transcript[:80] + "..." if inv.transcript else "No transcript."
                 )
                 history.append(
                     InterviewHistoryItem(
@@ -110,9 +107,7 @@ class InterviewStateMixin(rx.State, mixin=True):
                 )
             elif filename.endswith(".docx"):
                 doc = docx.Document(io.BytesIO(upload_data))
-                self.transcript_text = "\n".join(
-                    para.text for para in doc.paragraphs
-                )
+                self.transcript_text = "\n".join(para.text for para in doc.paragraphs)
             else:
                 self.transcript_text = upload_data.decode("utf-8")
         except Exception as e:  # pragma: no cover - UI alert path
@@ -121,9 +116,7 @@ class InterviewStateMixin(rx.State, mixin=True):
     def run_synthesis(self):
         """Runs Gemini-based synthesis and opportunity dedupe."""
         if not self.transcript_text.strip() or not self.persona_input.strip():
-            return rx.window_alert(
-                "Error: Both Persona and Transcript are required."
-            )
+            return rx.window_alert("Error: Both Persona and Transcript are required.")
 
         self.is_processing = True
         yield
@@ -156,9 +149,7 @@ class InterviewStateMixin(rx.State, mixin=True):
                 interview = Interview(
                     persona_id=persona.id,
                     transcript=self.transcript_text[:500] + "...[TRUNCATED]",
-                    quality_score=result.get("quality_check", {}).get(
-                        "score", 0
-                    ),
+                    quality_score=result.get("quality_check", {}).get("score", 0),
                     feedback=result.get("quality_check", {}).get(
                         "feedback", "No feedback generated."
                     ),
@@ -170,9 +161,7 @@ class InterviewStateMixin(rx.State, mixin=True):
 
                 # 2. Fetch all existing Master Opportunities
                 existing_opps = session.exec(select(Opportunity)).all()
-                existing_opps_dict = {
-                    opp.id: opp.statement for opp in existing_opps
-                }
+                existing_opps_dict = {opp.id: opp.statement for opp in existing_opps}
 
                 matched_results: list[dict] = []
 
@@ -189,9 +178,7 @@ class InterviewStateMixin(rx.State, mixin=True):
                         )
                 else:
                     dedupe_template = load_prompt("dedupe.txt")
-                    new_opps_list = [
-                        o["opportunity_statement"] for o in new_opps
-                    ]
+                    new_opps_list = [o["opportunity_statement"] for o in new_opps]
 
                     dedupe_prompt = dedupe_template.format(
                         existing_opps_dict=existing_opps_dict,
@@ -222,11 +209,7 @@ class InterviewStateMixin(rx.State, mixin=True):
                             if original_opp
                             else "No quote found."
                         )
-                        theme = (
-                            original_opp["theme"]
-                            if original_opp
-                            else "General"
-                        )
+                        theme = original_opp["theme"] if original_opp else "General"
 
                         matched_results.append(
                             {
@@ -234,9 +217,7 @@ class InterviewStateMixin(rx.State, mixin=True):
                                 "new_opportunity_statement": match[
                                     "new_opportunity_statement"
                                 ],
-                                "matched_existing_id": match[
-                                    "matched_existing_id"
-                                ],
+                                "matched_existing_id": match["matched_existing_id"],
                                 "quote": quote,
                             }
                         )
@@ -248,9 +229,7 @@ class InterviewStateMixin(rx.State, mixin=True):
                     matched_id = item["matched_existing_id"]
                     if matched_id and matched_id in existing_opps_dict:
                         master_opp = session.get(Opportunity, matched_id)
-                        master_opp.date_last_validated = datetime.now(
-                            timezone.utc
-                        )
+                        master_opp.date_last_validated = datetime.now(timezone.utc)
                         session.add(master_opp)
                     else:
                         master_opp = Opportunity(
@@ -295,10 +274,7 @@ class InterviewStateMixin(rx.State, mixin=True):
         try:
             target_opps: list[str] = []
             for item in getattr(self, "ledger_data", []):
-                if any(
-                    p.name == self.target_persona
-                    for p in item.personas_affected
-                ):
+                if any(p.name == self.target_persona for p in item.personas_affected):
                     target_opps.append(item.opportunity)
 
             if not target_opps:
@@ -352,4 +328,3 @@ class InterviewStateMixin(rx.State, mixin=True):
             else:
                 self.prep_questions = ""
                 self.prep_last_updated = ""
-

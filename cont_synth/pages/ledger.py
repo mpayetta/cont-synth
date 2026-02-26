@@ -1,30 +1,49 @@
 import reflex as rx
 from cont_synth.state import State, LedgerItem, PersonaBadge, QuoteItem, SolutionItem
 
+
 # --- HELPER COMPONENTS ---
 def render_persona_badge(badge: PersonaBadge):
     """Helper to render individual persona pills."""
     return rx.badge(badge.name, color_scheme=badge.color, variant="soft")
+
 
 def render_quote(q: QuoteItem):
     """Renders a sleek card for an individual quote inside the modal."""
     return rx.card(
         rx.vstack(
             rx.flex(
-                rx.badge(q.persona_name, color_scheme=q.persona_color, variant="soft", size="2"),
+                rx.badge(
+                    q.persona_name,
+                    color_scheme=q.persona_color,
+                    variant="soft",
+                    size="2",
+                ),
                 # The Trash icon dynamically passes the current opportunity and the quote's interview ID
                 rx.icon_button(
-                    rx.icon("trash", size=14), 
-                    size="1", variant="ghost", color_scheme="red", 
-                    on_click=lambda: State.delete_evidence(State.selected_opportunity.opportunity_id, q.interview_id)
+                    rx.icon("trash", size=14),
+                    size="1",
+                    variant="ghost",
+                    color_scheme="red",
+                    on_click=lambda: State.delete_evidence(
+                        State.selected_opportunity.opportunity_id, q.interview_id
+                    ),
                 ),
-                justify="between", width="100%", align="center"
+                justify="between",
+                width="100%",
+                align="center",
             ),
-            rx.text(f'"{q.text}"', size="3", font_style="italic", color="var(--slate-11)"),
-            spacing="3"
+            rx.text(
+                f'"{q.text}"', size="3", font_style="italic", color="var(--slate-11)"
+            ),
+            spacing="3",
         ),
-        size="2", width="100%", variant="surface", flex_shrink="0"  
+        size="2",
+        width="100%",
+        variant="surface",
+        flex_shrink="0",
     )
+
 
 def render_solution(sol: SolutionItem):
     """Renders a sleek card for an individual solution idea with Edit/Branch controls."""
@@ -33,75 +52,157 @@ def render_solution(sol: SolutionItem):
             rx.vstack(
                 rx.flex(
                     rx.flex(
-                        rx.cond(sol.indent_level > 0, rx.icon("corner-down-right", size=14, color="var(--gray-8)"), rx.fragment()),
-                        rx.text(sol.name, weight="bold", size="3", color="var(--blue-11)"),
-                        spacing="2", align="center"
+                        rx.cond(
+                            sol.indent_level > 0,
+                            rx.icon(
+                                "corner-down-right", size=14, color="var(--gray-8)"
+                            ),
+                            rx.fragment(),
+                        ),
+                        rx.text(
+                            sol.name, weight="bold", size="3", color="var(--blue-11)"
+                        ),
+                        spacing="2",
+                        align="center",
                     ),
                     rx.flex(
-                        rx.badge(sol.status, color_scheme="blue", variant="soft", size="1"),
+                        rx.badge(
+                            sol.status, color_scheme="blue", variant="soft", size="1"
+                        ),
                         # --- FIX: Pass both the ID and the Name to the backend ---
-                        rx.icon_button(rx.icon("git-branch", size=14), size="1", variant="ghost", color_scheme="blue", on_click=lambda: State.set_target_parent(sol.id, sol.name)),
-                        rx.icon_button(rx.icon("pencil", size=14), size="1", variant="ghost", color_scheme="gray", on_click=lambda: State.start_edit_solution(sol)),
-                        rx.icon_button(rx.icon("trash", size=14), size="1", variant="ghost", color_scheme="red", on_click=lambda: State.delete_solution(sol.id)),
-                        spacing="2", align="center"
+                        rx.icon_button(
+                            rx.icon("git-branch", size=14),
+                            size="1",
+                            variant="ghost",
+                            color_scheme="blue",
+                            on_click=lambda: State.set_target_parent(sol.id, sol.name),
+                        ),
+                        rx.icon_button(
+                            rx.icon("pencil", size=14),
+                            size="1",
+                            variant="ghost",
+                            color_scheme="gray",
+                            on_click=lambda: State.start_edit_solution(sol),
+                        ),
+                        rx.icon_button(
+                            rx.icon("trash", size=14),
+                            size="1",
+                            variant="ghost",
+                            color_scheme="red",
+                            on_click=lambda: State.delete_solution(sol.id),
+                        ),
+                        spacing="2",
+                        align="center",
                     ),
-                    justify="between", width="100%"
+                    justify="between",
+                    width="100%",
                 ),
                 rx.text(sol.description, size="2", color="gray"),
-                spacing="2"
+                spacing="2",
             ),
-            size="2", width="100%", variant="surface",
-            
+            size="2",
+            width="100%",
+            variant="surface",
             # --- THE MAGIC: Add a green left-border highlight if this card is the active parent! ---
-            border_left=rx.cond(State.target_parent_id == sol.id, "4px solid var(--green-9)", "1px solid var(--gray-4)")
+            border_left=rx.cond(
+                State.target_parent_id == sol.id,
+                "4px solid var(--green-9)",
+                "1px solid var(--gray-4)",
+            ),
         ),
         width="100%",
-        padding_left=f"calc({sol.indent_level} * 30px)" 
+        padding_left=f"calc({sol.indent_level} * 30px)",
     )
+
 
 def show_ledger_row(item: LedgerItem):
     """Renders a single row in the Global Ledger table."""
     return rx.table.row(
-        rx.table.cell(rx.badge(item.theme, color_scheme="gray", variant="solid")),
-        rx.table.cell(rx.flex(rx.foreach(item.personas_affected, render_persona_badge), spacing="2", wrap="wrap")),
+        rx.table.cell(
+            rx.flex(
+                rx.cond(
+                    item.indent_level > 0,
+                    rx.icon(
+                        "corner-down-right",
+                        size=14,
+                        color="var(--gray-8)",
+                        margin_right="2",
+                    ),
+                    rx.fragment(),
+                ),
+                rx.badge(item.theme, color_scheme="gray", variant="solid"),
+                align="center",
+                padding_left=f"calc({item.indent_level} * 20px)",  # <--- Indent nested rows!
+            )
+        ),
+        rx.table.cell(
+            rx.flex(
+                rx.foreach(item.personas_affected, render_persona_badge),
+                spacing="2",
+                wrap="wrap",
+            )
+        ),
         rx.table.cell(
             rx.vstack(
                 rx.text(item.opportunity),
-                rx.cond(item.is_cross_functional, rx.badge("🌟 Cross-Persona Impact", color_scheme="amber", variant="soft", size="1"), rx.fragment()),
-                spacing="1"
+                rx.cond(
+                    item.is_cross_functional,
+                    rx.badge(
+                        "🌟 Cross-Persona Impact",
+                        color_scheme="amber",
+                        variant="soft",
+                        size="1",
+                    ),
+                    rx.fragment(),
+                ),
+                spacing="1",
             )
         ),
-        rx.table.cell(rx.badge(item.status, color_scheme=item.status_color, variant="soft", size="2")),
+        rx.table.cell(
+            rx.badge(
+                item.status, color_scheme=item.status_color, variant="soft", size="2"
+            )
+        ),
         rx.table.cell(item.days_old),
         # --- Action Buttons (Open Workspace + Edit + Delete) ---
         rx.table.cell(
             rx.flex(
                 rx.button(
-                    "Open", 
-                    variant="soft", 
-                    color_scheme="blue", 
-                    size="2", 
-                    on_click=lambda: State.open_drawer(item)
+                    "Open",
+                    variant="soft",
+                    color_scheme="blue",
+                    size="2",
+                    on_click=lambda: State.open_drawer(item),
                 ),
                 rx.icon_button(
-                    rx.icon("pencil", size=16), 
-                    variant="soft", 
-                    color_scheme="gray", 
-                    size="2", 
-                    on_click=lambda: State.start_edit_opportunity(item.opportunity_id, item.theme, item.opportunity)
+                    rx.icon("pencil", size=16),
+                    variant="soft",
+                    color_scheme="gray",
+                    size="2",
+                    # Pass the parent ID so it opens the dialog correctly
+                    on_click=lambda: State.start_edit_opportunity(
+                        item.opportunity_id,
+                        item.theme,
+                        item.opportunity,
+                        item.parent_id,
+                    ),
                 ),
                 rx.icon_button(
-                    rx.icon("trash", size=16), 
-                    variant="soft", 
-                    color_scheme="red", 
-                    size="2", 
-                    on_click=lambda: State.delete_opportunity(item.opportunity_id)
+                    rx.icon("trash", size=16),
+                    variant="soft",
+                    color_scheme="red",
+                    size="2",
+                    on_click=lambda: State.delete_opportunity(item.opportunity_id),
                 ),
-                spacing="2", align="center"
+                spacing="2",
+                align="center",
             )
         ),
-        style=rx.cond(item.is_cross_functional, {"backgroundColor": "var(--amber-2)"}, {})
+        style=rx.cond(
+            item.is_cross_functional, {"backgroundColor": "var(--amber-2)"}, {}
+        ),
     )
+
 
 # --- OPPORTUNITY DRAWER SUBSECTIONS ---
 def render_drawer_header() -> rx.Component:
@@ -185,7 +286,9 @@ def render_evidence_tab() -> rx.Component:
             ),
             rx.box(
                 rx.vstack(
-                    rx.text("🔗 Map Missed Evidence", size="2", weight="bold", color="gray"),
+                    rx.text(
+                        "🔗 Map Missed Evidence", size="2", weight="bold", color="gray"
+                    ),
                     rx.select(
                         State.interview_choices,
                         value=State.selected_interview_choice,
@@ -299,21 +402,6 @@ def render_solutions_tab() -> rx.Component:
                             ),
                             spacing="2",
                         ),
-                        rx.cond(
-                            (State.editing_solution_id == -1)
-                            & (State.target_parent_id == -1),
-                            rx.button(
-                                rx.icon("sparkles", size=14),
-                                "AI Brainstorm",
-                                on_click=lambda: State.generate_competing_solutions(
-                                    State.selected_opportunity.opportunity_id
-                                ),
-                                loading=State.is_generating_solutions,
-                                color_scheme="amber",
-                                variant="soft",
-                            ),
-                            rx.fragment(),
-                        ),
                         justify="between",
                         width="100%",
                     ),
@@ -338,9 +426,7 @@ def render_drawer_tabs() -> rx.Component:
         rx.tabs.list(
             rx.tabs.trigger("Verbatim Evidence", value="evidence"),
             rx.tabs.trigger("Solutions Backlog", value="solutions"),
-            rx.tabs.trigger(
-                "Experiments (Soon)", value="experiments", disabled=True
-            ),
+            rx.tabs.trigger("Experiments (Soon)", value="experiments", disabled=True),
             width="100%",
         ),
         render_evidence_tab(),
@@ -364,17 +450,27 @@ def opportunity_drawer() -> rx.Component:
                         render_drawer_header(),
                         render_primary_outcome_mapping(),
                         render_drawer_tabs(),
-                        width="100%", padding="24px"
+                        width="100%",
+                        padding="24px",
                     ),
-                    height="100vh", width="600px", max_width="90vw", bg="var(--gray-1)", position="fixed", top="0", right="0", overflow_y="auto", box_shadow="-10px 0 30px rgba(0,0,0,0.1)"
+                    height="100vh",
+                    width="600px",
+                    max_width="90vw",
+                    bg="var(--gray-1)",
+                    position="fixed",
+                    top="0",
+                    right="0",
+                    overflow_y="auto",
+                    box_shadow="-10px 0 30px rgba(0,0,0,0.1)",
                 ),
-                rx.fragment() 
+                rx.fragment(),
             )
         ),
         direction="right",
         open=State.is_drawer_open,
-        on_open_change=State.handle_drawer_change
+        on_open_change=State.handle_drawer_change,
     )
+
 
 def render_ledger() -> rx.Component:
     """The main view for the Global Ledger."""
@@ -383,75 +479,164 @@ def render_ledger() -> rx.Component:
         rx.flex(
             rx.box(
                 rx.text("The Single Source of Truth.", weight="bold", size="6"),
-                rx.text("Filter by business outcome to focus your Continuous Discovery efforts.", color="gray", size="3"),
+                rx.text(
+                    "Filter by business outcome to focus your Continuous Discovery efforts.",
+                    color="gray",
+                    size="3",
+                ),
             ),
             rx.flex(
-                rx.select(State.outcome_names, value=State.active_outcome_name, on_change=State.change_outcome_filter, size="3", width="250px"),
+                rx.select(
+                    State.outcome_names,
+                    value=State.active_outcome_name,
+                    on_change=State.change_outcome_filter,
+                    size="3",
+                    width="250px",
+                ),
                 rx.dialog.root(
-                    rx.dialog.trigger(rx.button("+ New Outcome", variant="soft", size="3")),
+                    rx.dialog.trigger(
+                        rx.button("+ New Outcome", variant="soft", size="3")
+                    ),
                     rx.dialog.content(
                         rx.dialog.title("Define Business Outcome"),
-                        rx.dialog.description("What metric are we trying to move?", margin_bottom="8px"),
-                        rx.input(placeholder="e.g., Increase Q3 Retention", value=State.new_outcome_name, on_change=State.set_new_outcome_name, margin_bottom="12px"),
-                        rx.flex(
-                            rx.dialog.close(rx.button("Cancel", variant="soft", color_scheme="gray")),
-                            rx.dialog.close(rx.button("Save Outcome", on_click=State.create_outcome, color_scheme="blue")),
-                            spacing="3", justify="end"
+                        rx.dialog.description(
+                            "What metric are we trying to move?", margin_bottom="8px"
                         ),
-                        max_width="450px"
-                    )
+                        rx.input(
+                            placeholder="e.g., Increase Q3 Retention",
+                            value=State.new_outcome_name,
+                            on_change=State.set_new_outcome_name,
+                            margin_bottom="12px",
+                        ),
+                        rx.flex(
+                            rx.dialog.close(
+                                rx.button("Cancel", variant="soft", color_scheme="gray")
+                            ),
+                            rx.dialog.close(
+                                rx.button(
+                                    "Save Outcome",
+                                    on_click=State.create_outcome,
+                                    color_scheme="blue",
+                                )
+                            ),
+                            spacing="3",
+                            justify="end",
+                        ),
+                        max_width="450px",
+                    ),
                 ),
-                spacing="3", align="center"
+                spacing="3",
+                align="center",
             ),
-            justify="between", width="100%", margin_bottom="10px", align="center"
+            justify="between",
+            width="100%",
+            margin_bottom="10px",
+            align="center",
         ),
         rx.divider(),
-        
         # --- Action Bar & Opportunity Form Dialog ---
         rx.flex(
-            rx.button("Refresh Global Ledger", on_click=State.load_ledger, size="2", variant="outline", color_scheme="gray"),
-            
+            rx.button(
+                "Refresh Global Ledger",
+                on_click=State.load_ledger,
+                size="2",
+                variant="outline",
+                color_scheme="gray",
+            ),
             rx.dialog.root(
                 rx.dialog.trigger(
-                    rx.button("+ New Opportunity", size="2", color_scheme="blue", variant="soft", on_click=State.open_opp_dialog)
+                    rx.button(
+                        "+ New Opportunity",
+                        size="2",
+                        color_scheme="blue",
+                        variant="soft",
+                        on_click=State.open_opp_dialog,
+                    )
                 ),
                 rx.dialog.content(
-                    rx.dialog.title(rx.cond(State.editing_opp_id != -1, "Edit Opportunity", "Create Manual Opportunity")),
-                    rx.dialog.description("Manually add or update an opportunity.", margin_bottom="8px"),
-                    
+                    rx.dialog.title(
+                        rx.cond(
+                            State.editing_opp_id != -1,
+                            "Edit Opportunity",
+                            "Create Manual Opportunity",
+                        )
+                    ),
+                    rx.dialog.description(
+                        "Manually add or update an opportunity.", margin_bottom="8px"
+                    ),
                     rx.vstack(
+                        rx.text("Parent Opportunity", size="2", weight="bold"),
+                        rx.select(
+                            State.parent_opp_choices,
+                            value=State.manual_opp_parent_id,
+                            on_change=State.set_manual_opp_parent_id,
+                            width="100%",
+                        ),
                         rx.text("Theme / Category", size="2", weight="bold"),
-                        rx.input(placeholder="e.g., Usability, Pricing...", value=State.manual_opp_theme, on_change=State.set_manual_opp_theme, width="100%"),
-                        
-                        rx.text("Opportunity Statement", size="2", weight="bold", margin_top="2"),
-                        rx.text_area(placeholder="I need a way to...", value=State.manual_opp_statement, on_change=State.set_manual_opp_statement, width="100%"),
-                        spacing="2", width="100%", margin_bottom="12px"
+                        rx.input(
+                            placeholder="e.g., Usability, Pricing...",
+                            value=State.manual_opp_theme,
+                            on_change=State.set_manual_opp_theme,
+                            width="100%",
+                        ),
+                        rx.text(
+                            "Opportunity Statement",
+                            size="2",
+                            weight="bold",
+                            margin_top="2",
+                        ),
+                        rx.text_area(
+                            placeholder="I need a way to...",
+                            value=State.manual_opp_statement,
+                            on_change=State.set_manual_opp_statement,
+                            width="100%",
+                        ),
+                        spacing="2",
+                        width="100%",
+                        margin_bottom="12px",
                     ),
-                    
                     rx.flex(
-                        rx.button("Cancel", variant="soft", color_scheme="gray", on_click=State.close_opp_dialog),
-                        rx.button("Save Opportunity", on_click=State.save_manual_opportunity, color_scheme="blue"),
-                        spacing="3", justify="end"
+                        rx.button(
+                            "Cancel",
+                            variant="soft",
+                            color_scheme="gray",
+                            on_click=State.close_opp_dialog,
+                        ),
+                        rx.button(
+                            "Save Opportunity",
+                            on_click=State.save_manual_opportunity,
+                            color_scheme="blue",
+                        ),
+                        spacing="3",
+                        justify="end",
                     ),
-                    max_width="500px"
+                    max_width="500px",
                 ),
                 open=State.is_opp_dialog_open,
-                on_open_change=State.handle_opp_dialog_change
+                on_open_change=State.handle_opp_dialog_change,
             ),
-            spacing="3", width="100%", justify="start", margin_bottom="4"
+            spacing="3",
+            width="100%",
+            justify="start",
+            margin_bottom="4",
         ),
-
         rx.table.root(
-            rx.table.header(rx.table.row(
-                rx.table.column_header_cell("Theme"),
-                rx.table.column_header_cell("Personas Affected"),
-                rx.table.column_header_cell("Master Opportunity"),
-                rx.table.column_header_cell("Status"),
-                rx.table.column_header_cell("Days Since Validated"),
-                rx.table.column_header_cell("Workspace"),
-            )),
+            rx.table.header(
+                rx.table.row(
+                    rx.table.column_header_cell("Theme"),
+                    rx.table.column_header_cell("Personas Affected"),
+                    rx.table.column_header_cell("Master Opportunity"),
+                    rx.table.column_header_cell("Status"),
+                    rx.table.column_header_cell("Days Since Validated"),
+                    rx.table.column_header_cell("Workspace"),
+                )
+            ),
             rx.table.body(rx.foreach(State.ledger_data, show_ledger_row)),
-            width="100%", variant="surface"
+            width="100%",
+            variant="surface",
         ),
-        width="100%", max_width="1400px", spacing="4", padding_top="20px"
+        width="100%",
+        max_width="1400px",
+        spacing="4",
+        padding_top="20px",
     )

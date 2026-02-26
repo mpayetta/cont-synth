@@ -58,6 +58,8 @@ class InterviewHistoryItem(rx.Base):
 
 class LedgerItem(rx.Base):
     opportunity_id: int
+    parent_id: int = -1     
+    indent_level: int = 0   
     theme: str
     personas_affected: list[PersonaBadge]
     opportunity: str

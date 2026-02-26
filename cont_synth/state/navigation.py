@@ -17,4 +17,3 @@ class NavigationStateMixin(rx.State, mixin=True):
             self.load_history()
         elif view_name == "ledger":
             self.load_ledger()
-
