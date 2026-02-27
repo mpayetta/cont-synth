@@ -75,3 +75,19 @@ class Solution(rx.Model, table=True):
     status: str = (
         "Ideation"  # Status pipeline: Ideation -> Testing -> Discarded -> Shipped
     )
+
+class Experiment(rx.Model, table=True):
+    """Tests designed to validate assumptions behind a solution."""
+    
+    solution_id: int = Field(foreign_key="solution.id")
+    name: str
+    assumption: str # e.g., "Users are willing to pay for this."
+    method: str # e.g., "Fake Door", "A/B Test", "Prototype Interview"
+    
+    # State management
+    status: str = "Draft" # Draft -> Running -> Concluded
+    signal: str = "Pending" # Pending -> Validated -> Invalidated
+    
+    # Telemetry & Proof
+    evidence_notes: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

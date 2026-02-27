@@ -47,6 +47,17 @@ class SolutionItem(rx.Base):
     description: str
     status: str
     indent_level: int = 0
+    
+class ExperimentItem(rx.Base):
+    id: int
+    solution_id: int
+    solution_name: str  # carry this for display in the tab
+    name: str
+    assumption: str
+    method: str         # "Fake Door", "A/B Test", "Prototype Interview"
+    status: str         # "Draft", "Running", "Concluded"
+    signal: str         # "Pending", "Validated", "Invalidated"
+    evidence_notes: str
 
 
 class OutcomeItem(rx.Base):
@@ -75,6 +86,7 @@ class LedgerItem(rx.Base):
     evidence: list[QuoteItem]
     solutions: list[SolutionItem] = []
     linked_outcomes: list[OutcomeItem] = []
+    experiments: list[ExperimentItem] = []
 
 
 class PersonaPrep(rx.Model, table=True):

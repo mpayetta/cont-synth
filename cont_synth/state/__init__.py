@@ -1,6 +1,7 @@
 import reflex as rx
 
 from .core import (
+    ExperimentItem,
     PersonaBadge,
     QuoteItem,
     SolutionItem,
@@ -75,6 +76,18 @@ class State(
     interview_choices: list[str] = []
     selected_interview_choice: str = ""
     manual_quote_text: str = ""
+    
+    # --- Drawer tab control ---
+    active_drawer_tab: str = "evidence"
+
+    # --- Experiments workspace ---
+    experiment_target_solution_id: int = -1
+    experiment_target_solution_name: str = ""
+    selected_solution_for_experiment: str = ""
+    new_experiment_name: str = ""
+    new_experiment_assumption: str = ""
+    new_experiment_method: str = "Prototype Interview"
+    editing_experiment_id: int = -1
 
     # Initialize with a blank dummy object so the frontend never hits a null crash
     selected_opportunity: LedgerItem = LedgerItem(
@@ -94,6 +107,7 @@ class State(
 
 __all__ = [
     "State",
+    "ExperimentItem",
     "PersonaBadge",
     "QuoteItem",
     "SolutionItem",

@@ -13,8 +13,10 @@ from ..models import (
     Solution,
     Outcome,
     OutcomeOpportunityLink,
+    Experiment,
 )
 from .core import (
+    ExperimentItem,
     PersonaBadge,
     QuoteItem,
     SolutionItem,
@@ -34,6 +36,14 @@ class LedgerStateMixin(rx.State, mixin=True):
     def selectable_outcomes(self) -> list[str]:
         """Names of outcomes plus a None/unmapped option."""
         return ["None (Unmapped)"] + [o.name for o in self.outcomes]
+
+    @rx.var
+    def solution_choices_for_experiment(self) -> list[str]:
+        """Solutions of the selected opportunity formatted for the experiment form select."""
+        return [
+            f"{s.id} - {s.name}"
+            for s in self.selected_opportunity.solutions
+        ]
 
     def load_outcomes(self):
         """Loads all business outcomes for the global dropdowns."""
@@ -209,6 +219,25 @@ class LedgerStateMixin(rx.State, mixin=True):
 
                 sol_items = flat_sols
 
+                # Inside the per-opportunity loop, after sol_items is built:
+                exp_items: list[ExperimentItem] = []
+                for sol in db_solutions:
+                    db_exps = session.exec(
+                        select(Experiment).where(Experiment.solution_id == sol.id)
+                    ).all()
+                    for exp in db_exps:
+                        exp_items.append(ExperimentItem(
+                            id=exp.id,
+                            solution_id=sol.id,
+                            solution_name=sol.name,
+                            name=exp.name,
+                            assumption=exp.assumption,
+                            method=exp.method,
+                            status=exp.status,
+                            signal=exp.signal,
+                            evidence_notes=exp.evidence_notes,
+                        ))
+
                 outcome_links = session.exec(
                     select(OutcomeOpportunityLink).where(
                         OutcomeOpportunityLink.opportunity_id == opp.id
@@ -251,6 +280,7 @@ class LedgerStateMixin(rx.State, mixin=True):
                         evidence=evidence_list,
                         solutions=sol_items,
                         linked_outcomes=linked_out_items,
+                        experiments=exp_items,
                     )
                 )
 
@@ -289,6 +319,7 @@ class LedgerStateMixin(rx.State, mixin=True):
         else:
             self.selected_opp_outcome_name = "None (Unmapped)"
 
+        self.active_drawer_tab = "evidence"
         self.cancel_edit()
         self.is_drawer_open = True
 
@@ -319,7 +350,14 @@ class LedgerStateMixin(rx.State, mixin=True):
     def delete_solution(self, solution_id: int):
         """Permanently removes a solution AND recursively deletes all its nested children."""
 
-        def delete_recursive(session: rx.session, sol_id: int):
+        def delete_recursive(session, sol_id):
+            # Delete experiments first
+            experiments = session.exec(
+                select(Experiment).where(Experiment.solution_id == sol_id)
+            ).all()
+            for exp in experiments:
+                session.delete(exp)
+            # Then recurse into children
             children = session.exec(
                 select(Solution).where(Solution.parent_id == sol_id)
             ).all()
@@ -328,6 +366,7 @@ class LedgerStateMixin(rx.State, mixin=True):
             sol = session.get(Solution, sol_id)
             if sol:
                 session.delete(sol)
+
 
         with rx.session() as session:
             delete_recursive(session, solution_id)
@@ -573,6 +612,13 @@ class LedgerStateMixin(rx.State, mixin=True):
                 session.delete(link)
 
             def delete_sol_recursive(sol_id: int):
+                # Delete experiments first
+                experiments = session.exec(
+                    select(Experiment).where(Experiment.solution_id == sol_id)
+                ).all()
+                for exp in experiments:
+                    session.delete(exp)
+                    
                 children = session.exec(
                     select(Solution).where(Solution.parent_id == sol_id)
                 ).all()
@@ -640,3 +686,84 @@ class LedgerStateMixin(rx.State, mixin=True):
 
         self.load_ledger()
         self._sync_drawer()
+        
+    def set_selected_solution_for_experiment(self, choice: str):
+        """Parses the select string and sets the target solution fields."""
+        try:
+            sol_id = int(choice.split(" - ")[0])
+            sol_name = " - ".join(choice.split(" - ")[1:])
+            self.experiment_target_solution_id = sol_id
+            self.experiment_target_solution_name = sol_name
+            self.selected_solution_for_experiment = choice
+        except Exception:
+            pass
+
+    def open_add_experiment(self, sol_id: int, sol_name: str):
+        """Sets the target solution for a new experiment (called from a solution card)."""
+        self.experiment_target_solution_id = sol_id
+        self.experiment_target_solution_name = sol_name
+        self.selected_solution_for_experiment = f"{sol_id} - {sol_name}"
+        self.editing_experiment_id = -1
+        self.new_experiment_name = ""
+        self.new_experiment_assumption = ""
+        self.new_experiment_method = "Prototype Interview"
+        self.active_drawer_tab = "experiments"
+
+    def add_experiment(self, opportunity_id: int):
+        """Creates a new experiment and bumps the solution to 'Testing'."""
+        if not self.new_experiment_name.strip():
+            return rx.window_alert("Experiment name cannot be empty.")
+        with rx.session() as session:
+            # Create experiment
+            session.add(Experiment(
+                solution_id=self.experiment_target_solution_id,
+                name=self.new_experiment_name.strip(),
+                assumption=self.new_experiment_assumption.strip(),
+                method=self.new_experiment_method,
+            ))
+            # Auto-bump solution status to Testing
+            sol = session.get(Solution, self.experiment_target_solution_id)
+            if sol and sol.status == "Ideation":
+                sol.status = "Testing"
+                session.add(sol)
+            session.commit()
+        # reset form
+        self.experiment_target_solution_id = -1
+        self.experiment_target_solution_name = ""
+        self.selected_solution_for_experiment = ""
+        self.new_experiment_name = ""
+        self.new_experiment_assumption = ""
+        self.load_ledger()
+        self._sync_drawer()
+
+    def update_experiment_status(self, exp_id: int, status: str):
+        """Advances Draft → Running → Concluded."""
+        with rx.session() as session:
+            exp = session.get(Experiment, exp_id)
+            if exp:
+                exp.status = status
+                session.add(exp)
+                session.commit()
+        self.load_ledger()
+        self._sync_drawer()
+
+    def update_experiment_signal(self, exp_id: int, signal: str):
+        """Marks an experiment as Validated or Invalidated."""
+        with rx.session() as session:
+            exp = session.get(Experiment, exp_id)
+            if exp:
+                exp.signal = signal
+                session.add(exp)
+                session.commit()
+        self.load_ledger()
+        self._sync_drawer()
+
+    def delete_experiment(self, exp_id: int):
+        with rx.session() as session:
+            exp = session.get(Experiment, exp_id)
+            if exp:
+                session.delete(exp)
+                session.commit()
+        self.load_ledger()
+        self._sync_drawer()
+

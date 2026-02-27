@@ -1,5 +1,5 @@
 import reflex as rx
-from cont_synth.state import State, LedgerItem, PersonaBadge, QuoteItem, SolutionItem
+from cont_synth.state import State, LedgerItem, PersonaBadge, QuoteItem, SolutionItem, ExperimentItem
 
 
 # --- HELPER COMPONENTS ---
@@ -69,7 +69,14 @@ def render_solution(sol: SolutionItem):
                         rx.badge(
                             sol.status, color_scheme="blue", variant="soft", size="1"
                         ),
-                        # --- FIX: Pass both the ID and the Name to the backend ---
+                        rx.icon_button(
+                            rx.icon("flask-conical", size=14),
+                            size="1",
+                            variant="ghost",
+                            color_scheme="purple",
+                            title="Design an experiment for this solution",
+                            on_click=lambda: State.open_add_experiment(sol.id, sol.name),
+                        ),
                         rx.icon_button(
                             rx.icon("git-branch", size=14),
                             size="1",
@@ -327,6 +334,132 @@ def render_evidence_tab() -> rx.Component:
     )
 
 
+def render_experiment_card(exp: ExperimentItem):
+    signal_color = rx.cond(
+        exp.signal == "Validated", "green",
+        rx.cond(exp.signal == "Invalidated", "red", "gray")
+    )
+    return rx.card(
+        rx.vstack(
+            rx.flex(
+                rx.badge(exp.solution_name, color_scheme="blue", variant="soft", size="1"),
+                rx.badge(exp.method, color_scheme="purple", variant="soft", size="1"),
+                rx.badge(exp.status, color_scheme="orange", variant="soft", size="1"),
+                rx.badge(exp.signal, color_scheme=signal_color, variant="soft", size="1"),
+                rx.icon_button(rx.icon("trash", size=14), size="1", variant="ghost",
+                    color_scheme="red", on_click=lambda: State.delete_experiment(exp.id)),
+                justify="between", width="100%", align="center",
+            ),
+            rx.text(exp.name, weight="bold", size="3"),
+            rx.text(f"Assumption: {exp.assumption}", size="2", color="gray"),
+            rx.flex(
+                rx.cond(exp.status == "Draft",
+                    rx.button("▶ Start Running", size="1", variant="soft",
+                        on_click=lambda: State.update_experiment_status(exp.id, "Running")),
+                    rx.fragment()),
+                rx.cond(exp.status == "Running",
+                    rx.button("✓ Conclude", size="1", variant="soft", color_scheme="orange",
+                        on_click=lambda: State.update_experiment_status(exp.id, "Concluded")),
+                    rx.fragment()),
+                rx.cond(exp.status == "Concluded",
+                    rx.flex(
+                        rx.button("✅ Validated", size="1", variant="soft", color_scheme="green",
+                            on_click=lambda: State.update_experiment_signal(exp.id, "Validated")),
+                        rx.button("❌ Invalidated", size="1", variant="soft", color_scheme="red",
+                            on_click=lambda: State.update_experiment_signal(exp.id, "Invalidated")),
+                        spacing="2",
+                    ),
+                    rx.fragment()),
+                spacing="2",
+            ),
+            spacing="2",
+        ),
+        size="2", width="100%", variant="surface",
+    )
+
+
+def render_experiments_tab() -> rx.Component:
+    return rx.tabs.content(
+        rx.vstack(
+            rx.flex(
+                rx.cond(
+                    State.selected_opportunity.experiments.length() > 0,
+                    rx.foreach(State.selected_opportunity.experiments, render_experiment_card),
+                    rx.text("No experiments designed yet.", color="gray", size="2"),
+                ),
+                direction="column",
+                spacing="4",
+                width="100%",
+                margin_top="8px",
+            ),
+            rx.box(
+                rx.vstack(
+                    rx.text(
+                        rx.cond(
+                            State.experiment_target_solution_name != "",
+                            f"🧪 Testing: {State.experiment_target_solution_name}",
+                            "🧪 Design New Experiment",
+                        ),
+                        size="2",
+                        weight="bold",
+                        color=rx.cond(
+                            State.experiment_target_solution_name != "",
+                            "var(--purple-11)",
+                            "gray",
+                        ),
+                    ),
+                    rx.text("Target Solution", size="1", weight="bold", color="gray"),
+                    rx.select(
+                        State.solution_choices_for_experiment,
+                        value=State.selected_solution_for_experiment,
+                        on_change=State.set_selected_solution_for_experiment,
+                        placeholder="Select a solution to test...",
+                        width="100%",
+                    ),
+                    rx.input(
+                        placeholder="Experiment name (e.g., Fake Door for Premium Export)",
+                        value=State.new_experiment_name,
+                        on_change=State.set_new_experiment_name,
+                        width="100%",
+                    ),
+                    rx.text_area(
+                        placeholder="What assumption are you testing? (e.g., Users will pay for faster exports)",
+                        value=State.new_experiment_assumption,
+                        on_change=State.set_new_experiment_assumption,
+                        width="100%",
+                    ),
+                    rx.text("Method", size="1", weight="bold", color="gray"),
+                    rx.select(
+                        ["Prototype Interview", "Fake Door", "A/B Test", "Usability Test", "Survey", "Other"],
+                        value=State.new_experiment_method,
+                        on_change=State.set_new_experiment_method,
+                        width="100%",
+                    ),
+                    rx.button(
+                        "Design Experiment",
+                        on_click=lambda: State.add_experiment(
+                            State.selected_opportunity.opportunity_id
+                        ),
+                        color_scheme="purple",
+                        variant="solid",
+                        width="100%",
+                    ),
+                    spacing="3",
+                ),
+                padding="16px",
+                background_color="var(--gray-3)",
+                border_radius="8px",
+                margin_top="6",
+                width="100%",
+            ),
+            width="100%",
+            margin_top="4",
+            padding_bottom="40px",
+        ),
+        value="experiments",
+    )
+
+
 def render_solutions_tab() -> rx.Component:
     return rx.tabs.content(
         rx.vstack(
@@ -426,12 +559,14 @@ def render_drawer_tabs() -> rx.Component:
         rx.tabs.list(
             rx.tabs.trigger("Verbatim Evidence", value="evidence"),
             rx.tabs.trigger("Solutions Backlog", value="solutions"),
-            rx.tabs.trigger("Experiments (Soon)", value="experiments", disabled=True),
+            rx.tabs.trigger("Experiments", value="experiments"),
             width="100%",
         ),
         render_evidence_tab(),
         render_solutions_tab(),
-        default_value="evidence",
+        render_experiments_tab(),
+        value=State.active_drawer_tab,
+        on_change=State.set_active_drawer_tab,
         margin_top="4",
         width="100%",
     )
@@ -470,7 +605,6 @@ def opportunity_drawer() -> rx.Component:
         open=State.is_drawer_open,
         on_open_change=State.handle_drawer_change,
     )
-
 
 def render_ledger() -> rx.Component:
     """The main view for the Global Ledger."""
