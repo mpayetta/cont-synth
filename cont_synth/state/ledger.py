@@ -17,6 +17,7 @@ from ..models import (
 )
 from .core import (
     ExperimentItem,
+    OppDetailSolution,
     PersonaBadge,
     QuoteItem,
     SolutionItem,
@@ -44,6 +45,26 @@ class LedgerStateMixin(rx.State, mixin=True):
             f"{s.id} - {s.name}"
             for s in self.selected_opportunity.solutions
         ]
+
+    @rx.var
+    def detail_solutions_with_experiments(self) -> list[OppDetailSolution]:
+        """Combines solutions with their experiments for the full-page detail view."""
+        result = []
+        for sol in self.selected_opportunity.solutions:
+            sol_exps = [
+                e for e in self.selected_opportunity.experiments
+                if e.solution_id == sol.id
+            ]
+            result.append(OppDetailSolution(
+                id=sol.id,
+                parent_id=sol.parent_id,
+                name=sol.name,
+                description=sol.description,
+                status=sol.status,
+                indent_level=sol.indent_level,
+                experiments=sol_exps,
+            ))
+        return result
 
     def load_outcomes(self):
         """Loads all business outcomes for the global dropdowns."""
@@ -297,7 +318,15 @@ class LedgerStateMixin(rx.State, mixin=True):
             if self.available_personas and not self.target_persona:
                 self.target_persona = self.available_personas[0]
 
-            all_interviews = session.exec(select(Interview)).all()
+            all_interviews = (
+                session.exec(
+                    select(Interview).where(
+                        Interview.product_id == int(self.active_product_id)
+                    )
+                ).all()
+                if self.active_product_id
+                else []
+            )
             choices: list[str] = []
             for inv in all_interviews:
                 p = session.get(Persona, inv.persona_id)
@@ -380,6 +409,7 @@ class LedgerStateMixin(rx.State, mixin=True):
         self.editing_solution_id = sol.id
         self.new_solution_name = sol.name
         self.new_solution_desc = sol.description
+        self.new_solution_status = sol.status
 
     def _sync_drawer(self):
         """Refreshes the drawer UI after database changes."""
@@ -405,6 +435,7 @@ class LedgerStateMixin(rx.State, mixin=True):
                 if sol:
                     sol.name = self.new_solution_name.strip()
                     sol.description = self.new_solution_desc.strip()
+                    sol.status = self.new_solution_status
                     session.add(sol)
             else:
                 new_sol = Solution(
@@ -687,6 +718,74 @@ class LedgerStateMixin(rx.State, mixin=True):
         self.load_ledger()
         self._sync_drawer()
         
+    def navigate_to_opportunity(self, opp_id: int):
+        """Loads an opportunity into state and navigates to the full-page detail view."""
+        for item in self.ledger_data:
+            if item.opportunity_id == opp_id:
+                self.selected_opportunity = item
+                self.selected_opp_outcome_name = (
+                    item.linked_outcomes[0].name
+                    if len(item.linked_outcomes) > 0
+                    else "None (Unmapped)"
+                )
+                break
+        self.experiment_target_solution_id = -1
+        self.experiment_target_solution_name = ""
+        self.selected_solution_for_experiment = ""
+        self.is_editing_opp_detail = False
+        self.cancel_edit()
+        self.current_view = "opportunity"
+
+    def enter_opp_detail_edit(self):
+        """Enters inline edit mode on the opportunity detail page."""
+        opp = self.selected_opportunity
+        self.editing_opp_id = opp.opportunity_id
+        self.manual_opp_theme = opp.theme
+        self.manual_opp_statement = opp.opportunity
+        self.manual_opp_parent_id = "None"
+        if opp.parent_id != -1:
+            for choice in self.parent_opp_choices:
+                if choice.startswith(f"{opp.parent_id} -"):
+                    self.manual_opp_parent_id = choice
+                    break
+        self.is_editing_opp_detail = True
+
+    def exit_opp_detail_edit(self):
+        """Cancels inline edit without saving."""
+        self.is_editing_opp_detail = False
+        self.editing_opp_id = -1
+        self.manual_opp_theme = "Uncategorized"
+        self.manual_opp_statement = ""
+        self.manual_opp_parent_id = "None"
+
+    def save_opp_detail_edit(self):
+        """Saves the opportunity from the inline detail editor."""
+        self.save_manual_opportunity()
+        self.is_editing_opp_detail = False
+
+    def delete_current_opportunity(self):
+        """Deletes the currently viewed opportunity and navigates back to the ledger."""
+        self.delete_opportunity(self.selected_opportunity.opportunity_id)
+        self.current_view = "ledger"
+
+    def start_edit_solution_from_detail(
+        self, sol_id: int, name: str, desc: str, status: str
+    ):
+        """Enters edit mode for a solution from the detail page."""
+        self.editing_solution_id = sol_id
+        self.new_solution_name = name
+        self.new_solution_desc = desc
+        self.new_solution_status = status
+
+    def cancel_experiment_form(self):
+        """Clears the inline experiment form without leaving the experiments area."""
+        self.experiment_target_solution_id = -1
+        self.experiment_target_solution_name = ""
+        self.selected_solution_for_experiment = ""
+        self.new_experiment_name = ""
+        self.new_experiment_assumption = ""
+        self.new_experiment_method = "Prototype Interview"
+
     def set_selected_solution_for_experiment(self, choice: str):
         """Parses the select string and sets the target solution fields."""
         try:

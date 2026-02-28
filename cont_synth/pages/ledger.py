@@ -9,8 +9,8 @@ def render_persona_badge(badge: PersonaBadge):
 
 
 def render_quote(q: QuoteItem):
-    """Renders a sleek card for an individual quote inside the modal."""
-    return rx.card(
+    """Renders a quote card for an individual evidence item inside the drawer."""
+    return rx.box(
         rx.vstack(
             rx.flex(
                 rx.badge(
@@ -19,7 +19,6 @@ def render_quote(q: QuoteItem):
                     variant="soft",
                     size="2",
                 ),
-                # The Trash icon dynamically passes the current opportunity and the quote's interview ID
                 rx.icon_button(
                     rx.icon("trash", size=14),
                     size="1",
@@ -34,13 +33,15 @@ def render_quote(q: QuoteItem):
                 align="center",
             ),
             rx.text(
-                f'"{q.text}"', size="3", font_style="italic", color="var(--slate-11)"
+                f'"{q.text}"', size="3", font_style="italic", color="var(--gray-12)"
             ),
-            spacing="3",
+            spacing="2",
         ),
-        size="2",
+        padding="16px",
+        background_color="var(--blue-2)",
+        border="1px solid var(--blue-6)",
+        border_radius="8px",
         width="100%",
-        variant="surface",
         flex_shrink="0",
     )
 
@@ -123,91 +124,102 @@ def render_solution(sol: SolutionItem):
 
 
 def show_ledger_row(item: LedgerItem):
-    """Renders a single row in the Global Ledger table."""
-    return rx.table.row(
-        rx.table.cell(
+    """Renders a single opportunity as a clickable card with a status border."""
+    return rx.box(
+        rx.box(
             rx.flex(
-                rx.cond(
-                    item.indent_level > 0,
-                    rx.icon(
-                        "corner-down-right",
-                        size=14,
-                        color="var(--gray-8)",
-                        margin_right="2",
+                # Left: clickable area — theme + opportunity text + personas
+                rx.flex(
+                    rx.flex(
+                        rx.cond(
+                            item.indent_level > 0,
+                            rx.icon("corner-down-right", size=13, color="var(--gray-7)"),
+                            rx.fragment(),
+                        ),
+                        rx.badge(item.theme, color_scheme="gray", variant="solid", size="1"),
+                        rx.cond(
+                            item.is_cross_functional,
+                            rx.badge("Cross-Persona", color_scheme="amber", variant="soft", size="1"),
+                            rx.fragment(),
+                        ),
+                        spacing="2",
+                        align="center",
                     ),
-                    rx.fragment(),
+                    rx.text(item.opportunity, weight="medium", size="3", line_height="1.5"),
+                    rx.flex(
+                        rx.foreach(
+                            item.personas_affected,
+                            lambda b: rx.badge(b.name, color_scheme=b.color, variant="soft", size="1"),
+                        ),
+                        spacing="1",
+                        wrap="wrap",
+                    ),
+                    direction="column",
+                    spacing="2",
+                    align_items="start",
+                    flex="1",
+                    cursor="pointer",
+                    on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
                 ),
-                rx.badge(item.theme, color_scheme="gray", variant="solid"),
-                align="center",
-                padding_left=f"calc({item.indent_level} * 20px)",  # <--- Indent nested rows!
-            )
-        ),
-        rx.table.cell(
-            rx.flex(
-                rx.foreach(item.personas_affected, render_persona_badge),
-                spacing="2",
-                wrap="wrap",
-            )
-        ),
-        rx.table.cell(
-            rx.vstack(
-                rx.text(item.opportunity),
-                rx.cond(
-                    item.is_cross_functional,
-                    rx.badge(
-                        "🌟 Cross-Persona Impact",
-                        color_scheme="amber",
-                        variant="soft",
+                # Right: quick-glance metrics
+                rx.flex(
+                    rx.flex(
+                        rx.icon("lightbulb", size=12, color="var(--blue-9)"),
+                        rx.text(
+                            f"{item.solutions.length()} solutions",
+                            size="1", color="var(--blue-9)",
+                        ),
+                        spacing="1", align="center",
+                    ),
+                    rx.flex(
+                        rx.icon("quote", size=12, color="var(--gray-8)"),
+                        rx.text(
+                            f"{item.evidence.length()} quotes",
+                            size="1", color="var(--gray-8)",
+                        ),
+                        spacing="1", align="center",
+                    ),
+                    rx.text(
+                        f"{item.days_old} days",
                         size="1",
+                        weight="medium",
+                        color=rx.cond(
+                            item.status_color == "green", "var(--green-9)",
+                            rx.cond(
+                                item.status_color == "yellow", "var(--yellow-9)",
+                                "var(--red-9)",
+                            ),
+                        ),
                     ),
-                    rx.fragment(),
+                    direction="column",
+                    spacing="1",
+                    align_items="end",
+                    flex_shrink="0",
                 ),
-                spacing="1",
-            )
-        ),
-        rx.table.cell(
-            rx.badge(
-                item.status, color_scheme=item.status_color, variant="soft", size="2"
-            )
-        ),
-        rx.table.cell(item.days_old),
-        # --- Action Buttons (Open Workspace + Edit + Delete) ---
-        rx.table.cell(
-            rx.flex(
-                rx.button(
-                    "Open",
-                    variant="soft",
-                    color_scheme="blue",
-                    size="2",
-                    on_click=lambda: State.open_drawer(item),
-                ),
-                rx.icon_button(
-                    rx.icon("pencil", size=16),
-                    variant="soft",
-                    color_scheme="gray",
-                    size="2",
-                    # Pass the parent ID so it opens the dialog correctly
-                    on_click=lambda: State.start_edit_opportunity(
-                        item.opportunity_id,
-                        item.theme,
-                        item.opportunity,
-                        item.parent_id,
-                    ),
-                ),
-                rx.icon_button(
-                    rx.icon("trash", size=16),
-                    variant="soft",
-                    color_scheme="red",
-                    size="2",
-                    on_click=lambda: State.delete_opportunity(item.opportunity_id),
-                ),
-                spacing="2",
+                justify="between",
                 align="center",
-            )
+                width="100%",
+                gap="6",
+            ),
+            padding="16px 16px 16px 20px",
+            border_left=rx.cond(
+                item.status_color == "green", "4px solid var(--green-7)",
+                rx.cond(
+                    item.status_color == "yellow", "4px solid var(--yellow-7)",
+                    "4px solid var(--red-7)",
+                ),
+            ),
+            border_radius="8px",
+            background_color=rx.cond(
+                item.indent_level > 0, "var(--gray-2)", "var(--gray-1)",
+            ),
+            border="1px solid var(--gray-4)",
+            width="100%",
+            _hover={"background_color": "var(--blue-1)", "border_color": "var(--blue-5)"},
+            transition="background-color 0.1s ease, border-color 0.1s ease",
         ),
-        style=rx.cond(
-            item.is_cross_functional, {"backgroundColor": "var(--amber-2)"}, {}
-        ),
+        padding_left=f"calc({item.indent_level} * 28px)",
+        width="100%",
     )
 
 
@@ -612,7 +624,7 @@ def render_ledger() -> rx.Component:
         # --- NEW OUTCOME HEADER ---
         rx.flex(
             rx.box(
-                rx.text("The Single Source of Truth.", weight="bold", size="6"),
+                rx.text("Opportunities List", weight="bold", size="6"),
                 rx.text(
                     "Filter by business outcome to focus your Continuous Discovery efforts.",
                     color="gray",
@@ -670,13 +682,6 @@ def render_ledger() -> rx.Component:
         rx.divider(),
         # --- Action Bar & Opportunity Form Dialog ---
         rx.flex(
-            rx.button(
-                "Refresh Global Ledger",
-                on_click=State.load_ledger,
-                size="2",
-                variant="outline",
-                color_scheme="gray",
-            ),
             rx.dialog.root(
                 rx.dialog.trigger(
                     rx.button(
@@ -754,20 +759,26 @@ def render_ledger() -> rx.Component:
             justify="start",
             margin_bottom="4",
         ),
-        rx.table.root(
-            rx.table.header(
-                rx.table.row(
-                    rx.table.column_header_cell("Theme"),
-                    rx.table.column_header_cell("Personas Affected"),
-                    rx.table.column_header_cell("Master Opportunity"),
-                    rx.table.column_header_cell("Status"),
-                    rx.table.column_header_cell("Days Since Validated"),
-                    rx.table.column_header_cell("Workspace"),
-                )
+        rx.cond(
+            State.ledger_data.length() == 0,
+            rx.center(
+                rx.vstack(
+                    rx.icon("inbox", size=36, color="var(--gray-7)"),
+                    rx.text("No opportunities found.", weight="medium", color="gray"),
+                    rx.text(
+                        "Create one with the button above, or run a synthesis from an interview.",
+                        size="2", color="gray", text_align="center",
+                    ),
+                    spacing="2", align="center",
+                ),
+                padding_y="80px",
+                width="100%",
             ),
-            rx.table.body(rx.foreach(State.ledger_data, show_ledger_row)),
-            width="100%",
-            variant="surface",
+            rx.vstack(
+                rx.foreach(State.ledger_data, show_ledger_row),
+                spacing="2",
+                width="100%",
+            ),
         ),
         width="100%",
         max_width="1400px",

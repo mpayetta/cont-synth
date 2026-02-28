@@ -5,16 +5,19 @@ from cont_synth.state import State, InterviewHistoryItem
 def show_history_row(item: InterviewHistoryItem):
     return rx.table.row(
         rx.table.cell(item.interview_id, weight="bold"),
-        rx.table.cell(rx.badge(item.persona, color_scheme="gray", variant="solid")),
+        rx.table.cell(
+            rx.badge(item.persona, color_scheme=item.persona_color, variant="soft")
+        ),
         rx.table.cell(item.date_logged),
         rx.table.cell(rx.text(item.snippet, color="gray", size="2")),
         rx.table.cell(
             rx.button(
-                rx.icon("trash", size=16),
-                "Delete",
-                color_scheme="red",
-                variant="soft",
-                on_click=lambda: State.delete_interview(item.interview_id),
+                rx.icon("eye", size=14),
+                "View",
+                variant="ghost",
+                color_scheme="gray",
+                size="2",
+                on_click=lambda: State.open_interview_detail(item.interview_id),
             )
         ),
     )
@@ -23,9 +26,9 @@ def show_history_row(item: InterviewHistoryItem):
 def render_logs() -> rx.Component:
     return rx.vstack(
         rx.box(
-            rx.text("Raw Transcript Management.", weight="bold", size="6"),
+            rx.text("Interview Logs", weight="bold", size="6"),
             rx.text(
-                "View and delete ingested interviews to keep the Global Ledger clean.",
+                "View ingested interviews and inspect their full transcripts and extracted evidence.",
                 color="gray",
                 size="3",
             ),
@@ -39,7 +42,7 @@ def render_logs() -> rx.Component:
                     rx.table.column_header_cell("Persona"),
                     rx.table.column_header_cell("Date Logged"),
                     rx.table.column_header_cell("Transcript Snippet"),
-                    rx.table.column_header_cell("Action"),
+                    rx.table.column_header_cell(""),
                 )
             ),
             rx.table.body(rx.foreach(State.interview_history, show_history_row)),

@@ -1,9 +1,9 @@
 import reflex as rx
 from sqlmodel import select
-from ..models import Product
-from .core import ProductItem
+from .core import LlmUsageItem, ProductItem
 from ..models import (
     Product,
+    LlmUsageLog,
     Opportunity,
     Outcome,
     Interview,
@@ -33,22 +33,47 @@ class NavigationStateMixin(rx.State, mixin=True):
                 self.active_product_id = str(self.products[0].id)
 
     def change_product(self, product_id: str):
-        """Switches the global product context and triggers a data refresh."""
+        """Switches the global product context, persists to localStorage, and refreshes data."""
         self.active_product_id = product_id
         self.load_data_for_current_view()
+        return rx.call_script(f"localStorage.setItem('active_product_id', '{product_id}')")
 
     def handle_navigation(self, view_name: str):
         """Safely handles view routing."""
         self.current_view = view_name
+        self.highlighted_quote_text = ""
         self.load_data_for_current_view()
+
+    def load_llm_usage(self):
+        """Fetches all LLM usage log rows for the dashboard."""
+        with rx.session() as session:
+            rows = session.exec(
+                select(LlmUsageLog).order_by(LlmUsageLog.created_at.desc())
+            ).all()
+            self.llm_usage_logs = [
+                LlmUsageItem(
+                    id=r.id,
+                    model_name=r.model_name,
+                    operation=r.operation,
+                    interview_id=r.interview_id if r.interview_id is not None else 0,
+                    prompt_tokens=r.prompt_tokens,
+                    output_tokens=r.output_tokens,
+                    total_tokens=r.total_tokens,
+                    created_at=r.created_at.strftime("%Y-%m-%d %H:%M"),
+                )
+                for r in rows
+            ]
 
     def load_data_for_current_view(self):
         """The Master Data Router: Loads specific domain data based on the active product."""
         self.load_products()
         if self.current_view == "logs":
             self.load_history()
-        elif self.current_view in ["ledger", "tree", "prep"]:
+        elif self.current_view in ["ledger", "prep"]:
             self.load_ledger()  # Ledger loads outcomes, opportunities, and personas
+        elif self.current_view == "llm_usage":
+            self.load_llm_usage()
+        # "interview_detail" and "opportunity" carry their data from the navigation event
 
     def create_product(self):
         """Creates a new workspace."""

@@ -78,16 +78,36 @@ class Solution(rx.Model, table=True):
 
 class Experiment(rx.Model, table=True):
     """Tests designed to validate assumptions behind a solution."""
-    
+
     solution_id: int = Field(foreign_key="solution.id")
     name: str
     assumption: str # e.g., "Users are willing to pay for this."
     method: str # e.g., "Fake Door", "A/B Test", "Prototype Interview"
-    
+
     # State management
     status: str = "Draft" # Draft -> Running -> Concluded
     signal: str = "Pending" # Pending -> Validated -> Invalidated
-    
+
     # Telemetry & Proof
     evidence_notes: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class User(rx.Model, table=True):
+    """Single-user authentication table."""
+
+    username: str = Field(unique=True, index=True)
+    password_hash: str
+    fullname: str
+
+
+class LlmUsageLog(rx.Model, table=True):
+    """One row per LLM API call, capturing token usage for cost tracking."""
+
+    model_name: str               # e.g. "gemini-2.5-pro", "gemini-2.5-flash"
+    operation: str                # "synthesis", "dedupe", "prep"
+    interview_id: int | None = Field(default=None, foreign_key="interview.id")
+    prompt_tokens: int
+    output_tokens: int
+    total_tokens: int
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

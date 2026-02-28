@@ -38,6 +38,7 @@ class QuoteItem(rx.Base):
     persona_name: str
     persona_color: str
     text: str
+    opportunity_statement: str = ""
 
 
 class SolutionItem(rx.Base):
@@ -60,6 +61,51 @@ class ExperimentItem(rx.Base):
     evidence_notes: str
 
 
+class PendingLlmUsage(rx.Base):
+    """Token usage from one LLM call, held in state until the Interview row exists."""
+
+    model_name: str
+    operation: str
+    prompt_tokens: int
+    output_tokens: int
+    total_tokens: int
+
+
+class LlmUsageItem(rx.Base):
+    """One row in the LLM Usage dashboard."""
+
+    id: int
+    model_name: str
+    operation: str
+    interview_id: int
+    prompt_tokens: int
+    output_tokens: int
+    total_tokens: int
+    created_at: str
+
+
+class PendingOppItem(rx.Base):
+    """One AI-extracted opportunity awaiting user confirmation before DB write."""
+    index: int
+    opportunity_statement: str
+    theme: str
+    source_quote: str
+    matched_existing_id: int = -1       # -1 = new opp; positive int = existing opp ID
+    matched_existing_statement: str = ""
+    selected: bool = True
+
+
+class OppDetailSolution(rx.Base):
+    """A solution with its experiments embedded, used in the full-page detail view."""
+    id: int
+    parent_id: int | None = None
+    name: str
+    description: str
+    status: str
+    indent_level: int = 0
+    experiments: list[ExperimentItem] = []
+
+
 class OutcomeItem(rx.Base):
     id: int
     name: str
@@ -68,6 +114,7 @@ class OutcomeItem(rx.Base):
 class InterviewHistoryItem(rx.Base):
     interview_id: int
     persona: str
+    persona_color: str = "gray"
     date_logged: str
     snippet: str
 
@@ -105,9 +152,13 @@ __all__ = [
     "PersonaBadge",
     "QuoteItem",
     "SolutionItem",
+    "ExperimentItem",
+    "OppDetailSolution",
     "OutcomeItem",
     "InterviewHistoryItem",
     "LedgerItem",
     "PersonaPrep",
     "ProductItem",
+    "PendingOppItem",
+    "LlmUsageItem",
 ]
