@@ -47,6 +47,20 @@ def render_synthesize() -> rx.Component:
             min_height="300px",
             width="100%",
         ),
+        rx.cond(
+            State.synthesis_error != "",
+            rx.hstack(
+                rx.icon("circle-alert", size=15, color="var(--red-9)"),
+                rx.text(State.synthesis_error, size="2", color="var(--red-11)"),
+                padding="10px 14px",
+                background_color="var(--red-2)",
+                border="1px solid var(--red-6)",
+                border_radius="6px",
+                width="100%",
+                align="center",
+                spacing="2",
+            ),
+        ),
         rx.button(
             "Run Dual-Engine Synthesis",
             on_click=State.run_synthesis,

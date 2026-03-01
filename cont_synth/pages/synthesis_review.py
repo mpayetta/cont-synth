@@ -2,6 +2,64 @@ import reflex as rx
 from cont_synth.state import State, PendingOppItem
 
 
+def _metadata_row() -> rx.Component:
+    """Displays extracted interview metadata (duration, date, participants) when available."""
+    return rx.cond(
+        (State.pending_synthesis_duration > 0)
+        | (State.pending_synthesis_interview_date != "")
+        | (State.pending_synthesis_participants.length() > 0),
+        rx.hstack(
+            rx.cond(
+                State.pending_synthesis_interview_date != "",
+                rx.hstack(
+                    rx.icon("calendar", size=12, color="var(--gray-9)"),
+                    rx.text(State.pending_synthesis_interview_date, size="1", color="var(--gray-11)"),
+                    spacing="1",
+                    align="center",
+                ),
+                rx.fragment(),
+            ),
+            rx.cond(
+                State.pending_synthesis_duration > 0,
+                rx.hstack(
+                    rx.icon("clock", size=12, color="var(--gray-9)"),
+                    rx.text(
+                        State.pending_synthesis_duration.to_string(),
+                        " min",
+                        size="1",
+                        color="var(--gray-11)",
+                    ),
+                    spacing="1",
+                    align="center",
+                ),
+                rx.fragment(),
+            ),
+            rx.cond(
+                State.pending_synthesis_participants.length() > 0,
+                rx.hstack(
+                    rx.icon("users", size=12, color="var(--gray-9)"),
+                    rx.text(
+                        State.pending_synthesis_participants_str,
+                        size="1",
+                        color="var(--gray-11)",
+                    ),
+                    spacing="1",
+                    align="center",
+                ),
+                rx.fragment(),
+            ),
+            spacing="3",
+            align="center",
+            padding="6px 10px",
+            background_color="var(--gray-3)",
+            border_radius="6px",
+            border="1px solid var(--gray-5)",
+            wrap="wrap",
+        ),
+        rx.fragment(),
+    )
+
+
 def render_pending_opp(opp: PendingOppItem) -> rx.Component:
     """Renders one AI-extracted opportunity with a checkbox, badges, and clickable evidence."""
     return rx.box(
@@ -176,6 +234,8 @@ def render_synthesis_review() -> rx.Component:
                     width="100%",
                     align="center",
                 ),
+                # Interview metadata (date, duration, participants) — shown when available
+                _metadata_row(),
                 # Scrollable opportunity list
                 rx.vstack(
                     rx.foreach(State.pending_synthesis_opps, render_pending_opp),

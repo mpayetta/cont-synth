@@ -27,30 +27,69 @@ _MARK_OPEN = '<mark style="background:rgba(250,204,21,0.5);border-radius:2px;pad
 _MARK_CLOSE = "</mark>"
 
 
+def _first_sentence(text: str) -> str:
+    """Return the first meaningful chunk of text.
+
+    Priority:
+    1. Split on '...' (LLM-added ellipsis joining non-adjacent transcript lines).
+    2. Split on a sentence-ending punctuation followed by whitespace.
+    Falls back to the full text when no boundary is found.
+    """
+    # LLM often writes "sentence one... sentence two" when the two sentences
+    # belong to different speaker turns. Matching only the first part is enough
+    # to locate and scroll to the right spot.
+    ellipsis = _re.search(r'\.\.\.+', text)
+    if ellipsis and ellipsis.start() > 10:
+        return text[:ellipsis.start()].rstrip()
+
+    # Sentence boundary: punctuation followed by whitespace
+    m = _re.search(r'[.?!]\s', text)
+    if m and m.start() > 10:
+        return text[:m.start() + 1]  # include the punctuation, drop the space
+
+    return text
+
+
+def _mark_fragment(escaped: str, fragment: str) -> str | None:
+    """Try to wrap fragment in <mark> inside escaped. Returns marked string or None."""
+    if not fragment.strip():
+        return None
+    # exact match
+    idx = escaped.find(fragment)
+    if idx >= 0:
+        end = idx + len(fragment)
+        return escaped[:idx] + _MARK_OPEN + escaped[idx:end] + _MARK_CLOSE + escaped[end:]
+    # flexible whitespace between words
+    words = fragment.split()
+    if len(words) >= 2:
+        pattern = r"\s+".join(_re.escape(w) for w in words)
+        m = _re.search(pattern, escaped)
+        if m:
+            return escaped[:m.start()] + _MARK_OPEN + escaped[m.start():m.end()] + _MARK_CLOSE + escaped[m.end():]
+    return None
+
+
 def _inject_mark(escaped: str, escaped_quote: str) -> str:
     """Wrap the first occurrence of escaped_quote in <mark> tags inside escaped.
 
     Pass 1 – exact substring match (fast path).
-    Pass 2 – word-by-word regex that allows any whitespace (\\s+) between words,
-              so quotes that span newline-separated sentences still match.
+    Pass 2 – word-by-word regex that allows any whitespace (\\s+) between words.
+    Pass 3 – first sentence only, for quotes that span non-adjacent speaker turns.
     """
     if not escaped_quote.strip():
         return escaped
 
-    # --- Pass 1: exact ---
-    idx = escaped.find(escaped_quote)
-    if idx >= 0:
-        end = idx + len(escaped_quote)
-        return escaped[:idx] + _MARK_OPEN + escaped[idx:end] + _MARK_CLOSE + escaped[end:]
+    result = _mark_fragment(escaped, escaped_quote)
+    if result is not None:
+        return result
 
-    # --- Pass 2: flexible whitespace ---
-    words = escaped_quote.split()
-    if len(words) < 2:
-        return escaped
-    pattern = r"\s+".join(_re.escape(w) for w in words)
-    m = _re.search(pattern, escaped)
-    if m:
-        return escaped[:m.start()] + _MARK_OPEN + escaped[m.start():m.end()] + _MARK_CLOSE + escaped[m.end():]
+    # Pass 3: the quote may stitch together non-adjacent transcript chunks.
+    # Match just the first sentence so the scroll lands in the right place.
+    first = _first_sentence(escaped_quote)
+    if first != escaped_quote:
+        result = _mark_fragment(escaped, first)
+        if result is not None:
+            return result
 
     return escaped
 
@@ -95,6 +134,7 @@ class State(
     is_prepping: bool = False
     persona_input: str = ""
     transcript_text: str = ""
+    synthesis_error: str = ""
     prep_questions: str = ""
     prep_last_updated: str = ""
 
@@ -153,6 +193,10 @@ class State(
     pending_synthesis_memorable_quote: str = ""
     pending_synthesis_opps: list[PendingOppItem] = []
     pending_llm_usages: list[PendingLlmUsage] = []
+    # Extracted interview metadata (all optional — empty/0 means not found)
+    pending_synthesis_duration: int = 0        # 0 = not found
+    pending_synthesis_interview_date: str = "" # "" = not found
+    pending_synthesis_participants: list[str] = []
 
     # --- Shared highlight state (synthesis review + interview detail) ---
     highlighted_quote_text: str = ""
@@ -378,6 +422,10 @@ class State(
     @rx.var
     def selected_opp_count(self) -> int:
         return sum(1 for opp in self.pending_synthesis_opps if opp.selected)
+
+    @rx.var
+    def pending_synthesis_participants_str(self) -> str:
+        return ", ".join(self.pending_synthesis_participants)
 
     @rx.var
     def detail_transcript_html(self) -> str:

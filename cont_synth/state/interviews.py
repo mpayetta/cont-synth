@@ -144,8 +144,16 @@ class InterviewStateMixin(rx.State, mixin=True):
 
     def run_synthesis(self):
         """Runs Gemini-based synthesis and opportunity dedupe, then shows the review step."""
-        if not self.transcript_text.strip() or not self.persona_input.strip():
-            return rx.window_alert("Error: Both Persona and Transcript are required.")
+        if not self.persona_input.strip() and not self.transcript_text.strip():
+            self.synthesis_error = "Persona and transcript are required."
+            return
+        if not self.persona_input.strip():
+            self.synthesis_error = "Persona is required."
+            return
+        if not self.transcript_text.strip():
+            self.synthesis_error = "Transcript is required."
+            return
+        self.synthesis_error = ""
 
         self.is_processing = True
         yield
@@ -274,6 +282,12 @@ class InterviewStateMixin(rx.State, mixin=True):
             self.pending_llm_usages = pending_usages
             self.highlighted_quote_text = pending_opps[0].source_quote if pending_opps else ""
 
+            # Extract optional metadata
+            meta = result.get("metadata") or {}
+            self.pending_synthesis_duration = meta.get("duration_minutes") or 0
+            self.pending_synthesis_interview_date = meta.get("interview_date") or ""
+            self.pending_synthesis_participants = meta.get("participants") or []
+
             # Clear the input form
             self.transcript_text = ""
             self.persona_input = ""
@@ -398,6 +412,9 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.pending_synthesis_opps = []
         self.pending_llm_usages = []
         self.highlighted_quote_text = ""
+        self.pending_synthesis_duration = 0
+        self.pending_synthesis_interview_date = ""
+        self.pending_synthesis_participants = []
         self.current_view = "synthesize"
 
     def confirm_synthesis(self):
@@ -423,6 +440,9 @@ class InterviewStateMixin(rx.State, mixin=True):
                 feedback=self.pending_synthesis_feedback,
                 memorable_quote=self.pending_synthesis_memorable_quote,
                 product_id=int(self.active_product_id),
+                duration_minutes=self.pending_synthesis_duration or None,
+                interview_date=self.pending_synthesis_interview_date or None,
+                participants=json.dumps(self.pending_synthesis_participants) if self.pending_synthesis_participants else None,
             )
             session.add(interview)
             session.commit()
@@ -492,6 +512,9 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.pending_synthesis_opps = []
         self.pending_llm_usages = []
         self.highlighted_quote_text = ""
+        self.pending_synthesis_duration = 0
+        self.pending_synthesis_interview_date = ""
+        self.pending_synthesis_participants = []
 
         self.load_ledger()
         self.load_history()

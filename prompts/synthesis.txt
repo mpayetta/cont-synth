@@ -8,3 +8,7 @@ RULES FOR SYNTHESIS:
 2. Opportunities: Extract specific unmet needs, pain points, or desires from the user. IT IS NEVER A FEATURE OR SOLUTION. You must IGNORE ambiguous complaints (e.g., "we ran into a few issues", "it didn't work right", "it was hard"). If the user does not explicitly explain the WHAT and the WHY behind the friction, do not extract it. Every extracted opportunity MUST have a clear, highly specific underlying need. Quality over quantity.
    - You MUST also assign a strict 1-3 word high-level `theme` to each opportunity (e.g., "Data Privacy", "Version Control", "PPT Formatting", "Reporting Speed").
 3. Memorable Quote: Extract one powerful, verbatim quote from the transcript that captures the core friction.
+4. Interview Metadata: Extract any of the following if clearly present in the transcript header or content. Leave each field null if absent or ambiguous.
+   - duration_minutes: Duration of the interview as an integer number of minutes.
+   - interview_date: Date the interview was conducted, in ISO format (YYYY-MM-DD).
+   - participants: List of participant names or roles (e.g. interviewer and interviewee names).

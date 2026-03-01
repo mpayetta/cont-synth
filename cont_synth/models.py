@@ -21,6 +21,10 @@ class Interview(rx.Model, table=True):
     feedback: str
     memorable_quote: str
     date_logged: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Metadata extracted by LLM — all optional
+    duration_minutes: int | None = Field(default=None)
+    interview_date: str | None = Field(default=None)   # ISO format: YYYY-MM-DD
+    participants: str | None = Field(default=None)     # JSON-encoded list of names
 
 
 class Opportunity(rx.Model, table=True):

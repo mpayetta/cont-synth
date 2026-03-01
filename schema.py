@@ -11,10 +11,16 @@ class QualityCheck(BaseModel):
     score: int
     feedback: str
 
+class InterviewMetadata(BaseModel):
+    duration_minutes: Optional[int]
+    interview_date: Optional[str]  # ISO format: YYYY-MM-DD, or null
+    participants: Optional[List[str]]
+
 class InterviewSnapshot(BaseModel):
     quality_check: QualityCheck
     opportunities: List[OpportunityExtraction]
     memorable_quote: str
+    metadata: Optional[InterviewMetadata]
 
 # For Gemini Flash (Deduplication)
 class OpportunityMatch(BaseModel):
