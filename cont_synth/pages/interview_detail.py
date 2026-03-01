@@ -179,7 +179,7 @@ def render_interview_detail() -> rx.Component:
             on_click=State.handle_navigation("logs"),
             margin_bottom="4px",
         ),
-        # Header: persona + date
+        # Header: persona + date + interview ID
         rx.hstack(
             rx.badge(
                 State.interview_detail_persona,
@@ -197,6 +197,56 @@ def render_interview_detail() -> rx.Component:
             ),
             align="center",
             spacing="2",
+        ),
+        # Metadata row — only shown when at least one field is available
+        rx.cond(
+            (State.interview_detail_interview_date != "")
+            | (State.interview_detail_duration > 0)
+            | (State.interview_detail_participants != ""),
+            rx.hstack(
+                rx.cond(
+                    State.interview_detail_interview_date != "",
+                    rx.hstack(
+                        rx.icon("calendar", size=13, color="var(--gray-9)"),
+                        rx.text(State.interview_detail_interview_date, size="2", color="var(--gray-11)"),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    State.interview_detail_duration > 0,
+                    rx.hstack(
+                        rx.icon("clock", size=13, color="var(--gray-9)"),
+                        rx.text(
+                            State.interview_detail_duration.to_string(),
+                            " min",
+                            size="2",
+                            color="var(--gray-11)",
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    State.interview_detail_participants != "",
+                    rx.hstack(
+                        rx.icon("users", size=13, color="var(--gray-9)"),
+                        rx.text(State.interview_detail_participants, size="2", color="var(--gray-11)"),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.fragment(),
+                ),
+                spacing="4",
+                align="center",
+                padding="6px 12px",
+                background_color="var(--gray-2)",
+                border="1px solid var(--gray-4)",
+                border_radius="6px",
+                wrap="wrap",
+            ),
         ),
         rx.divider(),
         # Two-column body

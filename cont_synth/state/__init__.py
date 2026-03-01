@@ -184,6 +184,10 @@ class State(
     interview_detail_transcript: str = ""
     interview_detail_quotes: list[QuoteItem] = []
     active_quote_index: int = 0
+    # Extracted metadata (empty/0 = not available)
+    interview_detail_interview_date: str = ""
+    interview_detail_duration: int = 0
+    interview_detail_participants: str = ""  # comma-joined display string
 
     # --- Pending synthesis (confirmation step) ---
     pending_synthesis_transcript: str = ""

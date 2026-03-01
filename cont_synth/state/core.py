@@ -117,6 +117,10 @@ class InterviewHistoryItem(rx.Base):
     persona_color: str = "gray"
     date_logged: str
     snippet: str
+    # Extracted metadata (empty/0 = not available)
+    interview_date: str = ""
+    duration_minutes: int = 0
+    participants: str = ""  # comma-joined display string
 
 
 class LedgerItem(rx.Base):

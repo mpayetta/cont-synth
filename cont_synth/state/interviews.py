@@ -73,6 +73,12 @@ class InterviewStateMixin(rx.State, mixin=True):
                 snippet = (
                     inv.transcript[:80] + "..." if inv.transcript else "No transcript."
                 )
+                participants_str = ""
+                if inv.participants:
+                    try:
+                        participants_str = ", ".join(json.loads(inv.participants))
+                    except Exception:
+                        participants_str = inv.participants
                 history.append(
                     InterviewHistoryItem(
                         interview_id=inv.id,
@@ -80,6 +86,9 @@ class InterviewStateMixin(rx.State, mixin=True):
                         persona_color=self._persona_color(persona.name),
                         date_logged=date_str,
                         snippet=snippet,
+                        interview_date=inv.interview_date or "",
+                        duration_minutes=inv.duration_minutes or 0,
+                        participants=participants_str,
                     )
                 )
             self.interview_history = history[::-1]
@@ -612,6 +621,13 @@ class InterviewStateMixin(rx.State, mixin=True):
                     )
                 )
 
+        participants_str = ""
+        if interview.participants:
+            try:
+                participants_str = ", ".join(json.loads(interview.participants))
+            except Exception:
+                participants_str = interview.participants
+
         self.selected_interview_id = interview_id
         self.interview_detail_persona = persona.name
         self.interview_detail_persona_color = p_color
@@ -620,6 +636,9 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.interview_detail_quotes = quotes
         self.active_quote_index = 0
         self.highlighted_quote_text = quotes[0].text if quotes else ""
+        self.interview_detail_interview_date = interview.interview_date or ""
+        self.interview_detail_duration = interview.duration_minutes or 0
+        self.interview_detail_participants = participants_str
         self.current_view = "interview_detail"
 
     async def next_quote(self):
