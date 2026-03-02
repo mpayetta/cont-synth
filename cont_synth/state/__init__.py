@@ -24,6 +24,7 @@ from .core import (
     RecentInterviewItem,
     PrepOppItem,
     PrepExperimentItem,
+    configure_genai,
 )
 from .auth import _hash_password, _verify_password
 from ..models import (
@@ -151,9 +152,11 @@ class State(
     login_error: str = ""
 
     # --- Account settings ---
-    is_settings_open: bool = False
+    account_section: str = "settings"
     settings_username: str = ""
     settings_fullname: str = ""
+    settings_gemini_api_key: str = ""
+    show_api_key: bool = False
     settings_new_password: str = ""
     settings_confirm_password: str = ""
     settings_error: str = ""
@@ -176,6 +179,7 @@ class State(
     synthesis_error: str = ""
     prep_questions: str = ""
     prep_last_updated: str = ""
+    prep_extra_context: str = ""
 
     # --- Interview guide prep (OST-based) ---
     prep_opportunities: list[PrepOppItem] = []
@@ -357,6 +361,7 @@ class State(
         self.login_error = ""
         self.login_username = ""
         self.login_password = ""
+        configure_genai(user.gemini_api_key or "")
         yield rx.call_script(f"localStorage.setItem('auth_user_id', '{user.id}')")
         yield rx.call_script(
             "localStorage.getItem('active_product_id') || ''",
@@ -388,6 +393,7 @@ class State(
         self.auth_username = user.username
         self.auth_fullname = user.fullname
         self.is_authenticated = True
+        configure_genai(user.gemini_api_key or "")
         self.load_data_for_current_view()
         return rx.call_script(
             "localStorage.getItem('active_product_id') || ''",
@@ -399,28 +405,32 @@ class State(
         if key == "Enter":
             yield State.login()
 
-    def open_account_settings(self):
-        """Open the account settings modal pre-filled with current user data."""
+    def load_account_page(self):
+        """On-mount handler for the /account page: pre-fill settings and load LLM usage."""
+        self.current_view = "account"
+        self.account_section = "settings"
+        return self._ensure_auth_and_load()
+
+    def _prefill_account_settings(self):
+        """Pre-fill account settings form fields from the current user record."""
+        with rx.session() as session:
+            user = session.get(User, self.auth_user_id)
+            if user:
+                self.settings_gemini_api_key = user.gemini_api_key or ""
         self.settings_username = self.auth_username
         self.settings_fullname = self.auth_fullname
         self.settings_new_password = ""
         self.settings_confirm_password = ""
         self.settings_error = ""
         self.settings_success = ""
-        self.is_settings_open = True
+        self.show_api_key = False
 
-    def close_account_settings(self):
-        """Close the account settings modal and clear its form."""
-        self.is_settings_open = False
-        self.settings_username = ""
-        self.settings_fullname = ""
-        self.settings_new_password = ""
-        self.settings_confirm_password = ""
-        self.settings_error = ""
-        self.settings_success = ""
+    def toggle_show_api_key(self):
+        """Toggle visibility of the Gemini API key input."""
+        self.show_api_key = not self.show_api_key
 
     def save_account_settings(self):
-        """Persist updated profile and optional new password to the database."""
+        """Persist updated profile, API key, and optional new password to the database."""
         from sqlmodel import select as _select
         self.settings_error = ""
         self.settings_success = ""
@@ -436,6 +446,7 @@ class State(
             if len(self.settings_new_password) < 6:
                 self.settings_error = "Password must be at least 6 characters."
                 return
+        new_api_key = self.settings_gemini_api_key.strip()
         with rx.session() as session:
             user = session.get(User, self.auth_user_id)
             if not user:
@@ -450,12 +461,15 @@ class State(
                     return
             user.username = new_username
             user.fullname = new_fullname
+            user.gemini_api_key = new_api_key if new_api_key else None
             if self.settings_new_password:
                 user.password_hash = _hash_password(self.settings_new_password)
             session.add(user)
             session.commit()
         self.auth_username = new_username
         self.auth_fullname = new_fullname
+        self.settings_gemini_api_key = new_api_key
+        configure_genai(new_api_key)
         self.settings_new_password = ""
         self.settings_confirm_password = ""
         self.settings_success = "Settings saved successfully."
@@ -500,7 +514,6 @@ class State(
 
         # Reset all volatile state and return to the start
         self.current_view = "synthesize"
-        self.is_settings_open = False
         self.interview_history = []
         self.ledger_data = []
         self.available_personas = []

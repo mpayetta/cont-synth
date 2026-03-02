@@ -127,6 +127,7 @@ class User(rx.Model, table=True):
     username: str = Field(unique=True, index=True)
     password_hash: str
     fullname: str
+    gemini_api_key: Optional[str] = Field(default=None)
 
 
 class LlmUsageLog(rx.Model, table=True):

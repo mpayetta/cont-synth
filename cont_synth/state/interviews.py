@@ -696,20 +696,23 @@ class InterviewStateMixin(rx.State, mixin=True):
         """Generates interview guide — OST-based if opportunities are selected, else persona battle plan."""
         has_persona = bool(getattr(self, "target_persona", ""))
         selected_opps = [o for o in self.prep_opportunities if o.selected]
+        has_extra_context = bool(self.prep_extra_context.strip())
 
-        if not has_persona and not selected_opps:
-            return rx.window_alert("Select at least one opportunity, or choose a persona to generate a guide.")
+        if not has_persona and not selected_opps and not has_extra_context:
+            return rx.window_alert("Select at least one opportunity, add extra context, or choose a persona to generate a guide.")
 
         self.is_prepping = True
         yield
 
         try:
-            if selected_opps:
-                # --- OST-based interview guide ---
+            if selected_opps or has_extra_context:
+                # --- OST-based interview guide (or open-topic guide when only extra context is provided) ---
                 selected_exps = [e for e in self.prep_running_experiments if e.selected]
 
-                opps_section = "\n".join(
-                    f"- [{o.theme}] {o.statement}" for o in selected_opps
+                opps_section = (
+                    "\n".join(f"- [{o.theme}] {o.statement}" for o in selected_opps)
+                    if selected_opps
+                    else "None — this interview is not tied to specific opportunities."
                 )
                 exps_section = (
                     "\n".join(
@@ -724,10 +727,16 @@ class InterviewStateMixin(rx.State, mixin=True):
                     if has_persona
                     else "No specific persona has been defined for this interview."
                 )
+                extra_context = (
+                    f"ADDITIONAL CONTEXT FROM THE INTERVIEWER:\n{self.prep_extra_context.strip()}\n"
+                    if has_extra_context
+                    else ""
+                )
 
                 guide_template = load_prompt("interview_guide.txt")
                 guide_prompt = guide_template.format(
                     persona_context=persona_context,
+                    extra_context=extra_context,
                     opportunities_section=opps_section,
                     assumptions_section=exps_section,
                 )

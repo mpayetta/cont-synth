@@ -9,10 +9,26 @@ from dotenv import load_dotenv
 
 # --- AI & Prompt Infrastructure ---
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+_env_gemini_key = os.getenv("GEMINI_API_KEY", "")
+genai.configure(api_key=_env_gemini_key)
 
 pro_model = genai.GenerativeModel("gemini-2.5-pro")
 flash_model = genai.GenerativeModel("gemini-2.5-flash")
+
+
+def configure_genai(api_key: str) -> None:
+    """Reconfigure the Gemini client with a new API key.
+
+    Falls back to the GEMINI_API_KEY env var when api_key is empty.
+    Also refreshes the module-level model references so all subsequent
+    LLM calls pick up the new key.
+    """
+    global pro_model, flash_model
+    effective_key = api_key.strip() if api_key.strip() else _env_gemini_key
+    genai.configure(api_key=effective_key)
+    pro_model = genai.GenerativeModel("gemini-2.5-pro")
+    flash_model = genai.GenerativeModel("gemini-2.5-flash")
 
 
 def load_prompt(filename: str) -> str:
@@ -219,6 +235,7 @@ __all__ = [
     "genai",
     "pro_model",
     "flash_model",
+    "configure_genai",
     "load_prompt",
     "PersonaBadge",
     "QuoteItem",

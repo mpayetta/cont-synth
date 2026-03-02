@@ -13,7 +13,7 @@ from .pages.interview_detail import render_interview_detail
 from .pages.llm_usage import render_llm_usage
 from .pages.participants import render_participants
 from .pages.login import login_page
-from .pages.account_settings import account_settings_modal
+from .pages.account import render_account
 
 
 # --- SIDEBAR COMPONENT ---
@@ -237,50 +237,6 @@ def _workspace_section() -> rx.Component:
                     width="100%",
                     spacing="2",
                 ),
-                # Divider + LLM Usage link
-                rx.divider(margin_y="4px"),
-                rx.hstack(
-                    rx.icon(
-                        "bar-chart-2",
-                        size=14,
-                        color=rx.cond(
-                            State.current_view == "llm_usage",
-                            "var(--blue-11)",
-                            "var(--gray-9)",
-                        ),
-                    ),
-                    rx.text(
-                        "LLM Usage",
-                        size="2",
-                        color=rx.cond(
-                            State.current_view == "llm_usage",
-                            "var(--blue-11)",
-                            "var(--gray-11)",
-                        ),
-                        weight=rx.cond(
-                            State.current_view == "llm_usage", "medium", "regular"
-                        ),
-                    ),
-                    spacing="2",
-                    align="center",
-                    width="100%",
-                    padding="6px 8px",
-                    border_radius="6px",
-                    cursor="pointer",
-                    background_color=rx.cond(
-                        State.current_view == "llm_usage",
-                        "var(--blue-3)",
-                        "transparent",
-                    ),
-                    on_click=State.handle_navigation("llm_usage"),
-                    _hover={
-                        "background_color": rx.cond(
-                            State.current_view == "llm_usage",
-                            "var(--blue-3)",
-                            "var(--gray-3)",
-                        )
-                    },
-                ),
                 spacing="2",
                 width="100%",
                 padding_top="8px",
@@ -312,7 +268,7 @@ def _user_section() -> rx.Component:
             variant="ghost",
             color_scheme="gray",
             size="1",
-            on_click=State.open_account_settings,
+            on_click=State.handle_navigation("account"),
             title="Account Settings",
         ),
         rx.icon_button(
@@ -365,7 +321,6 @@ def _page_layout(content: rx.Component, on_mount) -> rx.Component:
     """Authenticated app shell: sidebar + content area, guarded by is_authenticated."""
     return rx.box(
         opportunity_drawer(),
-        account_settings_modal(),
         rx.cond(
             State.is_authenticated,
             rx.hstack(
@@ -428,6 +383,10 @@ def llm_usage_page() -> rx.Component:
     return _page_layout(render_llm_usage(), State.load_llm_usage_page)
 
 
+def account_page() -> rx.Component:
+    return _page_layout(render_account(), State.load_account_page)
+
+
 def login_route() -> rx.Component:
     return rx.box(login_page(), on_mount=State.load_app)
 
@@ -444,4 +403,5 @@ app.add_page(interview_detail_page, route="/interviews/[interview_id]")
 app.add_page(prep_page, route="/prep")
 app.add_page(participants_page, route="/participants")
 app.add_page(llm_usage_page, route="/llm-usage")
+app.add_page(account_page, route="/account")
 app.add_page(login_route, route="/login")

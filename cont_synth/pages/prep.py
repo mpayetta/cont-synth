@@ -172,6 +172,33 @@ def render_prep() -> rx.Component:
             padding_top="4px",
         ),
 
+        # --- Extra Context ---
+        rx.vstack(
+            rx.hstack(
+                rx.text("Additional context", weight="medium", size="3"),
+                rx.badge("Optional", color_scheme="gray", variant="soft", size="1"),
+                spacing="2",
+                align="center",
+            ),
+            rx.text(
+                "Describe the goal of this interview, topics to cover, or any background the LLM should know. Useful when the conversation isn't tied to specific opportunities.",
+                size="2",
+                color="var(--gray-10)",
+            ),
+            rx.text_area(
+                placeholder="e.g. This is an onboarding call with a new enterprise customer. I want to understand their workflow before any product training happens.",
+                value=State.prep_extra_context,
+                on_change=State.set_prep_extra_context,
+                rows="4",
+                resize="vertical",
+                width="100%",
+            ),
+            spacing="2",
+            align_items="start",
+            width="100%",
+            padding_top="4px",
+        ),
+
         # --- Generate Button ---
         rx.button(
             rx.cond(
@@ -230,11 +257,16 @@ def render_prep() -> rx.Component:
                     align="center",
                     margin_bottom="12px",
                 ),
-                rx.markdown(State.prep_questions),
+                rx.box(
+                    rx.markdown(State.prep_questions),
+                    overflow_x="auto",
+                    width="100%",
+                ),
                 padding="20px",
                 background_color="var(--gray-3)",
                 border_radius="8px",
                 width="100%",
+                overflow_x="auto",
                 margin_top="4px",
             ),
         ),

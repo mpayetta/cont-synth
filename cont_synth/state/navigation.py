@@ -35,6 +35,7 @@ _URL_MAP: dict[str, str] = {
     "interview_detail": "/interviews",
     "llm_usage": "/llm-usage",
     "participants": "/participants",
+    "account": "/account",
 }
 
 
@@ -100,8 +101,10 @@ class NavigationStateMixin(rx.State, mixin=True):
         elif self.current_view == "prep":
             self.load_ledger()  # loads available_personas for the persona selector
             self.load_prep_data()  # loads opportunities and running experiments for OST selectors
-        elif self.current_view == "llm_usage":
+        elif self.current_view in ("llm_usage", "account"):
             self.load_llm_usage()
+            if self.current_view == "account":
+                self._prefill_account_settings()
         elif self.current_view == "participants":
             self.load_participants()
         elif self.current_view == "interview_detail":
