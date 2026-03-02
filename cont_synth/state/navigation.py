@@ -24,6 +24,20 @@ def _persona_color(name: str) -> str:
     return _PERSONA_COLORS[sum(ord(c) for c in name) % len(_PERSONA_COLORS)]
 
 
+_URL_MAP: dict[str, str] = {
+    "home": "/",
+    "synthesize": "/synthesize",
+    "synthesis_review": "/review",
+    "ledger": "/opportunities",
+    "opportunity": "/opportunities",
+    "prep": "/prep",
+    "logs": "/interviews",
+    "interview_detail": "/interviews",
+    "llm_usage": "/llm-usage",
+    "participants": "/participants",
+}
+
+
 class NavigationStateMixin(rx.State, mixin=True):
 
     def load_products(self):
@@ -50,10 +64,9 @@ class NavigationStateMixin(rx.State, mixin=True):
         return rx.call_script(f"localStorage.setItem('active_product_id', '{product_id}')")
 
     def handle_navigation(self, view_name: str):
-        """Safely handles view routing."""
-        self.current_view = view_name
+        """Navigate to the URL corresponding to view_name."""
         self.highlighted_quote_text = ""
-        self.load_data_for_current_view()
+        return rx.redirect(_URL_MAP.get(view_name, "/"))
 
     def load_llm_usage(self):
         """Fetches all LLM usage log rows for the dashboard."""
@@ -91,7 +104,24 @@ class NavigationStateMixin(rx.State, mixin=True):
             self.load_llm_usage()
         elif self.current_view == "participants":
             self.load_participants()
-        # "interview_detail" and "opportunity" carry their data from the navigation event
+        elif self.current_view == "interview_detail":
+            self.load_interview_detail_data()
+        elif self.current_view == "opportunity":
+            self.load_ledger()
+            for item in self.ledger_data:
+                if item.opportunity_id == self.selected_opportunity_id:
+                    self.selected_opportunity = item
+                    self.selected_opp_outcome_name = (
+                        item.linked_outcomes[0].name
+                        if len(item.linked_outcomes) > 0
+                        else "None (Unmapped)"
+                    )
+                    break
+            self.experiment_target_solution_id = -1
+            self.experiment_target_solution_name = ""
+            self.selected_solution_for_experiment = ""
+            self.is_editing_opp_detail = False
+            self.editing_solution_id = -1
 
     def load_dashboard(self):
         """Loads all data needed for the home dashboard."""

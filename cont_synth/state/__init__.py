@@ -221,6 +221,7 @@ class State(
 
     # --- Interview detail view ---
     selected_interview_id: int = 0
+    selected_opportunity_id: int = 0
     interview_detail_persona: str = ""
     interview_detail_persona_color: str = "gray"
     interview_detail_date: str = ""
@@ -357,11 +358,11 @@ class State(
         self.login_username = ""
         self.login_password = ""
         yield rx.call_script(f"localStorage.setItem('auth_user_id', '{user.id}')")
-        self.load_data_for_current_view()
         yield rx.call_script(
             "localStorage.getItem('active_product_id') || ''",
             callback=State.restore_product_from_storage,
         )
+        yield rx.redirect("/")
 
     def logout(self):
         """Clear the session and return to the login screen."""
@@ -369,11 +370,14 @@ class State(
         self.auth_user_id = 0
         self.auth_username = ""
         self.auth_fullname = ""
-        return rx.call_script("localStorage.removeItem('auth_user_id')")
+        yield rx.call_script("localStorage.removeItem('auth_user_id')")
+        yield rx.redirect("/login")
 
     def verify_stored_session(self, stored_id: str):
         """Callback from localStorage on app mount — restores session if valid."""
         if not stored_id or not stored_id.strip().isdigit():
+            if self.router.page.path != "/login":
+                return rx.redirect("/login")
             return
         user_id = int(stored_id.strip())
         with rx.session() as session:
@@ -511,11 +515,68 @@ class State(
         self.prep_opportunities = []
         self.prep_running_experiments = []
         self.active_product_id = "1"
-        self.load_data_for_current_view()
+        return rx.redirect("/synthesize")
 
     def toggle_show_team_members(self):
         """Toggle visibility of product-team interviewers in the Participants table."""
         self.show_team_members = not self.show_team_members
+
+    def _ensure_auth_and_load(self):
+        """If already authenticated, load data for the current view.
+        Otherwise trigger the localStorage auth check."""
+        if self.is_authenticated:
+            self.load_data_for_current_view()
+        else:
+            return rx.call_script(
+                "localStorage.getItem('auth_user_id') || ''",
+                callback=State.verify_stored_session,
+            )
+
+    # --- Per-page on_mount handlers ---
+
+    def load_home_page(self):
+        self.current_view = "home"
+        return self._ensure_auth_and_load()
+
+    def load_synthesize_page(self):
+        self.current_view = "synthesize"
+        return self._ensure_auth_and_load()
+
+    def load_review_page(self):
+        self.current_view = "synthesis_review"
+        return self._ensure_auth_and_load()
+
+    def load_ledger_page(self):
+        self.current_view = "ledger"
+        return self._ensure_auth_and_load()
+
+    def load_opportunity_page(self):
+        self.current_view = "opportunity"
+        id_str = self.router.page.params.get("opportunity_id", "0")
+        self.selected_opportunity_id = int(id_str) if id_str.isdigit() else 0
+        return self._ensure_auth_and_load()
+
+    def load_interviews_page(self):
+        self.current_view = "logs"
+        return self._ensure_auth_and_load()
+
+    def load_interview_detail_page(self):
+        self.current_view = "interview_detail"
+        id_str = self.router.page.params.get("interview_id", "0")
+        self.selected_interview_id = int(id_str) if id_str.isdigit() else 0
+        return self._ensure_auth_and_load()
+
+    def load_prep_page(self):
+        self.current_view = "prep"
+        return self._ensure_auth_and_load()
+
+    def load_participants_page(self):
+        self.current_view = "participants"
+        return self._ensure_auth_and_load()
+
+    def load_llm_usage_page(self):
+        self.current_view = "llm_usage"
+        return self._ensure_auth_and_load()
 
     def load_app(self):
         """Initial app load — check auth first; data loads only after session is verified."""

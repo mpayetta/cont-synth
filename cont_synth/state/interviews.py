@@ -316,7 +316,7 @@ class InterviewStateMixin(rx.State, mixin=True):
             self.persona_input = ""
 
             # Navigate to review
-            self.current_view = "synthesis_review"
+            yield rx.redirect("/review")
 
         except Exception as e:  # pragma: no cover - UI alert path
             print(f"Engine Failure: {str(e)}")
@@ -447,7 +447,7 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.pending_synthesis_interview_date = ""
         self.pending_synthesis_participants = []
         self.pending_synthesis_participant_roles = []
-        self.current_view = "synthesize"
+        return rx.redirect("/synthesize")
 
     def confirm_synthesis(self):
         """Write the confirmed (selected) opportunities and interview to the database."""
@@ -603,7 +603,7 @@ class InterviewStateMixin(rx.State, mixin=True):
 
         self.load_ledger()
         self.load_history()
-        self.current_view = "logs"
+        return rx.redirect("/interviews")
 
     def load_prep_data(self):
         """Loads opportunities and running experiments for the prep page OST selectors."""
@@ -802,7 +802,13 @@ class InterviewStateMixin(rx.State, mixin=True):
             self.is_prepping = False
 
     def open_interview_detail(self, interview_id: int):
-        """Loads the full interview transcript and its evidence snippets, then navigates to the detail view."""
+        """Navigate to the interview detail page via URL routing."""
+        self.selected_interview_id = interview_id
+        return rx.redirect(f"/interviews/{interview_id}")
+
+    def load_interview_detail_data(self):
+        """Loads the full interview transcript and evidence snippets from self.selected_interview_id."""
+        interview_id = self.selected_interview_id
         with rx.session() as session:
             interview = session.get(Interview, interview_id)
             if not interview:
@@ -841,7 +847,6 @@ class InterviewStateMixin(rx.State, mixin=True):
             except Exception:
                 p_names = [interview.participants] if interview.participants else []
             participants_str = ", ".join(p_names)
-            # Look up each name in the Participant table to get is_team_member status
             with rx.session() as p_session:
                 for p_name in p_names:
                     p_rec = p_session.exec(
@@ -854,7 +859,6 @@ class InterviewStateMixin(rx.State, mixin=True):
                         is_team_member=p_rec.is_team_member if p_rec else False,
                     ))
 
-        self.selected_interview_id = interview_id
         self.interview_detail_persona = persona.name
         self.interview_detail_persona_color = p_color
         self.interview_detail_date = date_str
@@ -866,7 +870,6 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.interview_detail_duration = interview.duration_minutes or 0
         self.interview_detail_participants = participants_str
         self.interview_detail_participant_items = participant_items
-        self.current_view = "interview_detail"
 
     async def next_quote(self):
         if self.active_quote_index < len(self.interview_detail_quotes) - 1:
@@ -887,7 +890,7 @@ class InterviewStateMixin(rx.State, mixin=True):
     def delete_current_interview(self):
         """Deletes the currently-viewed interview and navigates back to the list."""
         self.delete_interview(self.selected_interview_id)
-        self.current_view = "logs"
+        return rx.redirect("/interviews")
 
     def load_prep_for_persona(self, persona: str):
         """Sets the target persona and tries to load an existing script from DB."""

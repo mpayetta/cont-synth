@@ -360,30 +360,18 @@ def sidebar() -> rx.Component:
     )
 
 
-# --- MAIN DASHBOARD LAYOUT ---
-def _authenticated_layout() -> rx.Component:
-    """The full app shell, shown only when the user is logged in."""
+# --- SHARED PAGE LAYOUT ---
+def _page_layout(content: rx.Component, on_mount) -> rx.Component:
+    """Authenticated app shell: sidebar + content area, guarded by is_authenticated."""
     return rx.box(
         opportunity_drawer(),
         account_settings_modal(),
-        rx.hstack(
-            sidebar(),
-            rx.vstack(
+        rx.cond(
+            State.is_authenticated,
+            rx.hstack(
+                sidebar(),
                 rx.box(
-                    rx.match(
-                        State.current_view,
-                        ("home", render_home()),
-                        ("synthesize", render_synthesize()),
-                        ("synthesis_review", render_synthesis_review()),
-                        ("ledger", render_ledger()),
-                        ("opportunity", render_opportunity_detail()),
-                        ("prep", render_prep()),
-                        ("logs", render_logs()),
-                        ("interview_detail", render_interview_detail()),
-                        ("llm_usage", render_llm_usage()),
-                        ("participants", render_participants()),
-                        render_synthesize(),
-                    ),
+                    content,
                     padding="40px",
                     width="100%",
                     height="100%",
@@ -393,25 +381,67 @@ def _authenticated_layout() -> rx.Component:
                 height="100vh",
                 spacing="0",
             ),
-            width="100%",
-            height="100vh",
-            spacing="0",
+            rx.fragment(),  # blank while auth check redirects to /login
         ),
+        on_mount=on_mount,
     )
 
 
-def index() -> rx.Component:
-    return rx.box(
-        rx.cond(
-            State.is_authenticated,
-            _authenticated_layout(),
-            login_page(),
-        ),
-        # On mount: check stored session; data loads only after auth is confirmed.
-        on_mount=State.load_app,
-    )
+# --- PAGE FUNCTIONS ---
+def home_page() -> rx.Component:
+    return _page_layout(render_home(), State.load_home_page)
+
+
+def synthesize_page() -> rx.Component:
+    return _page_layout(render_synthesize(), State.load_synthesize_page)
+
+
+def synthesis_review_page() -> rx.Component:
+    return _page_layout(render_synthesis_review(), State.load_review_page)
+
+
+def ledger_page() -> rx.Component:
+    return _page_layout(render_ledger(), State.load_ledger_page)
+
+
+def opportunity_page() -> rx.Component:
+    return _page_layout(render_opportunity_detail(), State.load_opportunity_page)
+
+
+def interviews_page() -> rx.Component:
+    return _page_layout(render_logs(), State.load_interviews_page)
+
+
+def interview_detail_page() -> rx.Component:
+    return _page_layout(render_interview_detail(), State.load_interview_detail_page)
+
+
+def prep_page() -> rx.Component:
+    return _page_layout(render_prep(), State.load_prep_page)
+
+
+def participants_page() -> rx.Component:
+    return _page_layout(render_participants(), State.load_participants_page)
+
+
+def llm_usage_page() -> rx.Component:
+    return _page_layout(render_llm_usage(), State.load_llm_usage_page)
+
+
+def login_route() -> rx.Component:
+    return rx.box(login_page(), on_mount=State.load_app)
 
 
 # STRICTLY ONLY ONE APP INSTANTIATION
 app = rx.App()
-app.add_page(index)
+app.add_page(home_page, route="/")
+app.add_page(synthesize_page, route="/synthesize")
+app.add_page(synthesis_review_page, route="/review")
+app.add_page(ledger_page, route="/opportunities")
+app.add_page(opportunity_page, route="/opportunities/[opportunity_id]")
+app.add_page(interviews_page, route="/interviews")
+app.add_page(interview_detail_page, route="/interviews/[interview_id]")
+app.add_page(prep_page, route="/prep")
+app.add_page(participants_page, route="/participants")
+app.add_page(llm_usage_page, route="/llm-usage")
+app.add_page(login_route, route="/login")

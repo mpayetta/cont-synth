@@ -7,17 +7,24 @@ import pytest
 
 # conftest.py has mocked google.generativeai before this import.
 from cont_synth.state.core import (
+    DashboardBarItem,
+    DetailParticipantItem,
     ExperimentItem,
     InterviewHistoryItem,
     LedgerItem,
     LlmUsageItem,
     OppDetailSolution,
     OutcomeItem,
+    ParticipantItem,
     PendingLlmUsage,
     PendingOppItem,
+    PendingParticipantItem,
     PersonaBadge,
+    PrepExperimentItem,
+    PrepOppItem,
     ProductItem,
     QuoteItem,
+    RecentInterviewItem,
     SolutionItem,
 )
 
@@ -360,3 +367,263 @@ class TestInterviewHistoryItem:
         assert item.duration_minutes == 45
         assert item.participants == "Alice, Bob"
         assert item.interview_date == "2025-02-09"
+
+
+class TestPrepOppItem:
+    def test_create_with_required_fields(self):
+        item = PrepOppItem(id=1, theme="Workflow", statement="Users can't batch-export invoices")
+        assert item.id == 1
+        assert item.theme == "Workflow"
+        assert item.statement == "Users can't batch-export invoices"
+
+    def test_selected_defaults_to_false(self):
+        item = PrepOppItem(id=1, theme="T", statement="S")
+        assert item.selected is False
+
+    def test_selected_can_be_true(self):
+        item = PrepOppItem(id=1, theme="T", statement="S", selected=True)
+        assert item.selected is True
+
+    def test_id_is_int(self):
+        item = PrepOppItem(id=99, theme="T", statement="S")
+        assert isinstance(item.id, int)
+
+    def test_theme_and_statement_are_strings(self):
+        item = PrepOppItem(id=1, theme="Onboarding", statement="Setup takes too long")
+        assert isinstance(item.theme, str)
+        assert isinstance(item.statement, str)
+
+    def test_multiple_items_are_independent(self):
+        a = PrepOppItem(id=1, theme="T", statement="S", selected=True)
+        b = PrepOppItem(id=2, theme="T", statement="S", selected=False)
+        assert a.selected is True
+        assert b.selected is False
+
+
+class TestPrepExperimentItem:
+    def test_create_with_all_fields(self):
+        item = PrepExperimentItem(
+            id=3,
+            opp_id=10,
+            solution_name="Auto-Suggest",
+            experiment_name="Fake Door Test",
+            assumption="Users will click the new button",
+        )
+        assert item.id == 3
+        assert item.opp_id == 10
+        assert item.solution_name == "Auto-Suggest"
+        assert item.experiment_name == "Fake Door Test"
+        assert item.assumption == "Users will click the new button"
+
+    def test_selected_defaults_to_false(self):
+        item = PrepExperimentItem(
+            id=1, opp_id=1, solution_name="S", experiment_name="E", assumption="A"
+        )
+        assert item.selected is False
+
+    def test_selected_can_be_true(self):
+        item = PrepExperimentItem(
+            id=1, opp_id=1, solution_name="S", experiment_name="E",
+            assumption="A", selected=True,
+        )
+        assert item.selected is True
+
+    def test_opp_id_links_to_parent_opportunity(self):
+        item = PrepExperimentItem(
+            id=5, opp_id=42, solution_name="S", experiment_name="E", assumption="A"
+        )
+        assert item.opp_id == 42
+
+    def test_multiple_items_are_independent(self):
+        a = PrepExperimentItem(id=1, opp_id=10, solution_name="S", experiment_name="E", assumption="A", selected=True)
+        b = PrepExperimentItem(id=2, opp_id=10, solution_name="S", experiment_name="E", assumption="A", selected=False)
+        assert a.selected is True
+        assert b.selected is False
+
+
+# ---------------------------------------------------------------------------
+# DashboardBarItem (home dashboard weekly sparkline)
+# ---------------------------------------------------------------------------
+
+class TestDashboardBarItem:
+    def test_create(self):
+        bar = DashboardBarItem(week_label="Jan 20", count=3, height_css="36px")
+        assert bar.week_label == "Jan 20"
+        assert bar.count == 3
+        assert bar.height_css == "36px"
+
+    def test_height_css_default(self):
+        bar = DashboardBarItem(week_label="Feb 03", count=0)
+        assert bar.height_css == "0px"
+
+    def test_zero_count_bar(self):
+        bar = DashboardBarItem(week_label="Mar 10", count=0, height_css="0px")
+        assert bar.count == 0
+        assert bar.height_css == "0px"
+
+    def test_max_height_bar(self):
+        bar = DashboardBarItem(week_label="Apr 07", count=5, height_css="48px")
+        assert bar.count == 5
+        assert bar.height_css == "48px"
+
+    def test_week_label_preserved(self):
+        for label in ["Jan 05", "Feb 12", "Mar 19", "Dec 30"]:
+            bar = DashboardBarItem(week_label=label, count=1, height_css="10px")
+            assert bar.week_label == label
+
+    def test_count_is_int(self):
+        bar = DashboardBarItem(week_label="Jan 01", count=7, height_css="48px")
+        assert isinstance(bar.count, int)
+
+    def test_height_css_is_str(self):
+        bar = DashboardBarItem(week_label="Jan 01", count=2, height_css="24px")
+        assert isinstance(bar.height_css, str)
+
+
+# ---------------------------------------------------------------------------
+# RecentInterviewItem (home dashboard activity feed)
+# ---------------------------------------------------------------------------
+
+class TestRecentInterviewItem:
+    def test_create(self):
+        item = RecentInterviewItem(
+            interview_id=42,
+            persona="Enterprise Buyer",
+            persona_color="blue",
+            date_str="2026-02-28",
+            quote_count=5,
+        )
+        assert item.interview_id == 42
+        assert item.persona == "Enterprise Buyer"
+        assert item.persona_color == "blue"
+        assert item.date_str == "2026-02-28"
+        assert item.quote_count == 5
+
+    def test_zero_quotes(self):
+        item = RecentInterviewItem(
+            interview_id=1, persona="SMB Owner", persona_color="green",
+            date_str="2026-01-01", quote_count=0,
+        )
+        assert item.quote_count == 0
+
+    def test_all_persona_colors(self):
+        colors = ["blue", "purple", "orange", "green", "pink", "teal", "ruby", "iris", "indigo"]
+        for color in colors:
+            item = RecentInterviewItem(
+                interview_id=1, persona="User", persona_color=color,
+                date_str="2026-01-01", quote_count=1,
+            )
+            assert item.persona_color == color
+
+    def test_interview_id_is_int(self):
+        item = RecentInterviewItem(
+            interview_id=99, persona="P", persona_color="blue",
+            date_str="2026-01-01", quote_count=3,
+        )
+        assert isinstance(item.interview_id, int)
+
+    def test_date_str_formats(self):
+        for date_str in ["2026-01-15", "2025-12-31", "2026-03-01"]:
+            item = RecentInterviewItem(
+                interview_id=1, persona="P", persona_color="blue",
+                date_str=date_str, quote_count=0,
+            )
+            assert item.date_str == date_str
+
+
+# ---------------------------------------------------------------------------
+# ParticipantItem (CRM)
+# ---------------------------------------------------------------------------
+
+class TestParticipantItem:
+    def test_create_customer(self):
+        item = ParticipantItem(
+            id=1, name="Alice Chen", persona_name="VP of Engineering",
+            persona_color="blue", is_team_member=False,
+            segment="Enterprise", recruited_via="LinkedIn", notes="",
+        )
+        assert item.id == 1
+        assert item.name == "Alice Chen"
+        assert item.is_team_member is False
+
+    def test_create_team_member(self):
+        item = ParticipantItem(
+            id=2, name="Bob Smith", persona_name="",
+            persona_color="gray", is_team_member=True,
+            segment="", recruited_via="", notes="",
+        )
+        assert item.is_team_member is True
+
+    def test_defaults(self):
+        item = ParticipantItem(
+            id=3, name="Charlie", segment="SMB", recruited_via="Referral", notes="",
+        )
+        assert item.persona_name == ""
+        assert item.persona_color == "gray"
+        assert item.is_team_member is False
+        assert item.interview_count == 0
+        assert item.last_interviewed == ""
+
+    def test_interview_count_and_last_interviewed(self):
+        item = ParticipantItem(
+            id=4, name="Dana", segment="", recruited_via="", notes="",
+            interview_count=7, last_interviewed="2026-02-15",
+        )
+        assert item.interview_count == 7
+        assert item.last_interviewed == "2026-02-15"
+
+    def test_notes_preserved(self):
+        notes = "Key customer. Runs a 50-person team. Very opinionated about UX."
+        item = ParticipantItem(
+            id=5, name="Eve", segment="", recruited_via="", notes=notes,
+        )
+        assert item.notes == notes
+
+
+# ---------------------------------------------------------------------------
+# DetailParticipantItem (read-only chip in interview detail view)
+# ---------------------------------------------------------------------------
+
+class TestDetailParticipantItem:
+    def test_create_customer(self):
+        item = DetailParticipantItem(name="Alice Chen")
+        assert item.name == "Alice Chen"
+        assert item.is_team_member is False
+
+    def test_create_team_member(self):
+        item = DetailParticipantItem(name="Bob Smith", is_team_member=True)
+        assert item.is_team_member is True
+
+    def test_is_team_member_defaults_false(self):
+        item = DetailParticipantItem(name="Anyone")
+        assert item.is_team_member is False
+
+    def test_name_is_str(self):
+        item = DetailParticipantItem(name="Carol")
+        assert isinstance(item.name, str)
+
+
+# ---------------------------------------------------------------------------
+# PendingParticipantItem (role editor during synthesis review)
+# ---------------------------------------------------------------------------
+
+class TestPendingParticipantItem:
+    def test_create_with_defaults(self):
+        item = PendingParticipantItem(index=0, name="Alice")
+        assert item.index == 0
+        assert item.name == "Alice"
+        assert item.role == "interviewee"
+
+    def test_role_interviewer(self):
+        item = PendingParticipantItem(index=1, name="Bob", role="interviewer")
+        assert item.role == "interviewer"
+
+    def test_index_tracks_position(self):
+        items = [PendingParticipantItem(index=i, name=f"Person {i}") for i in range(5)]
+        for i, item in enumerate(items):
+            assert item.index == i
+
+    def test_both_valid_roles(self):
+        for role in ["interviewee", "interviewer"]:
+            item = PendingParticipantItem(index=0, name="N", role=role)
+            assert item.role == role

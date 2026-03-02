@@ -757,22 +757,9 @@ class LedgerStateMixin(rx.State, mixin=True):
         self._sync_drawer()
         
     def navigate_to_opportunity(self, opp_id: int):
-        """Loads an opportunity into state and navigates to the full-page detail view."""
-        for item in self.ledger_data:
-            if item.opportunity_id == opp_id:
-                self.selected_opportunity = item
-                self.selected_opp_outcome_name = (
-                    item.linked_outcomes[0].name
-                    if len(item.linked_outcomes) > 0
-                    else "None (Unmapped)"
-                )
-                break
-        self.experiment_target_solution_id = -1
-        self.experiment_target_solution_name = ""
-        self.selected_solution_for_experiment = ""
-        self.is_editing_opp_detail = False
-        self.cancel_edit()
-        self.current_view = "opportunity"
+        """Navigate to the opportunity detail page via URL routing."""
+        self.selected_opportunity_id = opp_id
+        return rx.redirect(f"/opportunities/{opp_id}")
 
     def enter_opp_detail_edit(self):
         """Enters inline edit mode on the opportunity detail page."""
@@ -804,7 +791,7 @@ class LedgerStateMixin(rx.State, mixin=True):
     def delete_current_opportunity(self):
         """Deletes the currently viewed opportunity and navigates back to the ledger."""
         self.delete_opportunity(self.selected_opportunity.opportunity_id)
-        self.current_view = "ledger"
+        return rx.redirect("/opportunities")
 
     def start_edit_solution_from_detail(
         self, sol_id: int, name: str, desc: str, status: str
