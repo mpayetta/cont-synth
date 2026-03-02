@@ -30,7 +30,7 @@ class Interview(rx.Model, table=True):
 class Opportunity(rx.Model, table=True):
     """The Master Opportunity that spans multiple interviews/personas."""
 
-    product_id: int | None = Field(default=1, foreign_key="product.id") 
+    product_id: int | None = Field(default=1, foreign_key="product.id")
     theme: str = Field(default="Uncategorized")
     statement: str
     parent_id: int | None = Field(
@@ -40,6 +40,11 @@ class Opportunity(rx.Model, table=True):
         default_factory=lambda: datetime.now(timezone.utc)
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Teresa Torres prioritization scores (0 = unrated, 1–5)
+    impact_score: int = Field(default=0)
+    sat_gap_score: int = Field(default=0)
+    # Target opportunity designation — only one should be True at a time
+    is_target: bool = Field(default=False)
 
 
 class InterviewOpportunityLink(rx.Model, table=True):
@@ -95,6 +100,25 @@ class Experiment(rx.Model, table=True):
     # Telemetry & Proof
     evidence_notes: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class Participant(rx.Model, table=True):
+    """A real human the team has talked to across one or more interviews."""
+
+    name: str = Field(index=True)
+    persona_id: int | None = Field(default=None, foreign_key="persona.id")  # their role archetype
+    is_team_member: bool = Field(default=False)  # True = product team interviewer, not a customer
+    segment: str = Field(default="")        # e.g. "Enterprise", "SMB"
+    recruited_via: str = Field(default="")  # e.g. "LinkedIn", "Customer Success"
+    notes: str = Field(default="")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class InterviewParticipantLink(rx.Model, table=True):
+    """Many-to-many bridge: one interview can have many participants and vice versa."""
+
+    interview_id: int = Field(foreign_key="interview.id", primary_key=True)
+    participant_id: int = Field(foreign_key="participant.id", primary_key=True)
 
 
 class User(rx.Model, table=True):

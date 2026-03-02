@@ -133,6 +133,14 @@ When you run migrations for the first time, the database is seeded with a defaul
 
 ---
 
+## Documentation
+
+| Guide | Description |
+|---|---|
+| [**Opportunities — Full Lifecycle**](docs/opportunities.md) | How Opportunities are created, evidenced, structured into a tree, explored with Solutions, validated with Experiments, and prioritized using the Torres framework (Frequency · Impact · Satisfaction Gap) |
+
+---
+
 ## Application Pages
 
 | Page | Description |

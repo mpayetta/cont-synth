@@ -14,7 +14,8 @@ class QualityCheck(BaseModel):
 class InterviewMetadata(BaseModel):
     duration_minutes: Optional[int]
     interview_date: Optional[str]  # ISO format: YYYY-MM-DD, or null
-    participants: Optional[List[str]]
+    participant_names: Optional[List[str]]  # e.g. ["Maia Fossati", "Mauricio Payetta"]
+    participant_roles: Optional[List[str]]  # parallel: "interviewee" or "interviewer"
 
 class InterviewSnapshot(BaseModel):
     quality_check: QualityCheck

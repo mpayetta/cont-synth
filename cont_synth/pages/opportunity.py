@@ -131,6 +131,16 @@ def render_detail_experiment(exp: ExperimentItem) -> rx.Component:
                     rx.badge(exp.method, color_scheme="purple", variant="soft", size="1"),
                     rx.badge(exp.status, color_scheme="orange", variant="soft", size="1"),
                     rx.badge(exp.signal, color_scheme=signal_color, variant="soft", size="1"),
+                    # Edit button — only available before concluding
+                    rx.cond(
+                        exp.status != "Concluded",
+                        rx.icon_button(
+                            rx.icon("pencil", size=12),
+                            size="1", variant="ghost", color_scheme="gray",
+                            on_click=lambda: State.start_edit_experiment(exp),
+                        ),
+                        rx.fragment(),
+                    ),
                     rx.alert_dialog.root(
                         rx.alert_dialog.trigger(
                             rx.icon_button(
@@ -207,6 +217,40 @@ def render_detail_experiment(exp: ExperimentItem) -> rx.Component:
                 ),
                 spacing="2",
             ),
+            # Suggestion button: appears after signal is set
+            rx.cond(
+                exp.signal != "Pending",
+                rx.button(
+                    rx.cond(exp.signal == "Validated", "→ Ship solution", "→ Discard solution"),
+                    size="1",
+                    variant="outline",
+                    color_scheme=rx.cond(exp.signal == "Validated", "green", "red"),
+                    on_click=lambda: State.apply_solution_outcome(exp.id),
+                ),
+                rx.fragment(),
+            ),
+            # Evidence notes: editable textarea when Concluded, read-only display otherwise
+            rx.cond(
+                exp.status == "Concluded",
+                rx.vstack(
+                    rx.text("Evidence / Learnings", size="1", weight="bold", color="gray"),
+                    rx.text_area(
+                        value=exp.evidence_notes,
+                        placeholder="What did you observe? What did you learn?",
+                        on_blur=lambda v: State.update_experiment_evidence(exp.id, v),
+                        size="1",
+                        width="100%",
+                        rows="3",
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+                rx.cond(
+                    exp.evidence_notes != "",
+                    rx.text(exp.evidence_notes, size="1", color="gray", font_style="italic"),
+                    rx.fragment(),
+                ),
+            ),
             spacing="2", width="100%",
         ),
         padding="10px",
@@ -241,7 +285,7 @@ def render_inline_experiment_form() -> rx.Component:
             ),
             rx.flex(
                 rx.button(
-                    "Save Experiment",
+                    rx.cond(State.editing_experiment_id != -1, "Save Changes", "Save Experiment"),
                     on_click=lambda: State.add_experiment(
                         State.selected_opportunity.opportunity_id
                     ),

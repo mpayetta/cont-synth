@@ -2,6 +2,7 @@ import reflex as rx
 from .state import State
 
 # --- PAGE IMPORTS ---
+from .pages.home import render_home
 from .pages.logs import render_logs
 from .pages.synthesize import render_synthesize
 from .pages.synthesis_review import render_synthesis_review
@@ -10,6 +11,7 @@ from .pages.ledger import render_ledger, opportunity_drawer
 from .pages.opportunity import render_opportunity_detail
 from .pages.interview_detail import render_interview_detail
 from .pages.llm_usage import render_llm_usage
+from .pages.participants import render_participants
 from .pages.login import login_page
 from .pages.account_settings import account_settings_modal
 
@@ -339,10 +341,12 @@ def sidebar() -> rx.Component:
             margin_bottom="6",
         ),
         # Navigation items
+        sidebar_item("Home", "house", "home"),
         sidebar_item("Synthesize", "sparkles", "synthesize"),
         sidebar_item("Opportunities", "table", "ledger"),
         sidebar_item("Pre-Meeting Prep", "target", "prep"),
         sidebar_item("Interviews", "archive", "logs"),
+        sidebar_item("Participants", "users", "participants"),
         # Push workspace section to the bottom
         rx.spacer(),
         _workspace_section(),
@@ -368,6 +372,7 @@ def _authenticated_layout() -> rx.Component:
                 rx.box(
                     rx.match(
                         State.current_view,
+                        ("home", render_home()),
                         ("synthesize", render_synthesize()),
                         ("synthesis_review", render_synthesis_review()),
                         ("ledger", render_ledger()),
@@ -376,6 +381,7 @@ def _authenticated_layout() -> rx.Component:
                         ("logs", render_logs()),
                         ("interview_detail", render_interview_detail()),
                         ("llm_usage", render_llm_usage()),
+                        ("participants", render_participants()),
                         render_synthesize(),
                     ),
                     padding="40px",

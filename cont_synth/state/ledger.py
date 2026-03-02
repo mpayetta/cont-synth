@@ -87,6 +87,31 @@ class LedgerStateMixin(rx.State, mixin=True):
                 )
             ).all()
             opp_dict = {opp.id: opp for opp in opportunities}
+            now = datetime.now(timezone.utc)
+
+            # Pre-compute evidence counts for priority sort (single bulk query)
+            opp_ids = [o.id for o in opportunities]
+            _sort_links = (
+                session.exec(
+                    select(InterviewOpportunityLink).where(
+                        InterviewOpportunityLink.opportunity_id.in_(opp_ids)
+                    )
+                ).all()
+                if opp_ids else []
+            )
+            _evidence_counts: dict[int, int] = {}
+            for _lnk in _sort_links:
+                _evidence_counts[_lnk.opportunity_id] = _evidence_counts.get(_lnk.opportunity_id, 0) + 1
+
+            def _opp_sort_key(o: Opportunity) -> tuple:
+                freq = min(_evidence_counts.get(o.id, 0), 5)
+                priority = o.impact_score + o.sat_gap_score + freq
+                db_date = (
+                    o.date_last_validated.replace(tzinfo=timezone.utc)
+                    if o.date_last_validated.tzinfo is None
+                    else o.date_last_validated
+                )
+                return (-priority, (now - db_date).days)
 
             # 1. BULLETPROOF FLATTENING (Handles Cycles & Orphans)
             opp_children_map = {}
@@ -98,6 +123,11 @@ class LedgerStateMixin(rx.State, mixin=True):
                     opp_children_map.setdefault(opp.parent_id, []).append(opp)
                 else:
                     opp_top_level.append(opp)
+
+            # Sort roots and each sibling group: highest priority first, then fewest days_old
+            opp_top_level.sort(key=_opp_sort_key)
+            for _sibs in opp_children_map.values():
+                _sibs.sort(key=_opp_sort_key)
 
             flat_opps: list[tuple[Opportunity, int]] = []
             visited_nodes = set()
@@ -128,7 +158,6 @@ class LedgerStateMixin(rx.State, mixin=True):
 
             new_ledger: list[LedgerItem] = []
             personas_set: set[str] = set()
-            now = datetime.now(timezone.utc)
 
             # 2. ITERATE OVER FLATTENED OPPORTUNITIES
             for opp, opp_indent in flat_opps:
@@ -286,6 +315,10 @@ class LedgerStateMixin(rx.State, mixin=True):
                     out for out in self.outcomes if out.id in linked_out_ids
                 ]
 
+                running_exp_count = sum(1 for e in exp_items if e.status == "Running")
+                frequency_score = min(len(evidence_list), 5)
+                priority_score = opp.impact_score + opp.sat_gap_score + frequency_score
+
                 new_ledger.append(
                     LedgerItem(
                         opportunity_id=opp.id,
@@ -302,6 +335,11 @@ class LedgerStateMixin(rx.State, mixin=True):
                         solutions=sol_items,
                         linked_outcomes=linked_out_items,
                         experiments=exp_items,
+                        impact_score=opp.impact_score,
+                        sat_gap_score=opp.sat_gap_score,
+                        priority_score=priority_score,
+                        running_experiments=running_exp_count,
+                        is_target=opp.is_target,
                     )
                 )
 
@@ -779,6 +817,7 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def cancel_experiment_form(self):
         """Clears the inline experiment form without leaving the experiments area."""
+        self.editing_experiment_id = -1
         self.experiment_target_solution_id = -1
         self.experiment_target_solution_name = ""
         self.selected_solution_for_experiment = ""
@@ -809,24 +848,33 @@ class LedgerStateMixin(rx.State, mixin=True):
         self.active_drawer_tab = "experiments"
 
     def add_experiment(self, opportunity_id: int):
-        """Creates a new experiment and bumps the solution to 'Testing'."""
+        """Creates a new experiment (or saves an edit) and bumps the solution to 'Testing'."""
         if not self.new_experiment_name.strip():
             return rx.window_alert("Experiment name cannot be empty.")
         with rx.session() as session:
-            # Create experiment
-            session.add(Experiment(
-                solution_id=self.experiment_target_solution_id,
-                name=self.new_experiment_name.strip(),
-                assumption=self.new_experiment_assumption.strip(),
-                method=self.new_experiment_method,
-            ))
-            # Auto-bump solution status to Testing
-            sol = session.get(Solution, self.experiment_target_solution_id)
-            if sol and sol.status == "Ideation":
-                sol.status = "Testing"
-                session.add(sol)
+            if self.editing_experiment_id != -1:
+                # Edit path: update existing experiment fields
+                exp = session.get(Experiment, self.editing_experiment_id)
+                if exp:
+                    exp.name = self.new_experiment_name.strip()
+                    exp.assumption = self.new_experiment_assumption.strip()
+                    exp.method = self.new_experiment_method
+                    session.add(exp)
+            else:
+                # Create path: new experiment + auto-bump solution to Testing
+                session.add(Experiment(
+                    solution_id=self.experiment_target_solution_id,
+                    name=self.new_experiment_name.strip(),
+                    assumption=self.new_experiment_assumption.strip(),
+                    method=self.new_experiment_method,
+                ))
+                sol = session.get(Solution, self.experiment_target_solution_id)
+                if sol and sol.status == "Ideation":
+                    sol.status = "Testing"
+                    session.add(sol)
             session.commit()
         # reset form
+        self.editing_experiment_id = -1
         self.experiment_target_solution_id = -1
         self.experiment_target_solution_name = ""
         self.selected_solution_for_experiment = ""
@@ -863,6 +911,74 @@ class LedgerStateMixin(rx.State, mixin=True):
             if exp:
                 session.delete(exp)
                 session.commit()
+        self.load_ledger()
+        self._sync_drawer()
+
+    def start_edit_experiment(self, exp: ExperimentItem):
+        """Populates the creation form with an existing experiment's data for editing."""
+        self.editing_experiment_id = exp.id
+        self.new_experiment_name = exp.name
+        self.new_experiment_assumption = exp.assumption
+        self.new_experiment_method = exp.method
+        self.experiment_target_solution_id = exp.solution_id
+        self.experiment_target_solution_name = exp.solution_name
+        self.selected_solution_for_experiment = f"{exp.solution_id} - {exp.solution_name}"
+
+    def update_experiment_evidence(self, exp_id: int, notes: str):
+        """Saves evidence notes for a concluded experiment."""
+        with rx.session() as session:
+            exp = session.get(Experiment, exp_id)
+            if exp:
+                exp.evidence_notes = notes
+                session.add(exp)
+                session.commit()
+        self.load_ledger()
+        self._sync_drawer()
+
+    def apply_solution_outcome(self, exp_id: int):
+        """Applies the experiment's signal as the solution's outcome status (user-confirmed)."""
+        with rx.session() as session:
+            exp = session.get(Experiment, exp_id)
+            if exp:
+                sol = session.get(Solution, exp.solution_id)
+                if sol:
+                    sol.status = "Shipped" if exp.signal == "Validated" else "Discarded"
+                    session.add(sol)
+                    session.commit()
+        self.load_ledger()
+        self._sync_drawer()
+
+    def update_opp_score(self, opp_id: int, field: str, score_str: str):
+        """Updates impact_score or sat_gap_score for an opportunity (1-5, 0 = unrated)."""
+        try:
+            score = int(score_str)
+        except ValueError:
+            return
+        score = max(0, min(5, score))
+        with rx.session() as session:
+            opp = session.get(Opportunity, opp_id)
+            if opp:
+                if field == "impact":
+                    opp.impact_score = score
+                elif field == "sat_gap":
+                    opp.sat_gap_score = score
+                session.add(opp)
+                session.commit()
+        self.load_ledger()
+        self._sync_drawer()
+
+    def set_target_opportunity(self, opp_id: int):
+        """Designates one opportunity as the current team focus; clears all others."""
+        with rx.session() as session:
+            all_opps = session.exec(
+                select(Opportunity).where(
+                    Opportunity.product_id == int(self.active_product_id)
+                )
+            ).all()
+            for opp in all_opps:
+                opp.is_target = opp.id == opp_id and not opp.is_target
+                session.add(opp)
+            session.commit()
         self.load_ledger()
         self._sync_drawer()
 

@@ -1,6 +1,7 @@
 import reflex as rx
+from datetime import date, timedelta
 from sqlmodel import select
-from .core import LlmUsageItem, ProductItem
+from .core import LlmUsageItem, ProductItem, DashboardBarItem, RecentInterviewItem
 from ..models import (
     Product,
     LlmUsageLog,
@@ -8,9 +9,19 @@ from ..models import (
     Outcome,
     Interview,
     Solution,
+    Experiment,
+    Persona,
     OutcomeOpportunityLink,
     InterviewOpportunityLink,
 )
+
+_PERSONA_COLORS = [
+    "blue", "purple", "orange", "green", "pink", "teal", "ruby", "iris", "indigo",
+]
+
+
+def _persona_color(name: str) -> str:
+    return _PERSONA_COLORS[sum(ord(c) for c in name) % len(_PERSONA_COLORS)]
 
 
 class NavigationStateMixin(rx.State, mixin=True):
@@ -67,13 +78,143 @@ class NavigationStateMixin(rx.State, mixin=True):
     def load_data_for_current_view(self):
         """The Master Data Router: Loads specific domain data based on the active product."""
         self.load_products()
-        if self.current_view == "logs":
+        if self.current_view == "home":
+            self.load_dashboard()
+        elif self.current_view == "logs":
             self.load_history()
         elif self.current_view in ["ledger", "prep"]:
             self.load_ledger()  # Ledger loads outcomes, opportunities, and personas
         elif self.current_view == "llm_usage":
             self.load_llm_usage()
+        elif self.current_view == "participants":
+            self.load_participants()
         # "interview_detail" and "opportunity" carry their data from the navigation event
+
+    def load_dashboard(self):
+        """Loads all data needed for the home dashboard."""
+        prod_id = int(self.active_product_id)
+        today = date.today()
+        MAX_BAR_HEIGHT = 48  # pixels
+
+        with rx.session() as session:
+            # ── Interview cadence ─────────────────────────────────────────────
+            interviews = session.exec(
+                select(Interview)
+                .where(Interview.product_id == prod_id)
+                .order_by(Interview.date_logged.desc())
+            ).all()
+
+            self.dashboard_total_interviews = len(interviews)
+
+            # Compute effective date for each interview (prefer interview_date over date_logged)
+            def _eff_date(inv) -> date | None:
+                if inv.interview_date:
+                    try:
+                        return date.fromisoformat(inv.interview_date)
+                    except (ValueError, TypeError):
+                        pass
+                return inv.date_logged.date() if inv.date_logged else None
+
+            # Days since most recent interview
+            max_idate: date | None = None
+            for inv in interviews:
+                d = _eff_date(inv)
+                if d and (max_idate is None or d > max_idate):
+                    max_idate = d
+            self.dashboard_days_since_last = (today - max_idate).days if max_idate else -1
+
+            # Weekly counts: index 0 = current week (0–6 days ago), 7 = 7 weeks ago
+            weekly_counts = [0] * 8
+            for inv in interviews:
+                d = _eff_date(inv)
+                if d:
+                    days_ago = (today - d).days
+                    if 0 <= days_ago <= 55:
+                        week_idx = days_ago // 7
+                        if week_idx < 8:
+                            weekly_counts[week_idx] += 1
+
+            max_count = max(weekly_counts) if any(weekly_counts) else 1
+            bars: list[DashboardBarItem] = []
+            for i in range(7, -1, -1):  # oldest (7 weeks ago) → newest (current)
+                week_start = today - timedelta(days=i * 7 + 6)
+                cnt = weekly_counts[i]
+                h = int(cnt * MAX_BAR_HEIGHT / max_count) if cnt > 0 else 0
+                bars.append(DashboardBarItem(
+                    week_label=week_start.strftime("%b %d"),
+                    count=cnt,
+                    height_css=f"{h}px",
+                ))
+            self.dashboard_weekly_bars = bars
+
+            # ── Opportunity health ────────────────────────────────────────────
+            opps = session.exec(
+                select(Opportunity).where(Opportunity.product_id == prod_id)
+            ).all()
+            opp_ids = [o.id for o in opps]
+            self.dashboard_total_opps = len(opp_ids)
+
+            if opp_ids:
+                evidence_links = session.exec(
+                    select(InterviewOpportunityLink).where(
+                        InterviewOpportunityLink.opportunity_id.in_(opp_ids)
+                    )
+                ).all()
+                self.dashboard_opps_with_evidence = len(
+                    set(lnk.opportunity_id for lnk in evidence_links)
+                )
+
+                solutions = session.exec(
+                    select(Solution).where(Solution.opportunity_id.in_(opp_ids))
+                ).all()
+                self.dashboard_opps_with_solutions = len(
+                    set(s.opportunity_id for s in solutions)
+                )
+                self.dashboard_solutions_testing = sum(
+                    1 for s in solutions if s.status == "Testing"
+                )
+
+                sol_ids = [s.id for s in solutions]
+                experiments = (
+                    session.exec(
+                        select(Experiment).where(Experiment.solution_id.in_(sol_ids))
+                    ).all()
+                    if sol_ids
+                    else []
+                )
+            else:
+                self.dashboard_opps_with_evidence = 0
+                self.dashboard_opps_with_solutions = 0
+                self.dashboard_solutions_testing = 0
+                experiments = []
+
+            # ── Experiment pipeline ───────────────────────────────────────────
+            self.dashboard_exp_draft = sum(1 for e in experiments if e.status == "Draft")
+            self.dashboard_exp_running = sum(1 for e in experiments if e.status == "Running")
+            concluded = [e for e in experiments if e.status == "Concluded"]
+            self.dashboard_exp_concluded = len(concluded)
+            self.dashboard_exp_validated = sum(1 for e in concluded if e.signal == "Validated")
+            self.dashboard_exp_invalidated = sum(1 for e in concluded if e.signal == "Invalidated")
+
+            # ── Recent activity feed (last 5 interviews) ──────────────────────
+            recent: list[RecentInterviewItem] = []
+            for inv in interviews[:5]:
+                persona = session.get(Persona, inv.persona_id)
+                p_name = persona.name if persona else "Unknown"
+                quote_count = len(session.exec(
+                    select(InterviewOpportunityLink).where(
+                        InterviewOpportunityLink.interview_id == inv.id
+                    )
+                ).all())
+                date_str = inv.interview_date or inv.date_logged.strftime("%Y-%m-%d")
+                recent.append(RecentInterviewItem(
+                    interview_id=inv.id,
+                    persona=p_name,
+                    persona_color=_persona_color(p_name),
+                    date_str=date_str,
+                    quote_count=quote_count,
+                ))
+            self.dashboard_recent_interviews = recent
 
     def create_product(self):
         """Creates a new workspace."""

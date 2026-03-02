@@ -1,62 +1,122 @@
 import reflex as rx
-from cont_synth.state import State, PendingOppItem
+from cont_synth.state import State, PendingOppItem, PendingParticipantItem
 
 
-def _metadata_row() -> rx.Component:
-    """Displays extracted interview metadata (duration, date, participants) when available."""
-    return rx.cond(
-        (State.pending_synthesis_duration > 0)
-        | (State.pending_synthesis_interview_date != "")
-        | (State.pending_synthesis_participants.length() > 0),
-        rx.hstack(
-            rx.cond(
-                State.pending_synthesis_interview_date != "",
-                rx.hstack(
-                    rx.icon("calendar", size=12, color="var(--gray-9)"),
-                    rx.text(State.pending_synthesis_interview_date, size="1", color="var(--gray-11)"),
-                    spacing="1",
-                    align="center",
-                ),
-                rx.fragment(),
-            ),
-            rx.cond(
-                State.pending_synthesis_duration > 0,
-                rx.hstack(
-                    rx.icon("clock", size=12, color="var(--gray-9)"),
-                    rx.text(
-                        State.pending_synthesis_duration.to_string(),
-                        " min",
-                        size="1",
-                        color="var(--gray-11)",
-                    ),
-                    spacing="1",
-                    align="center",
-                ),
-                rx.fragment(),
-            ),
-            rx.cond(
-                State.pending_synthesis_participants.length() > 0,
-                rx.hstack(
-                    rx.icon("users", size=12, color="var(--gray-9)"),
-                    rx.text(
-                        State.pending_synthesis_participants_str,
-                        size="1",
-                        color="var(--gray-11)",
-                    ),
-                    spacing="1",
-                    align="center",
-                ),
-                rx.fragment(),
-            ),
-            spacing="3",
-            align="center",
-            padding="6px 10px",
-            background_color="var(--gray-3)",
-            border_radius="6px",
-            border="1px solid var(--gray-5)",
-            wrap="wrap",
+def _render_participant_role(item: PendingParticipantItem) -> rx.Component:
+    """One participant chip with Customer / Team toggle buttons."""
+    return rx.hstack(
+        rx.text(item.name, size="2", weight="medium", color="var(--gray-12)"),
+        rx.button(
+            "Customer",
+            size="1",
+            color_scheme="blue",
+            variant=rx.cond(item.role == "interviewee", "soft", "ghost"),
+            on_click=lambda: State.set_participant_role(item.index, "interviewee"),
+            cursor="pointer",
         ),
-        rx.fragment(),
+        rx.button(
+            "Team",
+            size="1",
+            color_scheme="orange",
+            variant=rx.cond(item.role == "interviewer", "soft", "ghost"),
+            on_click=lambda: State.set_participant_role(item.index, "interviewer"),
+            cursor="pointer",
+        ),
+        spacing="2",
+        align="center",
+        padding="5px 10px",
+        background_color="var(--gray-2)",
+        border_radius="6px",
+        border="1px solid var(--gray-5)",
+    )
+
+
+def _transcript_header_meta() -> rx.Component:
+    """Date, duration, and editable participant roles — shown above the transcript."""
+    return rx.vstack(
+        # Date + duration row (shown only when available)
+        rx.cond(
+            (State.pending_synthesis_duration > 0)
+            | (State.pending_synthesis_interview_date != ""),
+            rx.hstack(
+                rx.cond(
+                    State.pending_synthesis_interview_date != "",
+                    rx.hstack(
+                        rx.icon("calendar", size=12, color="var(--gray-9)"),
+                        rx.text(
+                            State.pending_synthesis_interview_date,
+                            size="1",
+                            color="var(--gray-11)",
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    State.pending_synthesis_duration > 0,
+                    rx.hstack(
+                        rx.icon("clock", size=12, color="var(--gray-9)"),
+                        rx.text(
+                            State.pending_synthesis_duration.to_string(),
+                            " min",
+                            size="1",
+                            color="var(--gray-11)",
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.fragment(),
+                ),
+                spacing="4",
+                align="center",
+            ),
+            rx.fragment(),
+        ),
+        # Participants with role editor (shown only when participants were extracted)
+        rx.cond(
+            State.pending_synthesis_participants.length() > 0,
+            rx.vstack(
+                rx.hstack(
+                    rx.icon("users", size=13, color="var(--gray-9)"),
+                    rx.text(
+                        "Participants",
+                        size="1",
+                        weight="bold",
+                        color="var(--gray-9)",
+                        text_transform="uppercase",
+                        letter_spacing="0.05em",
+                    ),
+                    rx.text(
+                        "· set each person's role before confirming",
+                        size="1",
+                        color="var(--gray-8)",
+                        style={"font_style": "italic"},
+                    ),
+                    spacing="2",
+                    align="center",
+                ),
+                rx.flex(
+                    rx.foreach(
+                        State.pending_participants_with_roles,
+                        _render_participant_role,
+                    ),
+                    wrap="wrap",
+                    gap="2",
+                ),
+                spacing="2",
+                align_items="start",
+                width="100%",
+                padding="10px 14px",
+                background_color="var(--gray-2)",
+                border_radius="8px",
+                border="1px solid var(--gray-5)",
+            ),
+            rx.fragment(),
+        ),
+        spacing="2",
+        align_items="start",
+        width="100%",
     )
 
 
@@ -194,10 +254,12 @@ def render_synthesis_review() -> rx.Component:
                     align="center",
                     spacing="2",
                 ),
+                # Date, duration, and participant role editor
+                _transcript_header_meta(),
                 rx.box(
                     rx.html(State.synthesis_review_transcript_html),
                     width="100%",
-                    height="calc(100vh - 260px)",
+                    height="calc(100vh - 340px)",
                     overflow_y="auto",
                     padding="16px",
                     background_color="var(--gray-2)",
@@ -212,7 +274,7 @@ def render_synthesis_review() -> rx.Component:
             ),
             # ── Right: Opportunity review panel ───────────────────────────────
             rx.vstack(
-                # Header with count
+                # Header OUTSIDE the card — aligns with the left panel's title row
                 rx.hstack(
                     rx.text(
                         "Extracted Opportunities",
@@ -234,48 +296,52 @@ def render_synthesis_review() -> rx.Component:
                     width="100%",
                     align="center",
                 ),
-                # Interview metadata (date, duration, participants) — shown when available
-                _metadata_row(),
-                # Scrollable opportunity list
+                # Card: opportunity list + actions
                 rx.vstack(
-                    rx.foreach(State.pending_synthesis_opps, render_pending_opp),
-                    spacing="2",
-                    width="100%",
-                    overflow_y="auto",
-                    max_height="calc(100vh - 440px)",
-                    padding_right="4px",
-                ),
-                rx.divider(),
-                # Action buttons
-                rx.vstack(
-                    rx.button(
-                        rx.icon("check", size=14),
-                        "Confirm & Ingest Selected",
-                        color_scheme="blue",
-                        size="3",
+                    # Scrollable opportunity list
+                    rx.vstack(
+                        rx.foreach(State.pending_synthesis_opps, render_pending_opp),
+                        spacing="2",
                         width="100%",
-                        on_click=State.confirm_synthesis,
-                        disabled=State.selected_opp_count == 0,
+                        overflow_y="auto",
+                        max_height="calc(100vh - 360px)",
+                        padding_right="4px",
                     ),
-                    rx.button(
-                        "Cancel",
-                        variant="ghost",
-                        color_scheme="gray",
-                        size="2",
+                    rx.divider(),
+                    # Action buttons
+                    rx.vstack(
+                        rx.button(
+                            rx.icon("check", size=14),
+                            "Confirm & Ingest Selected",
+                            color_scheme="blue",
+                            size="3",
+                            width="100%",
+                            on_click=State.confirm_synthesis,
+                            disabled=State.selected_opp_count == 0,
+                        ),
+                        rx.button(
+                            "Cancel",
+                            variant="ghost",
+                            color_scheme="gray",
+                            size="2",
+                            width="100%",
+                            on_click=State.cancel_synthesis_review,
+                        ),
+                        spacing="2",
                         width="100%",
-                        on_click=State.cancel_synthesis_review,
                     ),
-                    spacing="2",
+                    spacing="3",
+                    padding="20px",
+                    background_color="var(--gray-2)",
+                    border_radius="10px",
+                    border="1px solid var(--gray-5)",
+                    align_items="stretch",
                     width="100%",
                 ),
                 spacing="3",
                 width="400px",
                 min_width="320px",
                 max_width="440px",
-                padding="20px",
-                background_color="var(--gray-2)",
-                border_radius="10px",
-                border="1px solid var(--gray-5)",
                 align_items="stretch",
             ),
             spacing="5",

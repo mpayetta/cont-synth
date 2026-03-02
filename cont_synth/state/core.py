@@ -138,6 +138,55 @@ class LedgerItem(rx.Base):
     solutions: list[SolutionItem] = []
     linked_outcomes: list[OutcomeItem] = []
     experiments: list[ExperimentItem] = []
+    # Teresa Torres prioritization (0 = unrated, 1–5)
+    impact_score: int = 0
+    sat_gap_score: int = 0
+    # priority_score = impact + sat_gap + min(evidence_count, 5), max 15
+    priority_score: int = 0
+    running_experiments: int = 0
+    is_target: bool = False
+
+
+class ParticipantItem(rx.Base):
+    id: int
+    name: str
+    persona_name: str = ""      # role archetype, e.g. "VP of Engineering"
+    persona_color: str = "gray"
+    is_team_member: bool = False  # True = product team interviewer, not a customer
+    segment: str
+    recruited_via: str
+    notes: str
+    interview_count: int = 0    # computed at load, not stored
+    last_interviewed: str = ""  # ISO date of most recent linked interview
+
+
+class PendingParticipantItem(rx.Base):
+    """One participant extracted from a pending synthesis, with an editable role."""
+    index: int
+    name: str
+    role: str = "interviewee"  # "interviewee" or "interviewer"
+
+
+class DetailParticipantItem(rx.Base):
+    """One participant shown read-only in the interview detail view."""
+    name: str
+    is_team_member: bool = False
+
+
+class DashboardBarItem(rx.Base):
+    """One column in the home dashboard weekly bar chart."""
+    week_label: str   # e.g. "Jan 20"
+    count: int
+    height_css: str = "0px"  # pre-computed CSS height for the bar, e.g. "32px"
+
+
+class RecentInterviewItem(rx.Base):
+    """One row in the home dashboard recent activity feed."""
+    interview_id: int
+    persona: str
+    persona_color: str
+    date_str: str
+    quote_count: int
 
 
 class PersonaPrep(rx.Model, table=True):
@@ -165,4 +214,7 @@ __all__ = [
     "ProductItem",
     "PendingOppItem",
     "LlmUsageItem",
+    "ParticipantItem",
+    "DashboardBarItem",
+    "RecentInterviewItem",
 ]

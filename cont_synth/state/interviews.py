@@ -6,6 +6,7 @@ import google.generativeai as genai
 import PyPDF2
 import docx
 import reflex as rx
+from sqlalchemy import func
 from sqlmodel import select
 
 from ..models import (
@@ -14,6 +15,8 @@ from ..models import (
     Opportunity,
     InterviewOpportunityLink,
     LlmUsageLog,
+    Participant,
+    InterviewParticipantLink,
 )
 from .core import (
     InterviewHistoryItem,
@@ -21,6 +24,7 @@ from .core import (
     PersonaPrep,
     PendingOppItem,
     PendingLlmUsage,
+    DetailParticipantItem,
     load_prompt,
     pro_model,
     flash_model,
@@ -295,7 +299,13 @@ class InterviewStateMixin(rx.State, mixin=True):
             meta = result.get("metadata") or {}
             self.pending_synthesis_duration = meta.get("duration_minutes") or 0
             self.pending_synthesis_interview_date = meta.get("interview_date") or ""
-            self.pending_synthesis_participants = meta.get("participants") or []
+            raw_names = meta.get("participant_names") or []
+            raw_roles = meta.get("participant_roles") or []
+            self.pending_synthesis_participants = raw_names
+            self.pending_synthesis_participant_roles = [
+                raw_roles[i] if i < len(raw_roles) else "interviewee"
+                for i in range(len(raw_names))
+            ]
 
             # Clear the input form
             self.transcript_text = ""
@@ -309,6 +319,14 @@ class InterviewStateMixin(rx.State, mixin=True):
             return rx.window_alert(f"Engine Failure: {str(e)}")
         finally:
             self.is_processing = False
+
+    def set_participant_role(self, index: int, role: str):
+        """Set a pending participant's role to 'interviewee' or 'interviewer'."""
+        new_roles = list(self.pending_synthesis_participant_roles)
+        while len(new_roles) <= index:
+            new_roles.append("interviewee")
+        new_roles[index] = role
+        self.pending_synthesis_participant_roles = new_roles
 
     def toggle_pending_opp(self, index: int):
         """Toggle the selected state of a pending opportunity by its index."""
@@ -424,6 +442,7 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.pending_synthesis_duration = 0
         self.pending_synthesis_interview_date = ""
         self.pending_synthesis_participants = []
+        self.pending_synthesis_participant_roles = []
         self.current_view = "synthesize"
 
     def confirm_synthesis(self):
@@ -467,6 +486,58 @@ class InterviewStateMixin(rx.State, mixin=True):
                     output_tokens=usage.output_tokens,
                     total_tokens=usage.total_tokens,
                 ))
+            session.commit()
+
+            # 3.5 Auto-create/link Participant records from LLM-extracted names
+            roles = self.pending_synthesis_participant_roles
+            for i, raw_name in enumerate(self.pending_synthesis_participants):
+                name = raw_name.strip()
+                if not name:
+                    continue
+                role = roles[i] if i < len(roles) else "interviewee"
+                is_team = (role == "interviewer")
+
+                existing_p = session.exec(
+                    select(Participant).where(
+                        func.lower(Participant.name) == name.lower()
+                    )
+                ).first()
+                if existing_p:
+                    participant = existing_p
+                    # Only backfill persona_id for customers (not team members)
+                    if not is_team and participant.persona_id is None:
+                        participant.persona_id = persona.id
+                        session.add(participant)
+                        session.commit()
+                    # If the participant was previously unknown, update their team status
+                    if participant.is_team_member != is_team and not participant.is_team_member:
+                        participant.is_team_member = is_team
+                        session.add(participant)
+                        session.commit()
+                else:
+                    # New participant — seed persona only for customers
+                    participant = Participant(
+                        name=name,
+                        persona_id=persona.id if not is_team else None,
+                        is_team_member=is_team,
+                    )
+                    session.add(participant)
+                    session.commit()
+                    session.refresh(participant)
+
+                # Only link interviewees — team members are not the subjects of research
+                if not is_team:
+                    already_linked = session.exec(
+                        select(InterviewParticipantLink).where(
+                            InterviewParticipantLink.interview_id == interview.id,
+                            InterviewParticipantLink.participant_id == participant.id,
+                        )
+                    ).first()
+                    if not already_linked:
+                        session.add(InterviewParticipantLink(
+                            interview_id=interview.id,
+                            participant_id=participant.id,
+                        ))
             session.commit()
 
             # 4. Process selected opportunities
@@ -524,6 +595,7 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.pending_synthesis_duration = 0
         self.pending_synthesis_interview_date = ""
         self.pending_synthesis_participants = []
+        self.pending_synthesis_participant_roles = []
 
         self.load_ledger()
         self.load_history()
@@ -622,11 +694,25 @@ class InterviewStateMixin(rx.State, mixin=True):
                 )
 
         participants_str = ""
+        participant_items: list[DetailParticipantItem] = []
         if interview.participants:
             try:
-                participants_str = ", ".join(json.loads(interview.participants))
+                p_names = json.loads(interview.participants)
             except Exception:
-                participants_str = interview.participants
+                p_names = [interview.participants] if interview.participants else []
+            participants_str = ", ".join(p_names)
+            # Look up each name in the Participant table to get is_team_member status
+            with rx.session() as p_session:
+                for p_name in p_names:
+                    p_rec = p_session.exec(
+                        select(Participant).where(
+                            func.lower(Participant.name) == p_name.lower()
+                        )
+                    ).first()
+                    participant_items.append(DetailParticipantItem(
+                        name=p_name,
+                        is_team_member=p_rec.is_team_member if p_rec else False,
+                    ))
 
         self.selected_interview_id = interview_id
         self.interview_detail_persona = persona.name
@@ -639,6 +725,7 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.interview_detail_interview_date = interview.interview_date or ""
         self.interview_detail_duration = interview.duration_minutes or 0
         self.interview_detail_participants = participants_str
+        self.interview_detail_participant_items = participant_items
         self.current_view = "interview_detail"
 
     async def next_quote(self):

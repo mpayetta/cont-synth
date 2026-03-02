@@ -123,103 +123,215 @@ def render_solution(sol: SolutionItem):
     )
 
 
+def _score_dot(item: LedgerItem, field: str, score: int) -> rx.Component:
+    """A single clickable dot for the 1-5 score selector."""
+    score_var = item.impact_score if field == "impact" else item.sat_gap_score
+    is_filled = score_var >= score
+    return rx.box(
+        width="10px",
+        height="10px",
+        border_radius="50%",
+        background_color=rx.cond(
+            is_filled,
+            rx.cond(field == "impact", "var(--blue-9)", "var(--violet-9)"),
+            "var(--gray-4)",
+        ),
+        cursor="pointer",
+        flex_shrink="0",
+        on_click=lambda: State.update_opp_score(item.opportunity_id, field, str(score)),
+        _hover={
+            "background_color": rx.cond(
+                field == "impact", "var(--blue-7)", "var(--violet-7)"
+            )
+        },
+        transition="background-color 0.1s ease",
+    )
+
+
 def show_ledger_row(item: LedgerItem):
-    """Renders a single opportunity as a clickable card with a status border."""
+    """Renders a single opportunity as a card with Torres scoring and experiment status."""
+    priority_color = rx.cond(
+        item.priority_score >= 11, "green",
+        rx.cond(item.priority_score >= 6, "amber",
+            rx.cond(item.priority_score >= 1, "blue", "gray")),
+    )
+
     return rx.box(
         rx.box(
+        rx.vstack(
+            # ── Row 1: badges + right-side status chips ──────────────────
             rx.flex(
-                # Left: clickable area — theme + opportunity text + personas
+                # Left: indent arrow + theme + tags
                 rx.flex(
-                    rx.flex(
-                        rx.cond(
-                            item.indent_level > 0,
-                            rx.icon("corner-down-right", size=13, color="var(--gray-7)"),
-                            rx.fragment(),
-                        ),
-                        rx.badge(item.theme, color_scheme="gray", variant="solid", size="1"),
-                        rx.cond(
-                            item.is_cross_functional,
-                            rx.badge("Cross-Persona", color_scheme="amber", variant="soft", size="1"),
-                            rx.fragment(),
-                        ),
-                        spacing="2",
-                        align="center",
+                    rx.cond(
+                        item.indent_level > 0,
+                        rx.icon("corner-down-right", size=13, color="var(--gray-7)"),
+                        rx.fragment(),
                     ),
-                    rx.text(item.opportunity, weight="medium", size="3", line_height="1.5"),
-                    rx.flex(
-                        rx.foreach(
-                            item.personas_affected,
-                            lambda b: rx.badge(b.name, color_scheme=b.color, variant="soft", size="1"),
+                    rx.cond(
+                        item.is_target,
+                        rx.badge(
+                            rx.icon("crosshair", size=10),
+                            "Target",
+                            color_scheme="green", variant="solid", size="1",
                         ),
-                        spacing="1",
-                        wrap="wrap",
+                        rx.fragment(),
                     ),
-                    direction="column",
-                    spacing="2",
-                    align_items="start",
-                    flex="1",
-                    cursor="pointer",
-                    on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
+                    rx.badge(item.theme, color_scheme="gray", variant="solid", size="1"),
+                    rx.cond(
+                        item.is_cross_functional,
+                        rx.badge("Cross-Persona", color_scheme="amber", variant="soft", size="1"),
+                        rx.fragment(),
+                    ),
+                    spacing="2", align="center", flex="1",
                 ),
-                # Right: quick-glance metrics
+                # Right: running experiments + priority score + target toggle
+                rx.flex(
+                    # Running experiments pill (only shown when > 0)
+                    rx.cond(
+                        item.running_experiments > 0,
+                        rx.badge(
+                            rx.icon("flask-conical", size=10),
+                            f"{item.running_experiments} running",
+                            color_scheme="orange", variant="soft", size="1",
+                        ),
+                        rx.fragment(),
+                    ),
+                    # Priority score badge
+                    rx.badge(
+                        f"P: {item.priority_score}",
+                        color_scheme=priority_color,
+                        variant=rx.cond(item.priority_score > 0, "soft", "outline"),
+                        size="1",
+                        title="Priority = Impact + Satisfaction Gap + Frequency (evidence count)",
+                    ),
+                    # Target toggle button
+                    rx.icon_button(
+                        rx.cond(
+                            item.is_target,
+                            rx.icon("crosshair", size=12),
+                            rx.icon("crosshair", size=12),
+                        ),
+                        size="1",
+                        variant=rx.cond(item.is_target, "solid", "ghost"),
+                        color_scheme=rx.cond(item.is_target, "green", "gray"),
+                        title=rx.cond(item.is_target, "Remove target designation", "Set as target opportunity"),
+                        on_click=lambda: State.set_target_opportunity(item.opportunity_id),
+                    ),
+                    spacing="2", align="center", flex_shrink="0",
+                ),
+                justify="between", width="100%", align="center",
+            ),
+            # ── Row 2: Opportunity statement (hero text) ──────────────────
+            rx.text(
+                item.opportunity,
+                weight="bold",
+                size="4",
+                line_height="1.4",
+                cursor="pointer",
+                on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
+                _hover={"color": "var(--blue-11)"},
+                transition="color 0.1s ease",
+            ),
+            # ── Row 3: Personas + quick metrics ──────────────────────────
+            rx.flex(
+                rx.flex(
+                    rx.foreach(
+                        item.personas_affected,
+                        lambda b: rx.badge(b.name, color_scheme=b.color, variant="soft", size="1"),
+                    ),
+                    spacing="1", wrap="wrap",
+                ),
                 rx.flex(
                     rx.flex(
-                        rx.icon("lightbulb", size=12, color="var(--blue-9)"),
-                        rx.text(
-                            f"{item.solutions.length()} solutions",
-                            size="1", color="var(--blue-9)",
-                        ),
+                        rx.icon("quote", size=11, color="var(--gray-8)"),
+                        rx.text(f"{item.evidence.length()} quotes", size="1", color="var(--gray-8)"),
                         spacing="1", align="center",
                     ),
+                    rx.text("·", size="1", color="var(--gray-6)"),
                     rx.flex(
-                        rx.icon("quote", size=12, color="var(--gray-8)"),
-                        rx.text(
-                            f"{item.evidence.length()} quotes",
-                            size="1", color="var(--gray-8)",
-                        ),
+                        rx.icon("lightbulb", size=11, color="var(--gray-8)"),
+                        rx.text(f"{item.solutions.length()} solutions", size="1", color="var(--gray-8)"),
                         spacing="1", align="center",
                     ),
+                    rx.text("·", size="1", color="var(--gray-6)"),
                     rx.text(
-                        f"{item.days_old} days",
+                        f"{item.days_old}d",
                         size="1",
                         weight="medium",
                         color=rx.cond(
                             item.status_color == "green", "var(--green-9)",
-                            rx.cond(
-                                item.status_color == "yellow", "var(--yellow-9)",
-                                "var(--red-9)",
-                            ),
+                            rx.cond(item.status_color == "yellow", "var(--amber-9)", "var(--red-9)"),
                         ),
+                        title=item.status,
                     ),
-                    direction="column",
-                    spacing="1",
-                    align_items="end",
-                    flex_shrink="0",
+                    spacing="2", align="center",
                 ),
-                justify="between",
-                align="center",
-                width="100%",
-                gap="6",
+                justify="between", width="100%", align="center",
             ),
-            padding="16px 16px 16px 20px",
-            border_left=rx.cond(
-                item.status_color == "green", "4px solid var(--green-7)",
-                rx.cond(
-                    item.status_color == "yellow", "4px solid var(--yellow-7)",
-                    "4px solid var(--red-7)",
+            # ── Row 4: Torres scoring ─────────────────────────────────────
+            rx.flex(
+                # Impact
+                rx.flex(
+                    rx.text("Impact", size="1", color="var(--gray-9)", weight="medium"),
+                    _score_dot(item, "impact", 1),
+                    _score_dot(item, "impact", 2),
+                    _score_dot(item, "impact", 3),
+                    _score_dot(item, "impact", 4),
+                    _score_dot(item, "impact", 5),
+                    spacing="1", align="center",
                 ),
+                rx.divider(orientation="vertical", size="1"),
+                # Satisfaction gap
+                rx.flex(
+                    rx.text("Sat. Gap", size="1", color="var(--gray-9)", weight="medium"),
+                    _score_dot(item, "sat_gap", 1),
+                    _score_dot(item, "sat_gap", 2),
+                    _score_dot(item, "sat_gap", 3),
+                    _score_dot(item, "sat_gap", 4),
+                    _score_dot(item, "sat_gap", 5),
+                    spacing="1", align="center",
+                ),
+                rx.divider(orientation="vertical", size="1"),
+                # Frequency note (auto-derived)
+                rx.flex(
+                    rx.text("Frequency", size="1", color="var(--gray-9)", weight="medium"),
+                    rx.text(
+                        f"{item.evidence.length()}/5 mentions",
+                        size="1", color="var(--gray-10)",
+                    ),
+                    spacing="1", align="center",
+                ),
+                spacing="3", align="center",
             ),
-            border_radius="8px",
-            background_color=rx.cond(
-                item.indent_level > 0, "var(--gray-2)", "var(--gray-1)",
-            ),
-            border="1px solid var(--gray-4)",
+            spacing="3",
             width="100%",
-            _hover={"background_color": "var(--blue-1)", "border_color": "var(--blue-5)"},
-            transition="background-color 0.1s ease, border-color 0.1s ease",
+            align_items="start",
         ),
-        padding_left=f"calc({item.indent_level} * 28px)",
+        padding="16px 16px 14px 20px",
+        border_left=rx.cond(
+            item.is_target,
+            "4px solid var(--green-8)",
+            rx.cond(
+                item.status_color == "green", "4px solid var(--green-6)",
+                rx.cond(item.status_color == "yellow", "4px solid var(--amber-6)", "4px solid var(--red-6)"),
+            ),
+        ),
+        border_radius="8px",
+        background_color=rx.cond(
+            item.is_target, "var(--green-1)",
+            rx.cond(item.indent_level > 0, "var(--gray-2)", "var(--gray-1)"),
+        ),
+        border="1px solid var(--gray-4)",
         width="100%",
+        _hover={
+            "background_color": rx.cond(item.is_target, "var(--green-2)", "var(--blue-1)"),
+            "border_color": rx.cond(item.is_target, "var(--green-6)", "var(--blue-5)"),
+        },
+        transition="background-color 0.1s ease, border-color 0.1s ease",
+    ),
+    padding_left=f"calc({item.indent_level} * 28px)",
+    width="100%",
     )
 
 
@@ -353,17 +465,36 @@ def render_experiment_card(exp: ExperimentItem):
     )
     return rx.card(
         rx.vstack(
+            # Header row: badges + action buttons
             rx.flex(
-                rx.badge(exp.solution_name, color_scheme="blue", variant="soft", size="1"),
-                rx.badge(exp.method, color_scheme="purple", variant="soft", size="1"),
-                rx.badge(exp.status, color_scheme="orange", variant="soft", size="1"),
-                rx.badge(exp.signal, color_scheme=signal_color, variant="soft", size="1"),
-                rx.icon_button(rx.icon("trash", size=14), size="1", variant="ghost",
-                    color_scheme="red", on_click=lambda: State.delete_experiment(exp.id)),
+                rx.flex(
+                    rx.badge(exp.solution_name, color_scheme="blue", variant="soft", size="1"),
+                    rx.badge(exp.method, color_scheme="purple", variant="soft", size="1"),
+                    rx.badge(exp.status, color_scheme="orange", variant="soft", size="1"),
+                    rx.badge(exp.signal, color_scheme=signal_color, variant="soft", size="1"),
+                    spacing="1",
+                    align="center",
+                    wrap="wrap",
+                ),
+                rx.flex(
+                    rx.cond(
+                        exp.status != "Concluded",
+                        rx.icon_button(rx.icon("pencil", size=14), size="1", variant="ghost",
+                            color_scheme="gray",
+                            on_click=lambda: State.start_edit_experiment(exp)),
+                        rx.fragment(),
+                    ),
+                    rx.icon_button(rx.icon("trash", size=14), size="1", variant="ghost",
+                        color_scheme="red", on_click=lambda: State.delete_experiment(exp.id)),
+                    spacing="1",
+                    align="center",
+                ),
                 justify="between", width="100%", align="center",
             ),
+            # Experiment name + assumption
             rx.text(exp.name, weight="bold", size="3"),
             rx.text(f"Assumption: {exp.assumption}", size="2", color="gray"),
+            # Status progression actions
             rx.flex(
                 rx.cond(exp.status == "Draft",
                     rx.button("▶ Start Running", size="1", variant="soft",
@@ -383,6 +514,40 @@ def render_experiment_card(exp: ExperimentItem):
                     ),
                     rx.fragment()),
                 spacing="2",
+            ),
+            # Suggestion button: appears after signal is set
+            rx.cond(
+                exp.signal != "Pending",
+                rx.button(
+                    rx.cond(exp.signal == "Validated", "→ Ship solution", "→ Discard solution"),
+                    size="1",
+                    variant="outline",
+                    color_scheme=rx.cond(exp.signal == "Validated", "green", "red"),
+                    on_click=lambda: State.apply_solution_outcome(exp.id),
+                ),
+                rx.fragment(),
+            ),
+            # Evidence notes: editable textarea when Concluded, read-only display otherwise
+            rx.cond(
+                exp.status == "Concluded",
+                rx.vstack(
+                    rx.text("Evidence / Learnings", size="1", weight="bold", color="gray"),
+                    rx.text_area(
+                        value=exp.evidence_notes,
+                        placeholder="What did you observe? What did you learn?",
+                        on_blur=lambda v: State.update_experiment_evidence(exp.id, v),
+                        size="1",
+                        width="100%",
+                        rows="3",
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+                rx.cond(
+                    exp.evidence_notes != "",
+                    rx.text(exp.evidence_notes, size="2", color="gray", style={"fontStyle": "italic"}),
+                    rx.fragment(),
+                ),
             ),
             spacing="2",
         ),
@@ -408,16 +573,24 @@ def render_experiments_tab() -> rx.Component:
                 rx.vstack(
                     rx.text(
                         rx.cond(
-                            State.experiment_target_solution_name != "",
-                            f"🧪 Testing: {State.experiment_target_solution_name}",
-                            "🧪 Design New Experiment",
+                            State.editing_experiment_id != -1,
+                            f"✏️ Editing: {State.new_experiment_name}",
+                            rx.cond(
+                                State.experiment_target_solution_name != "",
+                                f"🧪 Testing: {State.experiment_target_solution_name}",
+                                "🧪 Design New Experiment",
+                            ),
                         ),
                         size="2",
                         weight="bold",
                         color=rx.cond(
-                            State.experiment_target_solution_name != "",
-                            "var(--purple-11)",
-                            "gray",
+                            State.editing_experiment_id != -1,
+                            "var(--gray-11)",
+                            rx.cond(
+                                State.experiment_target_solution_name != "",
+                                "var(--purple-11)",
+                                "gray",
+                            ),
                         ),
                     ),
                     rx.text("Target Solution", size="1", weight="bold", color="gray"),
@@ -447,13 +620,27 @@ def render_experiments_tab() -> rx.Component:
                         on_change=State.set_new_experiment_method,
                         width="100%",
                     ),
-                    rx.button(
-                        "Design Experiment",
-                        on_click=lambda: State.add_experiment(
-                            State.selected_opportunity.opportunity_id
+                    rx.flex(
+                        rx.button(
+                            rx.cond(State.editing_experiment_id != -1, "Save Changes", "Design Experiment"),
+                            on_click=lambda: State.add_experiment(
+                                State.selected_opportunity.opportunity_id
+                            ),
+                            color_scheme="purple",
+                            variant="solid",
+                            flex="1",
                         ),
-                        color_scheme="purple",
-                        variant="solid",
+                        rx.cond(
+                            (State.editing_experiment_id != -1) | (State.new_experiment_name != ""),
+                            rx.button(
+                                "Cancel",
+                                on_click=State.cancel_experiment_form,
+                                variant="soft",
+                                color_scheme="gray",
+                            ),
+                            rx.fragment(),
+                        ),
+                        spacing="2",
                         width="100%",
                     ),
                     spacing="3",

@@ -1,6 +1,7 @@
 import html as _html_module
 import re as _re
 import reflex as rx
+from sqlmodel import select
 
 from .core import (
     ExperimentItem,
@@ -16,12 +17,32 @@ from .core import (
     ProductItem,
     PendingOppItem,
     PendingLlmUsage,
+    ParticipantItem,
+    PendingParticipantItem,
+    DetailParticipantItem,
+    DashboardBarItem,
+    RecentInterviewItem,
 )
 from .auth import _hash_password, _verify_password
-from ..models import User
+from ..models import (
+    User,
+    Experiment,
+    InterviewParticipantLink,
+    InterviewOpportunityLink,
+    OutcomeOpportunityLink,
+    LlmUsageLog,
+    Interview,
+    Solution,
+    Opportunity,
+    Outcome,
+    Participant,
+    Persona,
+    Product,
+)
 from .navigation import NavigationStateMixin
 from .interviews import InterviewStateMixin
 from .ledger import LedgerStateMixin
+from .participants import ParticipantStateMixin
 
 _MARK_OPEN = '<mark style="background:rgba(250,204,21,0.5);border-radius:2px;padding:1px 2px">'
 _MARK_CLOSE = "</mark>"
@@ -51,19 +72,23 @@ def _first_sentence(text: str) -> str:
 
 
 def _mark_fragment(escaped: str, fragment: str) -> str | None:
-    """Try to wrap fragment in <mark> inside escaped. Returns marked string or None."""
+    """Try to wrap fragment in <mark> inside escaped. Returns marked string or None.
+
+    Both passes are case-insensitive so LLM-capitalised quote fragments
+    ("O sea") match their lowercase originals in the transcript ("o sea").
+    """
     if not fragment.strip():
         return None
-    # exact match
-    idx = escaped.find(fragment)
+    # Pass A: case-insensitive exact substring match
+    idx = escaped.lower().find(fragment.lower())
     if idx >= 0:
         end = idx + len(fragment)
         return escaped[:idx] + _MARK_OPEN + escaped[idx:end] + _MARK_CLOSE + escaped[end:]
-    # flexible whitespace between words
+    # Pass B: word-by-word regex with flexible whitespace, case-insensitive
     words = fragment.split()
     if len(words) >= 2:
         pattern = r"\s+".join(_re.escape(w) for w in words)
-        m = _re.search(pattern, escaped)
+        m = _re.search(pattern, escaped, _re.IGNORECASE)
         if m:
             return escaped[:m.start()] + _MARK_OPEN + escaped[m.start():m.end()] + _MARK_CLOSE + escaped[m.end():]
     return None
@@ -72,19 +97,30 @@ def _mark_fragment(escaped: str, fragment: str) -> str | None:
 def _inject_mark(escaped: str, escaped_quote: str) -> str:
     """Wrap the first occurrence of escaped_quote in <mark> tags inside escaped.
 
-    Pass 1 – exact substring match (fast path).
-    Pass 2 – word-by-word regex that allows any whitespace (\\s+) between words.
-    Pass 3 – first sentence only, for quotes that span non-adjacent speaker turns.
+    Pass 1 – full quote (case-insensitive exact + flexible-whitespace regex).
+    Pass 2 – each individual segment split by '...' tried in order; the first
+              match wins. Handles the common LLM pattern of stitching
+              non-adjacent transcript lines with ellipses when the surrounding
+              text uses a plain '.' or newline instead.
+    Pass 3 – first sentence of the quote only, as a last-resort anchor.
     """
     if not escaped_quote.strip():
         return escaped
 
+    # Pass 1: try the full quote
     result = _mark_fragment(escaped, escaped_quote)
     if result is not None:
         return result
 
-    # Pass 3: the quote may stitch together non-adjacent transcript chunks.
-    # Match just the first sentence so the scroll lands in the right place.
+    # Pass 2: try each ellipsis-delimited segment individually (longest first)
+    segments = [s.strip() for s in _re.split(r'\s*\.\.\.+\s*', escaped_quote)]
+    for seg in sorted(segments, key=len, reverse=True):
+        if len(seg) > 10:
+            result = _mark_fragment(escaped, seg)
+            if result is not None:
+                return result
+
+    # Pass 3: first sentence of the full quote as a final anchor
     first = _first_sentence(escaped_quote)
     if first != escaped_quote:
         result = _mark_fragment(escaped, first)
@@ -98,6 +134,7 @@ class State(
     NavigationStateMixin,
     InterviewStateMixin,
     LedgerStateMixin,
+    ParticipantStateMixin,
     rx.State,
 ):
     """Main application state composed from feature-specific mixins."""
@@ -188,6 +225,7 @@ class State(
     interview_detail_interview_date: str = ""
     interview_detail_duration: int = 0
     interview_detail_participants: str = ""  # comma-joined display string
+    interview_detail_participant_items: list[DetailParticipantItem] = []
 
     # --- Pending synthesis (confirmation step) ---
     pending_synthesis_transcript: str = ""
@@ -201,6 +239,8 @@ class State(
     pending_synthesis_duration: int = 0        # 0 = not found
     pending_synthesis_interview_date: str = "" # "" = not found
     pending_synthesis_participants: list[str] = []
+    # Parallel list of roles for each participant ("interviewee" or "interviewer")
+    pending_synthesis_participant_roles: list[str] = []
 
     # --- Shared highlight state (synthesis review + interview detail) ---
     highlighted_quote_text: str = ""
@@ -227,6 +267,20 @@ class State(
     llm_usage_logs: list[LlmUsageItem] = []
     workspace_menu_open: bool = False
 
+    # --- Participant CRM ---
+    participants: list[ParticipantItem] = []
+    participant_segments: list[str] = []
+    participant_recruited_vias: list[str] = []
+    show_team_members: bool = False
+    is_participant_form_open: bool = False
+    editing_participant_id: int = -1
+    participant_form_name: str = ""
+    participant_form_persona: str = ""
+    participant_form_is_team_member: bool = False
+    participant_form_segment: str = ""
+    participant_form_recruited_via: str = ""
+    participant_form_notes: str = ""
+
     # --- Experiments workspace ---
     experiment_target_solution_id: int = -1
     experiment_target_solution_name: str = ""
@@ -235,6 +289,21 @@ class State(
     new_experiment_assumption: str = ""
     new_experiment_method: str = "Prototype Interview"
     editing_experiment_id: int = -1
+
+    # --- Home dashboard ---
+    dashboard_days_since_last: int = -1       # -1 = no interviews yet
+    dashboard_total_interviews: int = 0
+    dashboard_weekly_bars: list[DashboardBarItem] = []
+    dashboard_exp_draft: int = 0
+    dashboard_exp_running: int = 0
+    dashboard_exp_concluded: int = 0
+    dashboard_exp_validated: int = 0
+    dashboard_exp_invalidated: int = 0
+    dashboard_opps_with_evidence: int = 0
+    dashboard_opps_with_solutions: int = 0
+    dashboard_solutions_testing: int = 0
+    dashboard_total_opps: int = 0
+    dashboard_recent_interviews: list[RecentInterviewItem] = []
 
     @rx.var
     def active_product_name(self) -> str:
@@ -381,6 +450,65 @@ class State(
         self.settings_confirm_password = ""
         self.settings_success = "Settings saved successfully."
 
+    def wipe_database(self):
+        """Delete all data except the current user. Useful for resetting test state."""
+        with rx.session() as session:
+            # Delete in FK-safe order (children before parents)
+            for row in session.exec(select(Experiment)).all():
+                session.delete(row)
+            for row in session.exec(select(InterviewParticipantLink)).all():
+                session.delete(row)
+            for row in session.exec(select(InterviewOpportunityLink)).all():
+                session.delete(row)
+            for row in session.exec(select(OutcomeOpportunityLink)).all():
+                session.delete(row)
+            for row in session.exec(select(LlmUsageLog)).all():
+                session.delete(row)
+            for row in session.exec(select(PersonaPrep)).all():  # PersonaPrep is from .core
+                session.delete(row)
+            for row in session.exec(select(Interview)).all():
+                session.delete(row)
+            # Solutions have a self-referential parent_id — clear children first
+            for row in session.exec(select(Solution).where(Solution.parent_id != None)).all():
+                session.delete(row)
+            for row in session.exec(select(Solution)).all():
+                session.delete(row)
+            # Opportunities have a self-referential parent_id — clear children first
+            for row in session.exec(select(Opportunity).where(Opportunity.parent_id != None)).all():
+                session.delete(row)
+            for row in session.exec(select(Opportunity)).all():
+                session.delete(row)
+            for row in session.exec(select(Outcome)).all():
+                session.delete(row)
+            for row in session.exec(select(Participant)).all():
+                session.delete(row)
+            for row in session.exec(select(Persona)).all():
+                session.delete(row)
+            for row in session.exec(select(Product)).all():
+                session.delete(row)
+            session.commit()
+
+        # Reset all volatile state and return to the start
+        self.current_view = "synthesize"
+        self.is_settings_open = False
+        self.interview_history = []
+        self.ledger_data = []
+        self.available_personas = []
+        self.participants = []
+        self.llm_usage_logs = []
+        self.outcomes = []
+        self.outcome_names = ["All Outcomes"]
+        self.active_outcome_name = "All Outcomes"
+        self.pending_synthesis_opps = []
+        self.pending_synthesis_participants = []
+        self.pending_synthesis_participant_roles = []
+        self.active_product_id = "1"
+        self.load_data_for_current_view()
+
+    def toggle_show_team_members(self):
+        """Toggle visibility of product-team interviewers in the Participants table."""
+        self.show_team_members = not self.show_team_members
+
     def load_app(self):
         """Initial app load — check auth first; data loads only after session is verified."""
         return rx.call_script(
@@ -430,6 +558,26 @@ class State(
     @rx.var
     def pending_synthesis_participants_str(self) -> str:
         return ", ".join(self.pending_synthesis_participants)
+
+    @rx.var
+    def pending_participants_with_roles(self) -> list[PendingParticipantItem]:
+        """Zips participant names with their current roles for the role-editor UI."""
+        roles = self.pending_synthesis_participant_roles
+        return [
+            PendingParticipantItem(
+                index=i,
+                name=name,
+                role=roles[i] if i < len(roles) else "interviewee",
+            )
+            for i, name in enumerate(self.pending_synthesis_participants)
+        ]
+
+    @rx.var
+    def filtered_participants(self) -> list[ParticipantItem]:
+        """Participants list filtered by the show_team_members toggle."""
+        if self.show_team_members:
+            return self.participants
+        return [p for p in self.participants if not p.is_team_member]
 
     @rx.var
     def detail_transcript_html(self) -> str:
@@ -487,4 +635,5 @@ __all__ = [
     "LedgerItem",
     "PersonaPrep",
     "PendingOppItem",
+    "ParticipantItem",
 ]

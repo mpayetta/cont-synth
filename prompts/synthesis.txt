@@ -11,4 +11,5 @@ RULES FOR SYNTHESIS:
 4. Interview Metadata: Extract any of the following if clearly present in the transcript header or content. Leave each field null if absent or ambiguous.
    - duration_minutes: Duration of the interview as an integer number of minutes.
    - interview_date: Date the interview was conducted, in ISO format (YYYY-MM-DD).
-   - participants: List of participant names or roles (e.g. interviewer and interviewee names).
+   - participant_names: List of names of all people present (e.g. ["Maia Fossati", "Mauricio Payetta"]).
+   - participant_roles: Parallel list classifying each person's role. Use "interviewee" for the customer or external person being researched (source of insights), or "interviewer" for internal team members conducting the interview (Product Manager, Tech Lead, UX Lead, Researcher, etc.). When in doubt, default to "interviewee".
