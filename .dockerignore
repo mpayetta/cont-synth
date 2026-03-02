@@ -1,0 +1,27 @@
+.git
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Local environment — secrets must be passed via docker-compose env vars
+.env
+
+# Reflex build artifacts — rebuilt inside the container
+.web
+.reflex
+
+# Local database — mounted as a volume in docker-compose
+reflex.db
+data/
+
+# Dev-only files
+tests/
+requirements-dev.txt
+
+# Misc
+*.md
+.DS_Store
+transcripts/
+uploaded_files/
