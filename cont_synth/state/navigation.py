@@ -82,8 +82,11 @@ class NavigationStateMixin(rx.State, mixin=True):
             self.load_dashboard()
         elif self.current_view == "logs":
             self.load_history()
-        elif self.current_view in ["ledger", "prep"]:
+        elif self.current_view == "ledger":
             self.load_ledger()  # Ledger loads outcomes, opportunities, and personas
+        elif self.current_view == "prep":
+            self.load_ledger()  # loads available_personas for the persona selector
+            self.load_prep_data()  # loads opportunities and running experiments for OST selectors
         elif self.current_view == "llm_usage":
             self.load_llm_usage()
         elif self.current_view == "participants":

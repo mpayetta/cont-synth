@@ -189,6 +189,24 @@ class RecentInterviewItem(rx.Base):
     quote_count: int
 
 
+class PrepOppItem(rx.Base):
+    """One opportunity shown in the prep page OST selector."""
+    id: int
+    theme: str
+    statement: str
+    selected: bool = False
+
+
+class PrepExperimentItem(rx.Base):
+    """One running experiment shown in the prep page assumption selector."""
+    id: int
+    opp_id: int
+    solution_name: str
+    experiment_name: str
+    assumption: str
+    selected: bool = False
+
+
 class PersonaPrep(rx.Model, table=True):
     """Stores the latest generated prep script for a specific persona."""
 
@@ -217,4 +235,6 @@ __all__ = [
     "ParticipantItem",
     "DashboardBarItem",
     "RecentInterviewItem",
+    "PrepOppItem",
+    "PrepExperimentItem",
 ]

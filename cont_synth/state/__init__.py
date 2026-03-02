@@ -22,6 +22,8 @@ from .core import (
     DetailParticipantItem,
     DashboardBarItem,
     RecentInterviewItem,
+    PrepOppItem,
+    PrepExperimentItem,
 )
 from .auth import _hash_password, _verify_password
 from ..models import (
@@ -174,6 +176,10 @@ class State(
     synthesis_error: str = ""
     prep_questions: str = ""
     prep_last_updated: str = ""
+
+    # --- Interview guide prep (OST-based) ---
+    prep_opportunities: list[PrepOppItem] = []
+    prep_running_experiments: list[PrepExperimentItem] = []
 
     interview_history: list[InterviewHistoryItem] = []
 
@@ -502,6 +508,8 @@ class State(
         self.pending_synthesis_opps = []
         self.pending_synthesis_participants = []
         self.pending_synthesis_participant_roles = []
+        self.prep_opportunities = []
+        self.prep_running_experiments = []
         self.active_product_id = "1"
         self.load_data_for_current_view()
 
@@ -578,6 +586,36 @@ class State(
         if self.show_team_members:
             return self.participants
         return [p for p in self.participants if not p.is_team_member]
+
+    @rx.var
+    def prep_persona_options(self) -> list[str]:
+        """Persona list with a leading 'None' sentinel for the prep page dropdown."""
+        return ["— None —"] + self.available_personas
+
+    @rx.var
+    def selected_opportunity_ids(self) -> list[int]:
+        """IDs of opportunities checked in the prep page selector."""
+        return [o.id for o in self.prep_opportunities if o.selected]
+
+    @rx.var
+    def selected_experiment_ids(self) -> list[int]:
+        """IDs of experiments checked in the prep page selector."""
+        return [e.id for e in self.prep_running_experiments if e.selected]
+
+    @rx.var
+    def visible_prep_experiments(self) -> list[PrepExperimentItem]:
+        """Running experiments for currently selected prep opportunities."""
+        sel_ids = {o.id for o in self.prep_opportunities if o.selected}
+        if not sel_ids:
+            return []
+        return [e for e in self.prep_running_experiments if e.opp_id in sel_ids]
+
+    def copy_guide_to_clipboard(self):
+        """Copies the generated prep guide text to the system clipboard."""
+        import json as _json
+        return rx.call_script(
+            f"navigator.clipboard.writeText({_json.dumps(self.prep_questions)})"
+        )
 
     @rx.var
     def detail_transcript_html(self) -> str:

@@ -17,6 +17,8 @@ from ..models import (
     LlmUsageLog,
     Participant,
     InterviewParticipantLink,
+    Solution,
+    Experiment,
 )
 from .core import (
     InterviewHistoryItem,
@@ -25,6 +27,8 @@ from .core import (
     PendingOppItem,
     PendingLlmUsage,
     DetailParticipantItem,
+    PrepOppItem,
+    PrepExperimentItem,
     load_prompt,
     pro_model,
     flash_model,
@@ -601,60 +605,196 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.load_history()
         self.current_view = "logs"
 
+    def load_prep_data(self):
+        """Loads opportunities and running experiments for the prep page OST selectors."""
+        with rx.session() as session:
+            opps = session.exec(
+                select(Opportunity).where(
+                    Opportunity.product_id == int(self.active_product_id)
+                )
+            ).all()
+
+            self.prep_opportunities = [
+                PrepOppItem(id=o.id, theme=o.theme, statement=o.statement)
+                for o in opps
+            ]
+
+            opp_ids = [o.id for o in opps]
+            running_exps: list[PrepExperimentItem] = []
+
+            if opp_ids:
+                solutions = session.exec(
+                    select(Solution).where(Solution.opportunity_id.in_(opp_ids))
+                ).all()
+                sol_by_id = {s.id: s for s in solutions}
+                sol_to_opp = {s.id: s.opportunity_id for s in solutions}
+                sol_ids = [s.id for s in solutions]
+
+                if sol_ids:
+                    experiments = session.exec(
+                        select(Experiment).where(
+                            Experiment.solution_id.in_(sol_ids),
+                            Experiment.status == "Running",
+                        )
+                    ).all()
+                    for exp in experiments:
+                        sol = sol_by_id.get(exp.solution_id)
+                        running_exps.append(
+                            PrepExperimentItem(
+                                id=exp.id,
+                                opp_id=sol_to_opp.get(exp.solution_id, -1),
+                                solution_name=sol.name if sol else "",
+                                experiment_name=exp.name,
+                                assumption=exp.assumption,
+                            )
+                        )
+
+            self.prep_running_experiments = running_exps
+
+    def toggle_prep_opportunity(self, opp_id: int):
+        """Toggle selection of an opportunity in the prep page selector."""
+        new_list = []
+        was_selected = False
+        for o in self.prep_opportunities:
+            if o.id == opp_id:
+                was_selected = o.selected
+                new_list.append(
+                    PrepOppItem(id=o.id, theme=o.theme, statement=o.statement, selected=not o.selected)
+                )
+            else:
+                new_list.append(o)
+        self.prep_opportunities = new_list
+        # When deselecting an opportunity, also deselect its experiments
+        if was_selected:
+            self.prep_running_experiments = [
+                PrepExperimentItem(
+                    id=e.id,
+                    opp_id=e.opp_id,
+                    solution_name=e.solution_name,
+                    experiment_name=e.experiment_name,
+                    assumption=e.assumption,
+                    selected=False if e.opp_id == opp_id else e.selected,
+                )
+                for e in self.prep_running_experiments
+            ]
+
+    def toggle_prep_experiment(self, exp_id: int):
+        """Toggle selection of a running experiment in the prep page selector."""
+        self.prep_running_experiments = [
+            PrepExperimentItem(
+                id=e.id,
+                opp_id=e.opp_id,
+                solution_name=e.solution_name,
+                experiment_name=e.experiment_name,
+                assumption=e.assumption,
+                selected=not e.selected if e.id == exp_id else e.selected,
+            )
+            for e in self.prep_running_experiments
+        ]
+
     def generate_hostile_questions(self):
-        """Generates prep script for the currently selected persona."""
-        if not getattr(self, "target_persona", ""):
-            return rx.window_alert("No persona selected.")
+        """Generates interview guide — OST-based if opportunities are selected, else persona battle plan."""
+        has_persona = bool(getattr(self, "target_persona", ""))
+        selected_opps = [o for o in self.prep_opportunities if o.selected]
+
+        if not has_persona and not selected_opps:
+            return rx.window_alert("Select at least one opportunity, or choose a persona to generate a guide.")
 
         self.is_prepping = True
         yield
 
         try:
-            target_opps: list[str] = []
-            for item in getattr(self, "ledger_data", []):
-                if any(p.name == self.target_persona for p in item.personas_affected):
-                    target_opps.append(item.opportunity)
+            if selected_opps:
+                # --- OST-based interview guide ---
+                selected_exps = [e for e in self.prep_running_experiments if e.selected]
 
-            if not target_opps:
-                self.prep_questions = "No identified opportunities. Start fresh!"
-                self.prep_last_updated = ""
-                return
-
-            prep_template = load_prompt("prep.txt")
-            prep_prompt = prep_template.format(
-                target_persona=self.target_persona,
-                target_opps=target_opps,
-            )
-            prep_response = flash_model.generate_content(prep_prompt)
-            generated_text = prep_response.text
-
-            with rx.session() as session:
-                session.add(LlmUsageLog(
-                    model_name="gemini-2.5-flash",
-                    operation="prep",
-                    interview_id=None,
-                    prompt_tokens=prep_response.usage_metadata.prompt_token_count,
-                    output_tokens=prep_response.usage_metadata.candidates_token_count,
-                    total_tokens=prep_response.usage_metadata.total_token_count,
-                ))
-                session.commit()
-                existing_entry = session.get(PersonaPrep, self.target_persona)
-
-                if existing_entry:
-                    existing_entry.content = generated_text
-                    existing_entry.updated_at = datetime.utcnow()
-                    session.add(existing_entry)
-                else:
-                    new_entry = PersonaPrep(
-                        persona=self.target_persona,
-                        content=generated_text,
-                        updated_at=datetime.utcnow(),
+                opps_section = "\n".join(
+                    f"- [{o.theme}] {o.statement}" for o in selected_opps
+                )
+                exps_section = (
+                    "\n".join(
+                        f"- Solution '{e.solution_name}' | Experiment '{e.experiment_name}' | Assumption: {e.assumption}"
+                        for e in selected_exps
                     )
-                    session.add(new_entry)
-                session.commit()
+                    if selected_exps
+                    else "None selected."
+                )
+                persona_context = (
+                    f"The intended interviewee persona is '{self.target_persona}'."
+                    if has_persona
+                    else "No specific persona has been defined for this interview."
+                )
 
-            self.prep_questions = generated_text
-            self.prep_last_updated = datetime.now().strftime("%Y-%m-%d %H:%M")
+                guide_template = load_prompt("interview_guide.txt")
+                guide_prompt = guide_template.format(
+                    persona_context=persona_context,
+                    opportunities_section=opps_section,
+                    assumptions_section=exps_section,
+                )
+                guide_response = flash_model.generate_content(guide_prompt)
+                generated_text = guide_response.text
+
+                with rx.session() as session:
+                    session.add(LlmUsageLog(
+                        model_name="gemini-2.5-flash",
+                        operation="prep",
+                        interview_id=None,
+                        prompt_tokens=guide_response.usage_metadata.prompt_token_count,
+                        output_tokens=guide_response.usage_metadata.candidates_token_count,
+                        total_tokens=guide_response.usage_metadata.total_token_count,
+                    ))
+                    session.commit()
+
+                self.prep_questions = generated_text
+                self.prep_last_updated = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+            else:
+                # --- Legacy persona-only battle plan ---
+                target_opps: list[str] = []
+                for item in getattr(self, "ledger_data", []):
+                    if any(p.name == self.target_persona for p in item.personas_affected):
+                        target_opps.append(item.opportunity)
+
+                if not target_opps:
+                    self.prep_questions = "No identified opportunities. Start fresh!"
+                    self.prep_last_updated = ""
+                    return
+
+                prep_template = load_prompt("prep.txt")
+                prep_prompt = prep_template.format(
+                    target_persona=self.target_persona,
+                    target_opps=target_opps,
+                )
+                prep_response = flash_model.generate_content(prep_prompt)
+                generated_text = prep_response.text
+
+                with rx.session() as session:
+                    session.add(LlmUsageLog(
+                        model_name="gemini-2.5-flash",
+                        operation="prep",
+                        interview_id=None,
+                        prompt_tokens=prep_response.usage_metadata.prompt_token_count,
+                        output_tokens=prep_response.usage_metadata.candidates_token_count,
+                        total_tokens=prep_response.usage_metadata.total_token_count,
+                    ))
+                    session.commit()
+                    existing_entry = session.get(PersonaPrep, self.target_persona)
+
+                    if existing_entry:
+                        existing_entry.content = generated_text
+                        existing_entry.updated_at = datetime.utcnow()
+                        session.add(existing_entry)
+                    else:
+                        new_entry = PersonaPrep(
+                            persona=self.target_persona,
+                            content=generated_text,
+                            updated_at=datetime.utcnow(),
+                        )
+                        session.add(new_entry)
+                    session.commit()
+
+                self.prep_questions = generated_text
+                self.prep_last_updated = datetime.now().strftime("%Y-%m-%d %H:%M")
 
         except Exception as e:  # pragma: no cover - UI alert path
             self.prep_questions = f"Failed to generate: {str(e)}"
@@ -751,6 +891,12 @@ class InterviewStateMixin(rx.State, mixin=True):
 
     def load_prep_for_persona(self, persona: str):
         """Sets the target persona and tries to load an existing script from DB."""
+        if not persona or persona == "— None —":
+            self.target_persona = ""
+            self.prep_questions = ""
+            self.prep_last_updated = ""
+            return
+
         self.target_persona = persona
 
         with rx.session() as session:
