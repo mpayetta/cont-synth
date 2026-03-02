@@ -9,7 +9,27 @@ def show_history_row(item: InterviewHistoryItem):
             rx.badge(item.persona, color_scheme=item.persona_color, variant="soft")
         ),
         rx.table.cell(item.date_logged),
-        rx.table.cell(rx.text(item.snippet, color="gray", size="2")),
+        rx.table.cell(
+            rx.cond(
+                item.interview_date != "",
+                rx.text(item.interview_date, size="2"),
+                rx.text("—", size="2", color="var(--gray-7)"),
+            )
+        ),
+        rx.table.cell(
+            rx.cond(
+                item.duration_minutes > 0,
+                rx.text(item.duration_minutes.to_string(), " min", size="2"),
+                rx.text("—", size="2", color="var(--gray-7)"),
+            )
+        ),
+        rx.table.cell(
+            rx.cond(
+                item.participants != "",
+                rx.text(item.participants, size="2"),
+                rx.text("—", size="2", color="var(--gray-7)"),
+            )
+        ),
         rx.table.cell(
             rx.button(
                 rx.icon("eye", size=14),
@@ -41,7 +61,9 @@ def render_logs() -> rx.Component:
                     rx.table.column_header_cell("ID"),
                     rx.table.column_header_cell("Persona"),
                     rx.table.column_header_cell("Date Logged"),
-                    rx.table.column_header_cell("Transcript Snippet"),
+                    rx.table.column_header_cell("Interview Date"),
+                    rx.table.column_header_cell("Duration"),
+                    rx.table.column_header_cell("Participants"),
                     rx.table.column_header_cell(""),
                 )
             ),

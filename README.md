@@ -133,6 +133,14 @@ When you run migrations for the first time, the database is seeded with a defaul
 
 ---
 
+## Documentation
+
+| Guide | Description |
+|---|---|
+| [**Opportunities — Full Lifecycle**](docs/opportunities.md) | How Opportunities are created, evidenced, structured into a tree, explored with Solutions, validated with Experiments, and prioritized using the Torres framework (Frequency · Impact · Satisfaction Gap) |
+
+---
+
 ## Application Pages
 
 | Page | Description |
@@ -191,6 +199,51 @@ cont-synth/
 ├── requirements.txt           # Python dependencies
 └── .env                       # Secrets (not committed)
 ```
+
+---
+
+## Testing
+
+The project uses [pytest](https://pytest.org/) for unit testing. Tests run entirely offline — no Gemini API key or running Reflex server is required.
+
+### Install test dependencies
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+### Run all tests
+
+```bash
+pytest
+```
+
+### Run with coverage report
+
+```bash
+pytest --cov=cont_synth --cov=schema --cov-report=term-missing
+```
+
+### Run a specific test file
+
+```bash
+pytest tests/test_auth.py
+pytest tests/test_highlight.py -v
+```
+
+### Test structure
+
+| File | What it tests |
+|---|---|
+| `tests/test_auth.py` | Password hashing and verification helpers |
+| `tests/test_schemas.py` | Pydantic LLM response schemas (`InterviewSnapshot`, `DedupeResult`, etc.) |
+| `tests/test_highlight.py` | Transcript highlight injection (`_first_sentence`, `_mark_fragment`, `_inject_mark`) |
+| `tests/test_models.py` | All SQLModel database tables (CRUD, relationships) via in-memory SQLite |
+| `tests/test_business_logic.py` | Evidence status computation, persona color assignment, opportunity flattening + cycle detection |
+| `tests/test_data_classes.py` | All `rx.Base` UI data classes (`LedgerItem`, `SolutionItem`, `ExperimentItem`, etc.) |
+| `tests/test_state_computed.py` | Computed property logic (`active_product_name`, `selected_opp_count`, quote navigation, LLM aggregates) |
+
+> **Note:** UI page components (`cont_synth/pages/`) and state methods that call `rx.session()` require the full Reflex runtime and are covered by integration testing rather than unit tests.
 
 ---
 

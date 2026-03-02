@@ -1,5 +1,106 @@
 import reflex as rx
-from cont_synth.state import State
+from cont_synth.state import State, DetailParticipantItem
+
+
+def _detail_participant_chip(item: DetailParticipantItem) -> rx.Component:
+    """Read-only participant chip showing their role badge."""
+    return rx.hstack(
+        rx.text(item.name, size="2", weight="medium", color="var(--gray-12)"),
+        rx.cond(
+            item.is_team_member,
+            rx.badge("Team", color_scheme="orange", variant="soft", size="1"),
+            rx.badge("Customer", color_scheme="blue", variant="soft", size="1"),
+        ),
+        spacing="2",
+        align="center",
+        padding="5px 10px",
+        background_color="var(--gray-2)",
+        border_radius="6px",
+        border="1px solid var(--gray-5)",
+    )
+
+
+def _detail_transcript_meta() -> rx.Component:
+    """Date, duration, and participant chips — shown above the transcript."""
+    return rx.vstack(
+        # Date + duration row (shown only when available)
+        rx.cond(
+            (State.interview_detail_duration > 0)
+            | (State.interview_detail_interview_date != ""),
+            rx.hstack(
+                rx.cond(
+                    State.interview_detail_interview_date != "",
+                    rx.hstack(
+                        rx.icon("calendar", size=12, color="var(--gray-9)"),
+                        rx.text(
+                            State.interview_detail_interview_date,
+                            size="1",
+                            color="var(--gray-11)",
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    State.interview_detail_duration > 0,
+                    rx.hstack(
+                        rx.icon("clock", size=12, color="var(--gray-9)"),
+                        rx.text(
+                            State.interview_detail_duration.to_string(),
+                            " min",
+                            size="1",
+                            color="var(--gray-11)",
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.fragment(),
+                ),
+                spacing="4",
+                align="center",
+            ),
+            rx.fragment(),
+        ),
+        # Participant chips (shown only when participants were extracted)
+        rx.cond(
+            State.interview_detail_participant_items.length() > 0,
+            rx.vstack(
+                rx.hstack(
+                    rx.icon("users", size=13, color="var(--gray-9)"),
+                    rx.text(
+                        "Participants",
+                        size="1",
+                        weight="bold",
+                        color="var(--gray-9)",
+                        text_transform="uppercase",
+                        letter_spacing="0.05em",
+                    ),
+                    spacing="4",
+                    align="center",
+                ),
+                rx.flex(
+                    rx.foreach(
+                        State.interview_detail_participant_items,
+                        _detail_participant_chip,
+                    ),
+                    wrap="wrap",
+                    gap="3",
+                ),
+                spacing="2",
+                align_items="start",
+                width="100%",
+                padding="10px 14px",
+                background_color="var(--gray-2)",
+                border_radius="8px",
+                border="1px solid var(--gray-5)",
+            ),
+            rx.fragment(),
+        ),
+        spacing="2",
+        align_items="start",
+        width="100%",
+    )
 
 
 def evidence_panel() -> rx.Component:
@@ -179,7 +280,7 @@ def render_interview_detail() -> rx.Component:
             on_click=State.handle_navigation("logs"),
             margin_bottom="4px",
         ),
-        # Header: persona + date
+        # Header: persona badge + date logged + interview ID
         rx.hstack(
             rx.badge(
                 State.interview_detail_persona,
@@ -201,7 +302,7 @@ def render_interview_detail() -> rx.Component:
         rx.divider(),
         # Two-column body
         rx.hstack(
-            # Left: full transcript
+            # ── Left: Full transcript ─────────────────────────────────────────
             rx.vstack(
                 rx.hstack(
                     rx.icon("file-text", size=16, color="var(--gray-9)"),
@@ -216,10 +317,12 @@ def render_interview_detail() -> rx.Component:
                     align="center",
                     spacing="2",
                 ),
+                # Date, duration, and participant chips
+                _detail_transcript_meta(),
                 rx.box(
                     rx.html(State.detail_transcript_html),
                     width="100%",
-                    height="calc(100vh - 260px)",
+                    height="calc(100vh - 340px)",
                     overflow_y="auto",
                     padding="16px",
                     background_color="var(--gray-2)",
@@ -232,7 +335,7 @@ def render_interview_detail() -> rx.Component:
                 align_items="stretch",
                 min_width="0",
             ),
-            # Right: evidence panel
+            # ── Right: Evidence panel ─────────────────────────────────────────
             evidence_panel(),
             spacing="5",
             align_items="start",

@@ -2,6 +2,7 @@ import reflex as rx
 from .state import State
 
 # --- PAGE IMPORTS ---
+from .pages.home import render_home
 from .pages.logs import render_logs
 from .pages.synthesize import render_synthesize
 from .pages.synthesis_review import render_synthesis_review
@@ -10,8 +11,9 @@ from .pages.ledger import render_ledger, opportunity_drawer
 from .pages.opportunity import render_opportunity_detail
 from .pages.interview_detail import render_interview_detail
 from .pages.llm_usage import render_llm_usage
+from .pages.participants import render_participants
 from .pages.login import login_page
-from .pages.account_settings import account_settings_modal
+from .pages.account import render_account
 
 
 # --- SIDEBAR COMPONENT ---
@@ -235,50 +237,6 @@ def _workspace_section() -> rx.Component:
                     width="100%",
                     spacing="2",
                 ),
-                # Divider + LLM Usage link
-                rx.divider(margin_y="4px"),
-                rx.hstack(
-                    rx.icon(
-                        "bar-chart-2",
-                        size=14,
-                        color=rx.cond(
-                            State.current_view == "llm_usage",
-                            "var(--blue-11)",
-                            "var(--gray-9)",
-                        ),
-                    ),
-                    rx.text(
-                        "LLM Usage",
-                        size="2",
-                        color=rx.cond(
-                            State.current_view == "llm_usage",
-                            "var(--blue-11)",
-                            "var(--gray-11)",
-                        ),
-                        weight=rx.cond(
-                            State.current_view == "llm_usage", "medium", "regular"
-                        ),
-                    ),
-                    spacing="2",
-                    align="center",
-                    width="100%",
-                    padding="6px 8px",
-                    border_radius="6px",
-                    cursor="pointer",
-                    background_color=rx.cond(
-                        State.current_view == "llm_usage",
-                        "var(--blue-3)",
-                        "transparent",
-                    ),
-                    on_click=State.handle_navigation("llm_usage"),
-                    _hover={
-                        "background_color": rx.cond(
-                            State.current_view == "llm_usage",
-                            "var(--blue-3)",
-                            "var(--gray-3)",
-                        )
-                    },
-                ),
                 spacing="2",
                 width="100%",
                 padding_top="8px",
@@ -310,7 +268,7 @@ def _user_section() -> rx.Component:
             variant="ghost",
             color_scheme="gray",
             size="1",
-            on_click=State.open_account_settings,
+            on_click=State.handle_navigation("account"),
             title="Account Settings",
         ),
         rx.icon_button(
@@ -339,10 +297,12 @@ def sidebar() -> rx.Component:
             margin_bottom="6",
         ),
         # Navigation items
+        sidebar_item("Home", "house", "home"),
         sidebar_item("Synthesize", "sparkles", "synthesize"),
         sidebar_item("Opportunities", "table", "ledger"),
         sidebar_item("Pre-Meeting Prep", "target", "prep"),
         sidebar_item("Interviews", "archive", "logs"),
+        sidebar_item("Participants", "users", "participants"),
         # Push workspace section to the bottom
         rx.spacer(),
         _workspace_section(),
@@ -356,28 +316,17 @@ def sidebar() -> rx.Component:
     )
 
 
-# --- MAIN DASHBOARD LAYOUT ---
-def _authenticated_layout() -> rx.Component:
-    """The full app shell, shown only when the user is logged in."""
+# --- SHARED PAGE LAYOUT ---
+def _page_layout(content: rx.Component, on_mount) -> rx.Component:
+    """Authenticated app shell: sidebar + content area, guarded by is_authenticated."""
     return rx.box(
         opportunity_drawer(),
-        account_settings_modal(),
-        rx.hstack(
-            sidebar(),
-            rx.vstack(
+        rx.cond(
+            State.is_authenticated,
+            rx.hstack(
+                sidebar(),
                 rx.box(
-                    rx.match(
-                        State.current_view,
-                        ("synthesize", render_synthesize()),
-                        ("synthesis_review", render_synthesis_review()),
-                        ("ledger", render_ledger()),
-                        ("opportunity", render_opportunity_detail()),
-                        ("prep", render_prep()),
-                        ("logs", render_logs()),
-                        ("interview_detail", render_interview_detail()),
-                        ("llm_usage", render_llm_usage()),
-                        render_synthesize(),
-                    ),
+                    content,
                     padding="40px",
                     width="100%",
                     height="100%",
@@ -387,25 +336,72 @@ def _authenticated_layout() -> rx.Component:
                 height="100vh",
                 spacing="0",
             ),
-            width="100%",
-            height="100vh",
-            spacing="0",
+            rx.fragment(),  # blank while auth check redirects to /login
         ),
+        on_mount=on_mount,
     )
 
 
-def index() -> rx.Component:
-    return rx.box(
-        rx.cond(
-            State.is_authenticated,
-            _authenticated_layout(),
-            login_page(),
-        ),
-        # On mount: check stored session; data loads only after auth is confirmed.
-        on_mount=State.load_app,
-    )
+# --- PAGE FUNCTIONS ---
+def home_page() -> rx.Component:
+    return _page_layout(render_home(), State.load_home_page)
+
+
+def synthesize_page() -> rx.Component:
+    return _page_layout(render_synthesize(), State.load_synthesize_page)
+
+
+def synthesis_review_page() -> rx.Component:
+    return _page_layout(render_synthesis_review(), State.load_review_page)
+
+
+def ledger_page() -> rx.Component:
+    return _page_layout(render_ledger(), State.load_ledger_page)
+
+
+def opportunity_page() -> rx.Component:
+    return _page_layout(render_opportunity_detail(), State.load_opportunity_page)
+
+
+def interviews_page() -> rx.Component:
+    return _page_layout(render_logs(), State.load_interviews_page)
+
+
+def interview_detail_page() -> rx.Component:
+    return _page_layout(render_interview_detail(), State.load_interview_detail_page)
+
+
+def prep_page() -> rx.Component:
+    return _page_layout(render_prep(), State.load_prep_page)
+
+
+def participants_page() -> rx.Component:
+    return _page_layout(render_participants(), State.load_participants_page)
+
+
+def llm_usage_page() -> rx.Component:
+    return _page_layout(render_llm_usage(), State.load_llm_usage_page)
+
+
+def account_page() -> rx.Component:
+    return _page_layout(render_account(), State.load_account_page)
+
+
+def login_route() -> rx.Component:
+    return rx.box(login_page(), on_mount=State.load_app)
 
 
 # STRICTLY ONLY ONE APP INSTANTIATION
 app = rx.App()
-app.add_page(index)
+app.add_page(home_page, route="/")
+app.add_page(synthesize_page, route="/synthesize")
+app.add_page(synthesis_review_page, route="/review")
+app.add_page(ledger_page, route="/opportunities")
+app.add_page(opportunity_page, route="/opportunities/[opportunity_id]")
+app.add_page(interviews_page, route="/interviews")
+app.add_page(interview_detail_page, route="/interviews/[interview_id]")
+app.add_page(prep_page, route="/prep")
+app.add_page(participants_page, route="/participants")
+app.add_page(llm_usage_page, route="/llm-usage")
+app.add_page(account_page, route="/account")
+app.add_page(login_route, route="/login")

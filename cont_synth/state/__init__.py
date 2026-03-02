@@ -1,6 +1,7 @@
 import html as _html_module
 import re as _re
 import reflex as rx
+from sqlmodel import select
 
 from .core import (
     ExperimentItem,
@@ -16,41 +17,118 @@ from .core import (
     ProductItem,
     PendingOppItem,
     PendingLlmUsage,
+    ParticipantItem,
+    PendingParticipantItem,
+    DetailParticipantItem,
+    DashboardBarItem,
+    RecentInterviewItem,
+    PrepOppItem,
+    PrepExperimentItem,
+    configure_genai,
 )
 from .auth import _hash_password, _verify_password
-from ..models import User
+from ..models import (
+    User,
+    Experiment,
+    InterviewParticipantLink,
+    InterviewOpportunityLink,
+    OutcomeOpportunityLink,
+    LlmUsageLog,
+    Interview,
+    Solution,
+    Opportunity,
+    Outcome,
+    Participant,
+    Persona,
+    Product,
+)
 from .navigation import NavigationStateMixin
 from .interviews import InterviewStateMixin
 from .ledger import LedgerStateMixin
+from .participants import ParticipantStateMixin
 
 _MARK_OPEN = '<mark style="background:rgba(250,204,21,0.5);border-radius:2px;padding:1px 2px">'
 _MARK_CLOSE = "</mark>"
 
 
+def _first_sentence(text: str) -> str:
+    """Return the first meaningful chunk of text.
+
+    Priority:
+    1. Split on '...' (LLM-added ellipsis joining non-adjacent transcript lines).
+    2. Split on a sentence-ending punctuation followed by whitespace.
+    Falls back to the full text when no boundary is found.
+    """
+    # LLM often writes "sentence one... sentence two" when the two sentences
+    # belong to different speaker turns. Matching only the first part is enough
+    # to locate and scroll to the right spot.
+    ellipsis = _re.search(r'\.\.\.+', text)
+    if ellipsis and ellipsis.start() > 10:
+        return text[:ellipsis.start()].rstrip()
+
+    # Sentence boundary: punctuation followed by whitespace
+    m = _re.search(r'[.?!]\s', text)
+    if m and m.start() > 10:
+        return text[:m.start() + 1]  # include the punctuation, drop the space
+
+    return text
+
+
+def _mark_fragment(escaped: str, fragment: str) -> str | None:
+    """Try to wrap fragment in <mark> inside escaped. Returns marked string or None.
+
+    Both passes are case-insensitive so LLM-capitalised quote fragments
+    ("O sea") match their lowercase originals in the transcript ("o sea").
+    """
+    if not fragment.strip():
+        return None
+    # Pass A: case-insensitive exact substring match
+    idx = escaped.lower().find(fragment.lower())
+    if idx >= 0:
+        end = idx + len(fragment)
+        return escaped[:idx] + _MARK_OPEN + escaped[idx:end] + _MARK_CLOSE + escaped[end:]
+    # Pass B: word-by-word regex with flexible whitespace, case-insensitive
+    words = fragment.split()
+    if len(words) >= 2:
+        pattern = r"\s+".join(_re.escape(w) for w in words)
+        m = _re.search(pattern, escaped, _re.IGNORECASE)
+        if m:
+            return escaped[:m.start()] + _MARK_OPEN + escaped[m.start():m.end()] + _MARK_CLOSE + escaped[m.end():]
+    return None
+
+
 def _inject_mark(escaped: str, escaped_quote: str) -> str:
     """Wrap the first occurrence of escaped_quote in <mark> tags inside escaped.
 
-    Pass 1 – exact substring match (fast path).
-    Pass 2 – word-by-word regex that allows any whitespace (\\s+) between words,
-              so quotes that span newline-separated sentences still match.
+    Pass 1 – full quote (case-insensitive exact + flexible-whitespace regex).
+    Pass 2 – each individual segment split by '...' tried in order; the first
+              match wins. Handles the common LLM pattern of stitching
+              non-adjacent transcript lines with ellipses when the surrounding
+              text uses a plain '.' or newline instead.
+    Pass 3 – first sentence of the quote only, as a last-resort anchor.
     """
     if not escaped_quote.strip():
         return escaped
 
-    # --- Pass 1: exact ---
-    idx = escaped.find(escaped_quote)
-    if idx >= 0:
-        end = idx + len(escaped_quote)
-        return escaped[:idx] + _MARK_OPEN + escaped[idx:end] + _MARK_CLOSE + escaped[end:]
+    # Pass 1: try the full quote
+    result = _mark_fragment(escaped, escaped_quote)
+    if result is not None:
+        return result
 
-    # --- Pass 2: flexible whitespace ---
-    words = escaped_quote.split()
-    if len(words) < 2:
-        return escaped
-    pattern = r"\s+".join(_re.escape(w) for w in words)
-    m = _re.search(pattern, escaped)
-    if m:
-        return escaped[:m.start()] + _MARK_OPEN + escaped[m.start():m.end()] + _MARK_CLOSE + escaped[m.end():]
+    # Pass 2: try each ellipsis-delimited segment individually (longest first)
+    segments = [s.strip() for s in _re.split(r'\s*\.\.\.+\s*', escaped_quote)]
+    for seg in sorted(segments, key=len, reverse=True):
+        if len(seg) > 10:
+            result = _mark_fragment(escaped, seg)
+            if result is not None:
+                return result
+
+    # Pass 3: first sentence of the full quote as a final anchor
+    first = _first_sentence(escaped_quote)
+    if first != escaped_quote:
+        result = _mark_fragment(escaped, first)
+        if result is not None:
+            return result
 
     return escaped
 
@@ -59,6 +137,7 @@ class State(
     NavigationStateMixin,
     InterviewStateMixin,
     LedgerStateMixin,
+    ParticipantStateMixin,
     rx.State,
 ):
     """Main application state composed from feature-specific mixins."""
@@ -73,9 +152,11 @@ class State(
     login_error: str = ""
 
     # --- Account settings ---
-    is_settings_open: bool = False
+    account_section: str = "settings"
     settings_username: str = ""
     settings_fullname: str = ""
+    settings_gemini_api_key: str = ""
+    show_api_key: bool = False
     settings_new_password: str = ""
     settings_confirm_password: str = ""
     settings_error: str = ""
@@ -95,8 +176,14 @@ class State(
     is_prepping: bool = False
     persona_input: str = ""
     transcript_text: str = ""
+    synthesis_error: str = ""
     prep_questions: str = ""
     prep_last_updated: str = ""
+    prep_extra_context: str = ""
+
+    # --- Interview guide prep (OST-based) ---
+    prep_opportunities: list[PrepOppItem] = []
+    prep_running_experiments: list[PrepExperimentItem] = []
 
     interview_history: list[InterviewHistoryItem] = []
 
@@ -138,12 +225,18 @@ class State(
 
     # --- Interview detail view ---
     selected_interview_id: int = 0
+    selected_opportunity_id: int = 0
     interview_detail_persona: str = ""
     interview_detail_persona_color: str = "gray"
     interview_detail_date: str = ""
     interview_detail_transcript: str = ""
     interview_detail_quotes: list[QuoteItem] = []
     active_quote_index: int = 0
+    # Extracted metadata (empty/0 = not available)
+    interview_detail_interview_date: str = ""
+    interview_detail_duration: int = 0
+    interview_detail_participants: str = ""  # comma-joined display string
+    interview_detail_participant_items: list[DetailParticipantItem] = []
 
     # --- Pending synthesis (confirmation step) ---
     pending_synthesis_transcript: str = ""
@@ -153,6 +246,12 @@ class State(
     pending_synthesis_memorable_quote: str = ""
     pending_synthesis_opps: list[PendingOppItem] = []
     pending_llm_usages: list[PendingLlmUsage] = []
+    # Extracted interview metadata (all optional — empty/0 means not found)
+    pending_synthesis_duration: int = 0        # 0 = not found
+    pending_synthesis_interview_date: str = "" # "" = not found
+    pending_synthesis_participants: list[str] = []
+    # Parallel list of roles for each participant ("interviewee" or "interviewer")
+    pending_synthesis_participant_roles: list[str] = []
 
     # --- Shared highlight state (synthesis review + interview detail) ---
     highlighted_quote_text: str = ""
@@ -179,6 +278,20 @@ class State(
     llm_usage_logs: list[LlmUsageItem] = []
     workspace_menu_open: bool = False
 
+    # --- Participant CRM ---
+    participants: list[ParticipantItem] = []
+    participant_segments: list[str] = []
+    participant_recruited_vias: list[str] = []
+    show_team_members: bool = False
+    is_participant_form_open: bool = False
+    editing_participant_id: int = -1
+    participant_form_name: str = ""
+    participant_form_persona: str = ""
+    participant_form_is_team_member: bool = False
+    participant_form_segment: str = ""
+    participant_form_recruited_via: str = ""
+    participant_form_notes: str = ""
+
     # --- Experiments workspace ---
     experiment_target_solution_id: int = -1
     experiment_target_solution_name: str = ""
@@ -187,6 +300,21 @@ class State(
     new_experiment_assumption: str = ""
     new_experiment_method: str = "Prototype Interview"
     editing_experiment_id: int = -1
+
+    # --- Home dashboard ---
+    dashboard_days_since_last: int = -1       # -1 = no interviews yet
+    dashboard_total_interviews: int = 0
+    dashboard_weekly_bars: list[DashboardBarItem] = []
+    dashboard_exp_draft: int = 0
+    dashboard_exp_running: int = 0
+    dashboard_exp_concluded: int = 0
+    dashboard_exp_validated: int = 0
+    dashboard_exp_invalidated: int = 0
+    dashboard_opps_with_evidence: int = 0
+    dashboard_opps_with_solutions: int = 0
+    dashboard_solutions_testing: int = 0
+    dashboard_total_opps: int = 0
+    dashboard_recent_interviews: list[RecentInterviewItem] = []
 
     @rx.var
     def active_product_name(self) -> str:
@@ -233,12 +361,13 @@ class State(
         self.login_error = ""
         self.login_username = ""
         self.login_password = ""
+        configure_genai(user.gemini_api_key or "")
         yield rx.call_script(f"localStorage.setItem('auth_user_id', '{user.id}')")
-        self.load_data_for_current_view()
         yield rx.call_script(
             "localStorage.getItem('active_product_id') || ''",
             callback=State.restore_product_from_storage,
         )
+        yield rx.redirect("/")
 
     def logout(self):
         """Clear the session and return to the login screen."""
@@ -246,11 +375,14 @@ class State(
         self.auth_user_id = 0
         self.auth_username = ""
         self.auth_fullname = ""
-        return rx.call_script("localStorage.removeItem('auth_user_id')")
+        yield rx.call_script("localStorage.removeItem('auth_user_id')")
+        yield rx.redirect("/login")
 
     def verify_stored_session(self, stored_id: str):
         """Callback from localStorage on app mount — restores session if valid."""
         if not stored_id or not stored_id.strip().isdigit():
+            if self.router.page.path != "/login":
+                return rx.redirect("/login")
             return
         user_id = int(stored_id.strip())
         with rx.session() as session:
@@ -261,6 +393,7 @@ class State(
         self.auth_username = user.username
         self.auth_fullname = user.fullname
         self.is_authenticated = True
+        configure_genai(user.gemini_api_key or "")
         self.load_data_for_current_view()
         return rx.call_script(
             "localStorage.getItem('active_product_id') || ''",
@@ -272,28 +405,32 @@ class State(
         if key == "Enter":
             yield State.login()
 
-    def open_account_settings(self):
-        """Open the account settings modal pre-filled with current user data."""
+    def load_account_page(self):
+        """On-mount handler for the /account page: pre-fill settings and load LLM usage."""
+        self.current_view = "account"
+        self.account_section = "settings"
+        return self._ensure_auth_and_load()
+
+    def _prefill_account_settings(self):
+        """Pre-fill account settings form fields from the current user record."""
+        with rx.session() as session:
+            user = session.get(User, self.auth_user_id)
+            if user:
+                self.settings_gemini_api_key = user.gemini_api_key or ""
         self.settings_username = self.auth_username
         self.settings_fullname = self.auth_fullname
         self.settings_new_password = ""
         self.settings_confirm_password = ""
         self.settings_error = ""
         self.settings_success = ""
-        self.is_settings_open = True
+        self.show_api_key = False
 
-    def close_account_settings(self):
-        """Close the account settings modal and clear its form."""
-        self.is_settings_open = False
-        self.settings_username = ""
-        self.settings_fullname = ""
-        self.settings_new_password = ""
-        self.settings_confirm_password = ""
-        self.settings_error = ""
-        self.settings_success = ""
+    def toggle_show_api_key(self):
+        """Toggle visibility of the Gemini API key input."""
+        self.show_api_key = not self.show_api_key
 
     def save_account_settings(self):
-        """Persist updated profile and optional new password to the database."""
+        """Persist updated profile, API key, and optional new password to the database."""
         from sqlmodel import select as _select
         self.settings_error = ""
         self.settings_success = ""
@@ -309,6 +446,7 @@ class State(
             if len(self.settings_new_password) < 6:
                 self.settings_error = "Password must be at least 6 characters."
                 return
+        new_api_key = self.settings_gemini_api_key.strip()
         with rx.session() as session:
             user = session.get(User, self.auth_user_id)
             if not user:
@@ -323,15 +461,135 @@ class State(
                     return
             user.username = new_username
             user.fullname = new_fullname
+            user.gemini_api_key = new_api_key if new_api_key else None
             if self.settings_new_password:
                 user.password_hash = _hash_password(self.settings_new_password)
             session.add(user)
             session.commit()
         self.auth_username = new_username
         self.auth_fullname = new_fullname
+        self.settings_gemini_api_key = new_api_key
+        configure_genai(new_api_key)
         self.settings_new_password = ""
         self.settings_confirm_password = ""
         self.settings_success = "Settings saved successfully."
+
+    def wipe_database(self):
+        """Delete all data except the current user. Useful for resetting test state."""
+        with rx.session() as session:
+            # Delete in FK-safe order (children before parents)
+            for row in session.exec(select(Experiment)).all():
+                session.delete(row)
+            for row in session.exec(select(InterviewParticipantLink)).all():
+                session.delete(row)
+            for row in session.exec(select(InterviewOpportunityLink)).all():
+                session.delete(row)
+            for row in session.exec(select(OutcomeOpportunityLink)).all():
+                session.delete(row)
+            for row in session.exec(select(LlmUsageLog)).all():
+                session.delete(row)
+            for row in session.exec(select(PersonaPrep)).all():  # PersonaPrep is from .core
+                session.delete(row)
+            for row in session.exec(select(Interview)).all():
+                session.delete(row)
+            # Solutions have a self-referential parent_id — clear children first
+            for row in session.exec(select(Solution).where(Solution.parent_id != None)).all():
+                session.delete(row)
+            for row in session.exec(select(Solution)).all():
+                session.delete(row)
+            # Opportunities have a self-referential parent_id — clear children first
+            for row in session.exec(select(Opportunity).where(Opportunity.parent_id != None)).all():
+                session.delete(row)
+            for row in session.exec(select(Opportunity)).all():
+                session.delete(row)
+            for row in session.exec(select(Outcome)).all():
+                session.delete(row)
+            for row in session.exec(select(Participant)).all():
+                session.delete(row)
+            for row in session.exec(select(Persona)).all():
+                session.delete(row)
+            for row in session.exec(select(Product)).all():
+                session.delete(row)
+            session.commit()
+
+        # Reset all volatile state and return to the start
+        self.current_view = "synthesize"
+        self.interview_history = []
+        self.ledger_data = []
+        self.available_personas = []
+        self.participants = []
+        self.llm_usage_logs = []
+        self.outcomes = []
+        self.outcome_names = ["All Outcomes"]
+        self.active_outcome_name = "All Outcomes"
+        self.pending_synthesis_opps = []
+        self.pending_synthesis_participants = []
+        self.pending_synthesis_participant_roles = []
+        self.prep_opportunities = []
+        self.prep_running_experiments = []
+        self.active_product_id = "1"
+        return rx.redirect("/synthesize")
+
+    def toggle_show_team_members(self):
+        """Toggle visibility of product-team interviewers in the Participants table."""
+        self.show_team_members = not self.show_team_members
+
+    def _ensure_auth_and_load(self):
+        """If already authenticated, load data for the current view.
+        Otherwise trigger the localStorage auth check."""
+        if self.is_authenticated:
+            self.load_data_for_current_view()
+        else:
+            return rx.call_script(
+                "localStorage.getItem('auth_user_id') || ''",
+                callback=State.verify_stored_session,
+            )
+
+    # --- Per-page on_mount handlers ---
+
+    def load_home_page(self):
+        self.current_view = "home"
+        return self._ensure_auth_and_load()
+
+    def load_synthesize_page(self):
+        self.current_view = "synthesize"
+        return self._ensure_auth_and_load()
+
+    def load_review_page(self):
+        self.current_view = "synthesis_review"
+        return self._ensure_auth_and_load()
+
+    def load_ledger_page(self):
+        self.current_view = "ledger"
+        return self._ensure_auth_and_load()
+
+    def load_opportunity_page(self):
+        self.current_view = "opportunity"
+        id_str = self.router.page.params.get("opportunity_id", "0")
+        self.selected_opportunity_id = int(id_str) if id_str.isdigit() else 0
+        return self._ensure_auth_and_load()
+
+    def load_interviews_page(self):
+        self.current_view = "logs"
+        return self._ensure_auth_and_load()
+
+    def load_interview_detail_page(self):
+        self.current_view = "interview_detail"
+        id_str = self.router.page.params.get("interview_id", "0")
+        self.selected_interview_id = int(id_str) if id_str.isdigit() else 0
+        return self._ensure_auth_and_load()
+
+    def load_prep_page(self):
+        self.current_view = "prep"
+        return self._ensure_auth_and_load()
+
+    def load_participants_page(self):
+        self.current_view = "participants"
+        return self._ensure_auth_and_load()
+
+    def load_llm_usage_page(self):
+        self.current_view = "llm_usage"
+        return self._ensure_auth_and_load()
 
     def load_app(self):
         """Initial app load — check auth first; data loads only after session is verified."""
@@ -378,6 +636,60 @@ class State(
     @rx.var
     def selected_opp_count(self) -> int:
         return sum(1 for opp in self.pending_synthesis_opps if opp.selected)
+
+    @rx.var
+    def pending_synthesis_participants_str(self) -> str:
+        return ", ".join(self.pending_synthesis_participants)
+
+    @rx.var
+    def pending_participants_with_roles(self) -> list[PendingParticipantItem]:
+        """Zips participant names with their current roles for the role-editor UI."""
+        roles = self.pending_synthesis_participant_roles
+        return [
+            PendingParticipantItem(
+                index=i,
+                name=name,
+                role=roles[i] if i < len(roles) else "interviewee",
+            )
+            for i, name in enumerate(self.pending_synthesis_participants)
+        ]
+
+    @rx.var
+    def filtered_participants(self) -> list[ParticipantItem]:
+        """Participants list filtered by the show_team_members toggle."""
+        if self.show_team_members:
+            return self.participants
+        return [p for p in self.participants if not p.is_team_member]
+
+    @rx.var
+    def prep_persona_options(self) -> list[str]:
+        """Persona list with a leading 'None' sentinel for the prep page dropdown."""
+        return ["— None —"] + self.available_personas
+
+    @rx.var
+    def selected_opportunity_ids(self) -> list[int]:
+        """IDs of opportunities checked in the prep page selector."""
+        return [o.id for o in self.prep_opportunities if o.selected]
+
+    @rx.var
+    def selected_experiment_ids(self) -> list[int]:
+        """IDs of experiments checked in the prep page selector."""
+        return [e.id for e in self.prep_running_experiments if e.selected]
+
+    @rx.var
+    def visible_prep_experiments(self) -> list[PrepExperimentItem]:
+        """Running experiments for currently selected prep opportunities."""
+        sel_ids = {o.id for o in self.prep_opportunities if o.selected}
+        if not sel_ids:
+            return []
+        return [e for e in self.prep_running_experiments if e.opp_id in sel_ids]
+
+    def copy_guide_to_clipboard(self):
+        """Copies the generated prep guide text to the system clipboard."""
+        import json as _json
+        return rx.call_script(
+            f"navigator.clipboard.writeText({_json.dumps(self.prep_questions)})"
+        )
 
     @rx.var
     def detail_transcript_html(self) -> str:
@@ -435,4 +747,5 @@ __all__ = [
     "LedgerItem",
     "PersonaPrep",
     "PendingOppItem",
+    "ParticipantItem",
 ]
