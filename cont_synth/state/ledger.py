@@ -23,6 +23,9 @@ from .core import (
     SolutionItem,
     OutcomeItem,
     LedgerItem,
+    ThemeGroup,
+    BoardColumn,
+    MatrixCell,
 )
 
 
@@ -32,6 +35,80 @@ class LedgerStateMixin(rx.State, mixin=True):
     NOTE: Field definitions & defaults live on the concrete State class to keep
     Reflex / Pydantic happy. This mixin only provides behavior.
     """
+
+    # ── View-mode computed vars ───────────────────────────────────────────────
+
+    @rx.var
+    def ledger_data_by_theme(self) -> list[ThemeGroup]:
+        """Groups ledger_data by theme for the collapsible list view."""
+        groups: dict[str, list[LedgerItem]] = {}
+        for item in self.ledger_data:
+            theme = item.theme if item.theme else "Uncategorized"
+            groups.setdefault(theme, []).append(item)
+
+        result: list[ThemeGroup] = []
+        for theme, items in groups.items():
+            avg_p = sum(i.priority_score for i in items) // max(len(items), 1)
+            result.append(ThemeGroup(
+                theme=theme,
+                count=len(items),
+                avg_priority=avg_p,
+                is_target_group=any(i.is_target for i in items),
+                collapsed=theme in self.collapsed_themes,
+                opps=items,
+            ))
+
+        result.sort(key=lambda g: (-int(g.is_target_group), -g.avg_priority))
+        return result
+
+    @rx.var
+    def ledger_board_columns(self) -> list[BoardColumn]:
+        """Splits ledger_data into 4 priority tiers for the Kanban board view."""
+        high = [i for i in self.ledger_data if i.priority_score >= 8]
+        medium = [i for i in self.ledger_data if 4 <= i.priority_score < 8]
+        low = [i for i in self.ledger_data if 1 <= i.priority_score < 4]
+        unscored = [i for i in self.ledger_data if i.priority_score == 0]
+        return [
+            BoardColumn(label="High  P≥8", color="amber", opps=high),
+            BoardColumn(label="Medium  P≥4", color="blue", opps=medium),
+            BoardColumn(label="Low  P<4", color="gray", opps=low),
+            BoardColumn(label="Unscored", color="gray", opps=unscored),
+        ]
+
+    @rx.var
+    def matrix_cells(self) -> list[MatrixCell]:
+        """Returns 25 cells (sat_gap 5→1 × impact 1→5) for the priority matrix."""
+        cells: list[MatrixCell] = []
+        for sat in range(5, 0, -1):
+            for imp in range(1, 6):
+                cell_items = [
+                    i for i in self.ledger_data
+                    if i.sat_gap_score == sat and i.impact_score == imp
+                ]
+                cells.append(MatrixCell(
+                    sat_gap=sat,
+                    impact=imp,
+                    opps=cell_items,
+                    is_sweet_spot=(sat >= 3 and imp >= 3),
+                ))
+        return cells
+
+    @rx.var
+    def matrix_unscored(self) -> list[LedgerItem]:
+        """Opportunities missing at least one score (cannot appear in matrix)."""
+        return [
+            i for i in self.ledger_data
+            if i.impact_score == 0 or i.sat_gap_score == 0
+        ]
+
+    def toggle_theme_collapse(self, theme: str):
+        """Collapses or expands a theme group in the list view."""
+        if theme in self.collapsed_themes:
+            self.collapsed_themes = [t for t in self.collapsed_themes if t != theme]
+        else:
+            self.collapsed_themes = self.collapsed_themes + [theme]
+
+    # ─────────────────────────────────────────────────────────────────────────
 
     @rx.var
     def selectable_outcomes(self) -> list[str]:

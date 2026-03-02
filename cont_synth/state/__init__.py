@@ -13,6 +13,9 @@ from .core import (
     OutcomeItem,
     InterviewHistoryItem,
     LedgerItem,
+    ThemeGroup,
+    BoardColumn,
+    MatrixCell,
     PersonaPrep,
     ProductItem,
     PendingOppItem,
@@ -192,6 +195,8 @@ class State(
     ledger_data: list[LedgerItem] = []
     available_personas: list[str] = []
     target_persona: str = ""
+    ledger_view_mode: str = "list"   # "list" | "board" | "matrix"
+    collapsed_themes: list[str] = []
 
     # --- Solutions workspace ---
     is_generating_solutions: bool = False

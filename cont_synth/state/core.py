@@ -163,6 +163,31 @@ class LedgerItem(rx.Base):
     is_target: bool = False
 
 
+class ThemeGroup(rx.Base):
+    """A group of opportunities sharing the same theme, for the grouped list view."""
+    theme: str
+    count: int
+    avg_priority: int
+    is_target_group: bool = False
+    collapsed: bool = False
+    opps: list[LedgerItem] = []
+
+
+class BoardColumn(rx.Base):
+    """One column in the Kanban board view, representing a priority tier."""
+    label: str
+    color: str
+    opps: list[LedgerItem] = []
+
+
+class MatrixCell(rx.Base):
+    """One cell in the 5×5 Impact × Sat-Gap priority matrix."""
+    sat_gap: int
+    impact: int
+    opps: list[LedgerItem] = []
+    is_sweet_spot: bool = False  # sat_gap ≥ 3 and impact ≥ 3
+
+
 class ParticipantItem(rx.Base):
     id: int
     name: str
@@ -245,6 +270,9 @@ __all__ = [
     "OutcomeItem",
     "InterviewHistoryItem",
     "LedgerItem",
+    "ThemeGroup",
+    "BoardColumn",
+    "MatrixCell",
     "PersonaPrep",
     "ProductItem",
     "PendingOppItem",

@@ -2,6 +2,59 @@ import reflex as rx
 from cont_synth.state import State, OppDetailSolution, ExperimentItem, QuoteItem
 
 
+# --- SCORING HELPERS ---
+
+def _info_label_detail(text, explanation: str) -> rx.Component:
+    """A label + clickable ? icon that opens a popover with an explanation."""
+    return rx.flex(
+        rx.text(text, size="2", color="var(--gray-11)", weight="medium"),
+        rx.popover.root(
+            rx.popover.trigger(
+                rx.icon(
+                    "circle-help",
+                    size=14,
+                    color="var(--gray-8)",
+                    cursor="pointer",
+                    _hover={"color": "var(--gray-12)"},
+                ),
+            ),
+            rx.popover.content(
+                rx.text(explanation, size="2"),
+                max_width="280px",
+                side="top",
+            ),
+        ),
+        spacing="1",
+        align="center",
+    )
+
+
+def _score_dot_detail(field: str, score: int) -> rx.Component:
+    """A single clickable dot for scoring on the opportunity detail page."""
+    item = State.selected_opportunity
+    score_var = item.impact_score if field == "impact" else item.sat_gap_score
+    is_filled = score_var >= score
+    return rx.box(
+        width="12px",
+        height="12px",
+        border_radius="50%",
+        background_color=rx.cond(
+            is_filled,
+            rx.cond(field == "impact", "var(--blue-9)", "var(--violet-9)"),
+            "var(--gray-4)",
+        ),
+        cursor="pointer",
+        flex_shrink="0",
+        on_click=lambda: State.update_opp_score(item.opportunity_id, field, str(score)),
+        _hover={
+            "background_color": rx.cond(
+                field == "impact", "var(--blue-7)", "var(--violet-7)"
+            )
+        },
+        transition="background-color 0.1s ease",
+    )
+
+
 # --- EVIDENCE PANEL HELPERS ---
 
 def render_detail_quote(q: QuoteItem) -> rx.Component:
@@ -572,6 +625,58 @@ def render_opp_view_header() -> rx.Component:
                 spacing="2", wrap="wrap",
             ),
             spacing="4", align="center",
+        ),
+        # Priority scoring row
+        rx.flex(
+            _info_label_detail(
+                "Impact",
+                "How many customers are affected and how severely? Rate 1 (few/minor) to 5 (all/critical).",
+            ),
+            rx.flex(
+                _score_dot_detail("impact", 1),
+                _score_dot_detail("impact", 2),
+                _score_dot_detail("impact", 3),
+                _score_dot_detail("impact", 4),
+                _score_dot_detail("impact", 5),
+                spacing="1",
+            ),
+            rx.box(
+                width="1px", height="16px",
+                background_color="var(--gray-5)",
+                margin_x="2",
+            ),
+            _info_label_detail(
+                "Sat. Gap",
+                "How dissatisfied are customers with current workarounds? Rate 1 (satisfied) to 5 (very frustrated).",
+            ),
+            rx.flex(
+                _score_dot_detail("sat_gap", 1),
+                _score_dot_detail("sat_gap", 2),
+                _score_dot_detail("sat_gap", 3),
+                _score_dot_detail("sat_gap", 4),
+                _score_dot_detail("sat_gap", 5),
+                spacing="1",
+            ),
+            rx.box(
+                width="1px", height="16px",
+                background_color="var(--gray-5)",
+                margin_x="2",
+            ),
+            rx.text(
+                f"Priority {State.selected_opportunity.priority_score}/15",
+                size="2",
+                color=rx.cond(
+                    State.selected_opportunity.priority_score >= 11,
+                    "var(--amber-11)",
+                    rx.cond(
+                        State.selected_opportunity.priority_score >= 6,
+                        "var(--blue-11)",
+                        "var(--gray-10)",
+                    ),
+                ),
+                weight="medium",
+            ),
+            spacing="2", align="center", wrap="wrap",
         ),
         spacing="3",
         align_items="start",

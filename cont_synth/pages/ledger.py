@@ -1,5 +1,15 @@
 import reflex as rx
-from cont_synth.state import State, LedgerItem, PersonaBadge, QuoteItem, SolutionItem, ExperimentItem
+from cont_synth.state import (
+    State,
+    LedgerItem,
+    PersonaBadge,
+    QuoteItem,
+    SolutionItem,
+    ExperimentItem,
+    ThemeGroup,
+    BoardColumn,
+    MatrixCell,
+)
 
 
 # --- HELPER COMPONENTS ---
@@ -123,6 +133,31 @@ def render_solution(sol: SolutionItem):
     )
 
 
+def _info_label(text, explanation: str) -> rx.Component:
+    """A label + clickable ? icon that opens a popover with an explanation."""
+    return rx.flex(
+        rx.text(text, size="2", color="var(--gray-11)", weight="medium"),
+        rx.popover.root(
+            rx.popover.trigger(
+                rx.icon(
+                    "circle-help",
+                    size=14,
+                    color="var(--gray-8)",
+                    cursor="pointer",
+                    _hover={"color": "var(--gray-12)"},
+                ),
+            ),
+            rx.popover.content(
+                rx.text(explanation, size="2"),
+                max_width="280px",
+                side="top",
+            ),
+        ),
+        spacing="1",
+        align="center",
+    )
+
+
 def _score_dot(item: LedgerItem, field: str, score: int) -> rx.Component:
     """A single clickable dot for the 1-5 score selector."""
     score_var = item.impact_score if field == "impact" else item.sat_gap_score
@@ -222,7 +257,7 @@ def show_ledger_row(item: LedgerItem):
                 ),
                 justify="between", width="100%", align="center",
             ),
-            # ── Row 2: Opportunity statement (hero text) ──────────────────
+            # ── Row 2: Opportunity statement (hero text, 2-line clamp) ───
             rx.text(
                 item.opportunity,
                 weight="bold",
@@ -232,6 +267,12 @@ def show_ledger_row(item: LedgerItem):
                 on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
                 _hover={"color": "var(--blue-11)"},
                 transition="color 0.1s ease",
+                style={
+                    "overflow": "hidden",
+                    "display": "-webkit-box",
+                    "-webkit-line-clamp": "2",
+                    "-webkit-box-orient": "vertical",
+                },
             ),
             # ── Row 3: Personas + quick metrics ──────────────────────────
             rx.flex(
@@ -269,11 +310,10 @@ def show_ledger_row(item: LedgerItem):
                 ),
                 justify="between", width="100%", align="center",
             ),
-            # ── Row 4: Torres scoring ─────────────────────────────────────
+            # ── Row 4: Compact Torres scoring (single row) ───────────────
             rx.flex(
-                # Impact
+                _info_label("Impact", "Impact (1–5): How much does solving this opportunity move your target business outcome? 5 = critical driver, 1 = marginal effect."),
                 rx.flex(
-                    rx.text("Impact", size="1", color="var(--gray-9)", weight="medium"),
                     _score_dot(item, "impact", 1),
                     _score_dot(item, "impact", 2),
                     _score_dot(item, "impact", 3),
@@ -281,10 +321,9 @@ def show_ledger_row(item: LedgerItem):
                     _score_dot(item, "impact", 5),
                     spacing="1", align="center",
                 ),
-                rx.divider(orientation="vertical", size="1"),
-                # Satisfaction gap
+                rx.box(width="1px", height="12px", background_color="var(--gray-6)", flex_shrink="0", margin_x="2"),
+                _info_label("Gap", "Satisfaction Gap (1–5): How unhappy are users with the current situation? 5 = severe pain / no workaround, 1 = mild annoyance. High gap means users urgently want a better solution."),
                 rx.flex(
-                    rx.text("Sat. Gap", size="1", color="var(--gray-9)", weight="medium"),
                     _score_dot(item, "sat_gap", 1),
                     _score_dot(item, "sat_gap", 2),
                     _score_dot(item, "sat_gap", 3),
@@ -292,17 +331,9 @@ def show_ledger_row(item: LedgerItem):
                     _score_dot(item, "sat_gap", 5),
                     spacing="1", align="center",
                 ),
-                rx.divider(orientation="vertical", size="1"),
-                # Frequency note (auto-derived)
-                rx.flex(
-                    rx.text("Frequency", size="1", color="var(--gray-9)", weight="medium"),
-                    rx.text(
-                        f"{item.evidence.length()}/5 mentions",
-                        size="1", color="var(--gray-10)",
-                    ),
-                    spacing="1", align="center",
-                ),
-                spacing="3", align="center",
+                rx.box(width="1px", height="12px", background_color="var(--gray-6)", flex_shrink="0", margin_x="2"),
+                _info_label(f"Freq {item.evidence.length()}/5", "Frequency: How many interviews mentioned this opportunity (auto-counted from linked quotes, capped at 5). Combined with Impact and Gap to form the Priority score: Impact + Gap + Freq (max 15)."),
+                spacing="2", align="center", flex_wrap="wrap",
             ),
             spacing="3",
             width="100%",
@@ -319,8 +350,17 @@ def show_ledger_row(item: LedgerItem):
         ),
         border_radius="8px",
         background_color=rx.cond(
-            item.is_target, "var(--green-1)",
-            rx.cond(item.indent_level > 0, "var(--gray-2)", "var(--gray-1)"),
+            item.is_target,
+            "var(--green-1)",
+            rx.cond(
+                item.priority_score >= 11,
+                "var(--amber-1)",
+                rx.cond(
+                    item.priority_score >= 6,
+                    "var(--blue-1)",
+                    rx.cond(item.indent_level > 0, "var(--gray-2)", "var(--gray-1)"),
+                ),
+            ),
         ),
         border="1px solid var(--gray-4)",
         width="100%",
@@ -332,6 +372,391 @@ def show_ledger_row(item: LedgerItem):
     ),
     padding_left=f"calc({item.indent_level} * 28px)",
     width="100%",
+    )
+
+
+# ── THEME-GROUPED LIST VIEW ───────────────────────────────────────────────────
+
+def show_theme_group(group: ThemeGroup) -> rx.Component:
+    """Renders a collapsible group of opportunities sharing the same theme."""
+    priority_color = rx.cond(
+        group.avg_priority >= 11, "amber",
+        rx.cond(group.avg_priority >= 6, "blue", "gray"),
+    )
+    return rx.vstack(
+        # Group header (click to collapse/expand)
+        rx.flex(
+            rx.flex(
+                rx.icon(
+                    rx.cond(group.collapsed, "chevron-right", "chevron-down"),
+                    size=14, color="var(--gray-8)",
+                ),
+                rx.cond(
+                    group.is_target_group,
+                    rx.icon("crosshair", size=12, color="var(--green-9)"),
+                    rx.fragment(),
+                ),
+                rx.text(group.theme, weight="bold", size="3"),
+                rx.badge(
+                    f"{group.count}",
+                    color_scheme="gray", variant="surface", size="1",
+                ),
+                spacing="2", align="center",
+            ),
+            rx.badge(
+                f"avg P:{group.avg_priority}",
+                color_scheme=priority_color, variant="soft", size="1",
+            ),
+            justify="between",
+            width="100%",
+            cursor="pointer",
+            on_click=lambda: State.toggle_theme_collapse(group.theme),
+            padding="8px 14px",
+            border_radius="6px",
+            background_color="var(--gray-3)",
+            border="1px solid var(--gray-5)",
+            _hover={"background_color": "var(--gray-4)"},
+            transition="background-color 0.1s ease",
+        ),
+        # Items — hidden when collapsed
+        rx.cond(
+            group.collapsed,
+            rx.fragment(),
+            rx.vstack(
+                rx.foreach(group.opps, show_ledger_row),
+                spacing="2",
+                width="100%",
+                padding_left="8px",
+            ),
+        ),
+        spacing="2",
+        width="100%",
+    )
+
+
+# ── BOARD / KANBAN VIEW ───────────────────────────────────────────────────────
+
+def show_board_card(item: LedgerItem) -> rx.Component:
+    """A compact card for the Kanban board view."""
+    return rx.box(
+        rx.vstack(
+            # Theme badge + priority score
+            rx.flex(
+                rx.badge(item.theme, color_scheme="gray", variant="solid", size="1"),
+                rx.flex(
+                    rx.cond(
+                        item.running_experiments > 0,
+                        rx.badge(
+                            rx.icon("flask-conical", size=9),
+                            color_scheme="orange", variant="soft", size="1",
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        item.is_target,
+                        rx.icon("crosshair", size=11, color="var(--green-9)"),
+                        rx.fragment(),
+                    ),
+                    spacing="1", align="center",
+                ),
+                justify="between", width="100%", align="center",
+            ),
+            # Statement (2-line clamp)
+            rx.text(
+                item.opportunity,
+                size="2",
+                weight="medium",
+                cursor="pointer",
+                on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
+                _hover={"color": "var(--blue-11)"},
+                style={
+                    "overflow": "hidden",
+                    "display": "-webkit-box",
+                    "-webkit-line-clamp": "3",
+                    "-webkit-box-orient": "vertical",
+                },
+            ),
+            # Persona badges
+            rx.flex(
+                rx.foreach(
+                    item.personas_affected,
+                    lambda b: rx.badge(b.name, color_scheme=b.color, variant="soft", size="1"),
+                ),
+                spacing="1", wrap="wrap",
+            ),
+            # Quick metrics
+            rx.flex(
+                rx.icon("quote", size=10, color="var(--gray-7)"),
+                rx.text(f"{item.evidence.length()}", size="1", color="var(--gray-7)"),
+                rx.text("·", size="1", color="var(--gray-5)"),
+                rx.icon("lightbulb", size=10, color="var(--gray-7)"),
+                rx.text(f"{item.solutions.length()}", size="1", color="var(--gray-7)"),
+                rx.text("·", size="1", color="var(--gray-5)"),
+                rx.text(
+                    f"{item.days_old}d",
+                    size="1",
+                    color=rx.cond(
+                        item.status_color == "green", "var(--green-9)",
+                        rx.cond(item.status_color == "yellow", "var(--amber-9)", "var(--red-9)"),
+                    ),
+                ),
+                spacing="1", align="center",
+            ),
+            spacing="2",
+        ),
+        padding="12px",
+        border_radius="8px",
+        border_left=rx.cond(
+            item.is_target,
+            "3px solid var(--green-8)",
+            rx.cond(
+                item.status_color == "green", "3px solid var(--green-6)",
+                rx.cond(item.status_color == "yellow", "3px solid var(--amber-6)", "3px solid var(--red-6)"),
+            ),
+        ),
+        background_color=rx.cond(
+            item.is_target, "var(--green-1)",
+            rx.cond(
+                item.priority_score >= 8, "var(--amber-1)",
+                "var(--gray-1)",
+            ),
+        ),
+        border="1px solid var(--gray-4)",
+        width="100%",
+        cursor="pointer",
+        on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
+        _hover={"border_color": "var(--blue-5)", "background_color": "var(--blue-1)"},
+        transition="background-color 0.1s ease, border-color 0.1s ease",
+    )
+
+
+def show_board_column(col: BoardColumn) -> rx.Component:
+    """One priority-tier column in the Kanban board."""
+    return rx.vstack(
+        rx.flex(
+            rx.badge(col.label, color_scheme=col.color, variant="soft", size="2"),
+            rx.text(f"{col.opps.length()}", size="1", color="var(--gray-8)"),
+            spacing="2", align="center", justify="between", width="100%",
+        ),
+        rx.scroll_area(
+            rx.vstack(
+                rx.foreach(col.opps, show_board_card),
+                spacing="2",
+                width="100%",
+            ),
+            max_height="calc(100vh - 260px)",
+            width="100%",
+        ),
+        width="280px",
+        flex_shrink="0",
+        spacing="3",
+    )
+
+
+def show_board_view() -> rx.Component:
+    """Kanban board: 4 columns by priority tier (High / Medium / Low / Unscored)."""
+    return rx.scroll_area(
+        rx.flex(
+            rx.foreach(State.ledger_board_columns, show_board_column),
+            spacing="4",
+            align="start",
+            width="max-content",
+            min_width="100%",
+        ),
+        overflow_x="auto",
+        width="100%",
+    )
+
+
+# ── PRIORITY MATRIX VIEW ──────────────────────────────────────────────────────
+
+def show_matrix_cell(cell: MatrixCell) -> rx.Component:
+    """One cell in the 5×5 Impact × Sat-Gap priority matrix."""
+    return rx.box(
+        rx.vstack(
+            rx.foreach(
+                cell.opps,
+                lambda item: rx.box(
+                    rx.text(
+                        item.theme,
+                        size="1",
+                        weight="bold",
+                        color=rx.cond(item.is_target, "var(--green-11)", "var(--blue-11)"),
+                        overflow="hidden",
+                        white_space="nowrap",
+                        text_overflow="ellipsis",
+                        max_width="100%",
+                    ),
+                    rx.text(
+                        item.opportunity,
+                        size="1",
+                        color="var(--gray-11)",
+                        style={
+                            "overflow": "hidden",
+                            "display": "-webkit-box",
+                            "-webkit-line-clamp": "2",
+                            "-webkit-box-orient": "vertical",
+                        },
+                    ),
+                    padding="4px 6px",
+                    border_radius="4px",
+                    background_color=rx.cond(item.is_target, "var(--green-3)", "var(--blue-3)"),
+                    border="1px solid",
+                    border_color=rx.cond(item.is_target, "var(--green-6)", "var(--blue-5)"),
+                    cursor="pointer",
+                    width="100%",
+                    on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
+                    _hover={"opacity": "0.8"},
+                ),
+            ),
+            spacing="1",
+        ),
+        min_height="70px",
+        padding="6px",
+        background_color=rx.cond(
+            cell.is_sweet_spot, "var(--green-2)", "var(--gray-1)"
+        ),
+        border="1px solid",
+        border_color=rx.cond(
+            cell.is_sweet_spot, "var(--green-4)", "var(--gray-4)"
+        ),
+        border_radius="4px",
+        overflow="hidden",
+        width="100%",
+    )
+
+
+def show_matrix_view() -> rx.Component:
+    """5×5 Impact × Satisfaction Gap priority matrix."""
+    return rx.vstack(
+        # Axis guide + legend
+        rx.vstack(
+            rx.flex(
+                rx.text(
+                    "Priority = Impact + Satisfaction Gap + Frequency  (max 15)",
+                    size="2", weight="bold", color="var(--gray-12)",
+                ),
+                rx.flex(
+                    rx.box(width="12px", height="12px", background_color="var(--green-3)",
+                           border="1px solid var(--green-5)", border_radius="2px", flex_shrink="0"),
+                    rx.text("Priority zone", size="1", color="var(--gray-8)"),
+                    spacing="1", align="center",
+                ),
+                justify="between", width="100%", align="center",
+            ),
+            rx.flex(
+                rx.flex(
+                    rx.text("X-axis — ", size="1", color="var(--gray-9)", weight="medium"),
+                    rx.text(
+                        "Impact (1–5):",
+                        size="1", color="var(--gray-9)", weight="bold",
+                    ),
+                    rx.text(
+                        " How much does solving this move your business outcome?",
+                        size="1", color="var(--gray-8)",
+                    ),
+                    spacing="1", align="center",
+                ),
+                rx.text("·", size="1", color="var(--gray-5)"),
+                rx.flex(
+                    rx.text("Y-axis — ", size="1", color="var(--gray-9)", weight="medium"),
+                    rx.text(
+                        "Sat. Gap (1–5):",
+                        size="1", color="var(--gray-9)", weight="bold",
+                    ),
+                    rx.text(
+                        " How unhappy are users with the current situation? (5 = severe pain)",
+                        size="1", color="var(--gray-8)",
+                    ),
+                    spacing="1", align="center",
+                ),
+                spacing="2", align="center", flex_wrap="wrap",
+            ),
+            spacing="1",
+            width="100%",
+        ),
+        # Column headers (impact 1→5)
+        rx.flex(
+            rx.box(width="32px", flex_shrink="0"),  # gutter for row labels
+            rx.grid(
+                rx.text("I:1", size="1", color="var(--gray-7)", text_align="center"),
+                rx.text("I:2", size="1", color="var(--gray-7)", text_align="center"),
+                rx.text("I:3", size="1", color="var(--gray-7)", text_align="center"),
+                rx.text("I:4", size="1", color="var(--gray-7)", text_align="center"),
+                rx.text("I:5", size="1", color="var(--gray-7)", text_align="center"),
+                columns="5",
+                width="100%",
+                spacing="1",
+            ),
+            align="center",
+            spacing="1",
+            width="100%",
+        ),
+        # Row labels + matrix grid
+        rx.flex(
+            # Y-axis labels (sat_gap 5→1, top to bottom)
+            rx.vstack(
+                rx.text("G:5", size="1", color="var(--gray-7)", width="32px", text_align="center"),
+                rx.text("G:4", size="1", color="var(--gray-7)", width="32px", text_align="center"),
+                rx.text("G:3", size="1", color="var(--gray-7)", width="32px", text_align="center"),
+                rx.text("G:2", size="1", color="var(--gray-7)", width="32px", text_align="center"),
+                rx.text("G:1", size="1", color="var(--gray-7)", width="32px", text_align="center"),
+                justify="between",
+                height="350px",
+                flex_shrink="0",
+            ),
+            rx.grid(
+                rx.foreach(State.matrix_cells, show_matrix_cell),
+                columns="5",
+                spacing="1",
+                width="100%",
+            ),
+            spacing="1",
+            align="start",
+            width="100%",
+        ),
+        # Unscored opportunities (need rating before appearing in matrix)
+        rx.cond(
+            State.matrix_unscored.length() > 0,
+            rx.vstack(
+                rx.flex(
+                    rx.icon("alert-circle", size=14, color="var(--amber-9)"),
+                    rx.text("Needs scoring", size="2", weight="bold", color="var(--amber-11)"),
+                    rx.text(
+                        "— click to open and set Impact + Sat. Gap scores so these appear in the matrix",
+                        size="2", color="var(--gray-8)",
+                    ),
+                    spacing="2", align="center",
+                ),
+                rx.flex(
+                    rx.foreach(
+                        State.matrix_unscored,
+                        lambda item: rx.badge(
+                            item.theme + " · " + item.opportunity,
+                            color_scheme="gray",
+                            variant="outline",
+                            size="1",
+                            cursor="pointer",
+                            on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
+                            style={
+                                "overflow": "hidden",
+                                "max-width": "220px",
+                                "text-overflow": "ellipsis",
+                                "white-space": "nowrap",
+                            },
+                        ),
+                    ),
+                    wrap="wrap",
+                    spacing="2",
+                ),
+                spacing="3",
+                padding_top="20px",
+                width="100%",
+            ),
+            rx.fragment(),
+        ),
+        width="100%",
+        spacing="3",
     )
 
 
@@ -867,7 +1292,7 @@ def render_ledger() -> rx.Component:
             align="center",
         ),
         rx.divider(),
-        # --- Action Bar & Opportunity Form Dialog ---
+        # --- Action Bar: New Opportunity + View Mode Toggle ---
         rx.flex(
             rx.dialog.root(
                 rx.dialog.trigger(
@@ -941,11 +1366,41 @@ def render_ledger() -> rx.Component:
                 open=State.is_opp_dialog_open,
                 on_open_change=State.handle_opp_dialog_change,
             ),
-            spacing="3",
+            # View mode toggle buttons
+            rx.flex(
+                rx.button(
+                    rx.icon("list", size=14),
+                    "List",
+                    variant=rx.cond(State.ledger_view_mode == "list", "solid", "outline"),
+                    color_scheme="blue",
+                    size="2",
+                    on_click=State.set_ledger_view_mode("list"),
+                ),
+                rx.button(
+                    rx.icon("columns-3", size=14),
+                    "Board",
+                    variant=rx.cond(State.ledger_view_mode == "board", "solid", "outline"),
+                    color_scheme="blue",
+                    size="2",
+                    on_click=State.set_ledger_view_mode("board"),
+                ),
+                rx.button(
+                    rx.icon("grid-2x2", size=14),
+                    "Matrix",
+                    variant=rx.cond(State.ledger_view_mode == "matrix", "solid", "outline"),
+                    color_scheme="blue",
+                    size="2",
+                    on_click=State.set_ledger_view_mode("matrix"),
+                ),
+                gap="4px",
+                align="center",
+            ),
+            justify="between",
             width="100%",
-            justify="start",
+            align="center",
             margin_bottom="4",
         ),
+        # --- Main Content (view-mode conditional) ---
         rx.cond(
             State.ledger_data.length() == 0,
             rx.center(
@@ -961,10 +1416,19 @@ def render_ledger() -> rx.Component:
                 padding_y="80px",
                 width="100%",
             ),
-            rx.vstack(
-                rx.foreach(State.ledger_data, show_ledger_row),
-                spacing="2",
-                width="100%",
+            rx.cond(
+                State.ledger_view_mode == "board",
+                show_board_view(),
+                rx.cond(
+                    State.ledger_view_mode == "matrix",
+                    show_matrix_view(),
+                    # Default: grouped list view
+                    rx.vstack(
+                        rx.foreach(State.ledger_data_by_theme, show_theme_group),
+                        spacing="3",
+                        width="100%",
+                    ),
+                ),
             ),
         ),
         width="100%",
