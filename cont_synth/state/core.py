@@ -3,6 +3,7 @@ from datetime import datetime
 
 import google.generativeai as genai
 import reflex as rx
+from pydantic import BaseModel
 from sqlmodel import Field
 from dotenv import load_dotenv
 
@@ -39,17 +40,17 @@ def load_prompt(filename: str) -> str:
 
 
 # --- UI DATA MODELS ---
-class ProductItem(rx.Base):
+class ProductItem(BaseModel):
     id: int
     name: str
 
 
-class PersonaBadge(rx.Base):
+class PersonaBadge(BaseModel):
     name: str
     color: str
 
 
-class QuoteItem(rx.Base):
+class QuoteItem(BaseModel):
     interview_id: int
     persona_name: str
     persona_color: str
@@ -57,7 +58,7 @@ class QuoteItem(rx.Base):
     opportunity_statement: str = ""
 
 
-class SolutionItem(rx.Base):
+class SolutionItem(BaseModel):
     id: int
     parent_id: int | None = None
     name: str
@@ -65,7 +66,7 @@ class SolutionItem(rx.Base):
     status: str
     indent_level: int = 0
     
-class ExperimentItem(rx.Base):
+class ExperimentItem(BaseModel):
     id: int
     solution_id: int
     solution_name: str  # carry this for display in the tab
@@ -79,7 +80,7 @@ class ExperimentItem(rx.Base):
     evidence_notes: str
 
 
-class PendingLlmUsage(rx.Base):
+class PendingLlmUsage(BaseModel):
     """Token usage from one LLM call, held in state until the Interview row exists."""
 
     model_name: str
@@ -89,7 +90,7 @@ class PendingLlmUsage(rx.Base):
     total_tokens: int
 
 
-class LlmUsageItem(rx.Base):
+class LlmUsageItem(BaseModel):
     """One row in the LLM Usage dashboard."""
 
     id: int
@@ -102,7 +103,7 @@ class LlmUsageItem(rx.Base):
     created_at: str
 
 
-class PendingOppItem(rx.Base):
+class PendingOppItem(BaseModel):
     """One AI-extracted opportunity awaiting user confirmation before DB write."""
     index: int
     opportunity_statement: str
@@ -113,7 +114,7 @@ class PendingOppItem(rx.Base):
     selected: bool = True
 
 
-class OppDetailSolution(rx.Base):
+class OppDetailSolution(BaseModel):
     """A solution with its experiments embedded, used in the full-page detail view."""
     id: int
     parent_id: int | None = None
@@ -124,12 +125,12 @@ class OppDetailSolution(rx.Base):
     experiments: list[ExperimentItem] = []
 
 
-class OutcomeItem(rx.Base):
+class OutcomeItem(BaseModel):
     id: int
     name: str
 
 
-class InterviewHistoryItem(rx.Base):
+class InterviewHistoryItem(BaseModel):
     interview_id: int
     persona: str
     persona_color: str = "gray"
@@ -141,7 +142,7 @@ class InterviewHistoryItem(rx.Base):
     participants: str = ""  # comma-joined display string
 
 
-class LedgerItem(rx.Base):
+class LedgerItem(BaseModel):
     opportunity_id: int
     parent_id: int = -1
     indent_level: int = 0
@@ -162,27 +163,25 @@ class LedgerItem(rx.Base):
     # priority_score = impact + sat_gap + min(evidence_count, 5), max 15
     priority_score: int = 0
     running_experiments: int = 0
-    is_target: bool = False
 
 
-class ThemeGroup(rx.Base):
+class ThemeGroup(BaseModel):
     """A group of opportunities sharing the same theme, for the grouped list view."""
     theme: str
     count: int
     avg_priority: int
-    is_target_group: bool = False
     collapsed: bool = False
     opps: list[LedgerItem] = []
 
 
-class BoardColumn(rx.Base):
+class BoardColumn(BaseModel):
     """One column in the Kanban board view, representing a priority tier."""
     label: str
     color: str
     opps: list[LedgerItem] = []
 
 
-class MatrixCell(rx.Base):
+class MatrixCell(BaseModel):
     """One cell in the 5×5 Impact × Sat-Gap priority matrix."""
     sat_gap: int
     impact: int
@@ -190,7 +189,7 @@ class MatrixCell(rx.Base):
     is_sweet_spot: bool = False  # sat_gap ≥ 3 and impact ≥ 3
 
 
-class ParticipantItem(rx.Base):
+class ParticipantItem(BaseModel):
     id: int
     name: str
     persona_name: str = ""      # role archetype, e.g. "VP of Engineering"
@@ -203,27 +202,27 @@ class ParticipantItem(rx.Base):
     last_interviewed: str = ""  # ISO date of most recent linked interview
 
 
-class PendingParticipantItem(rx.Base):
+class PendingParticipantItem(BaseModel):
     """One participant extracted from a pending synthesis, with an editable role."""
     index: int
     name: str
     role: str = "interviewee"  # "interviewee" or "interviewer"
 
 
-class DetailParticipantItem(rx.Base):
+class DetailParticipantItem(BaseModel):
     """One participant shown read-only in the interview detail view."""
     name: str
     is_team_member: bool = False
 
 
-class DashboardBarItem(rx.Base):
+class DashboardBarItem(BaseModel):
     """One column in the home dashboard weekly bar chart."""
     week_label: str   # e.g. "Jan 20"
     count: int
     height_css: str = "0px"  # pre-computed CSS height for the bar, e.g. "32px"
 
 
-class RecentInterviewItem(rx.Base):
+class RecentInterviewItem(BaseModel):
     """One row in the home dashboard recent activity feed."""
     interview_id: int
     persona: str
@@ -232,7 +231,7 @@ class RecentInterviewItem(rx.Base):
     quote_count: int
 
 
-class PrepOppItem(rx.Base):
+class PrepOppItem(BaseModel):
     """One opportunity shown in the prep page OST selector."""
     id: int
     theme: str
@@ -240,7 +239,7 @@ class PrepOppItem(rx.Base):
     selected: bool = False
 
 
-class PrepExperimentItem(rx.Base):
+class PrepExperimentItem(BaseModel):
     """One running experiment shown in the prep page assumption selector."""
     id: int
     opp_id: int

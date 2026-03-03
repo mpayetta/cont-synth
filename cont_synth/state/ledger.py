@@ -53,12 +53,11 @@ class LedgerStateMixin(rx.State, mixin=True):
                 theme=theme,
                 count=len(items),
                 avg_priority=avg_p,
-                is_target_group=any(i.is_target for i in items),
                 collapsed=theme in self.collapsed_themes,
                 opps=items,
             ))
 
-        result.sort(key=lambda g: (-int(g.is_target_group), -g.avg_priority))
+        result.sort(key=lambda g: -g.avg_priority)
         return result
 
     @rx.var
@@ -418,7 +417,6 @@ class LedgerStateMixin(rx.State, mixin=True):
                         sat_gap_score=opp.sat_gap_score,
                         priority_score=priority_score,
                         running_experiments=running_exp_count,
-                        is_target=opp.is_target,
                     )
                 )
 
@@ -427,7 +425,7 @@ class LedgerStateMixin(rx.State, mixin=True):
 
             # Generate choices for the Parent Select dropdown
             self.parent_opp_choices = ["None"] + [
-                f"{item.opportunity_id} - {item.opportunity[:50]}..."
+                f"{item.opportunity_id} - {item.opportunity}"
                 for item in new_ledger
             ]
 
@@ -1017,17 +1015,170 @@ class LedgerStateMixin(rx.State, mixin=True):
                 session.commit()
         self._load_and_sync()
 
-    def set_target_opportunity(self, opp_id: int):
-        """Designates one opportunity as the current team focus; clears all others."""
+    # ── Evidence dropdown filter ──────────────────────────────────────────────
+
+    @rx.var
+    def available_interview_choices(self) -> list[str]:
+        """Interview choices with already-linked interviews filtered out for the selected opportunity."""
+        linked_ids = {e.interview_id for e in self.selected_opportunity.evidence}
+        return [
+            choice for choice in self.interview_choices
+            if int(choice.split(" - ")[0]) not in linked_ids
+        ]
+
+    # ── Merge opportunity ─────────────────────────────────────────────────────
+
+    @rx.var
+    def merge_target_choices(self) -> list[str]:
+        """All opportunities except the current merge source, formatted as 'id - statement'."""
+        return [
+            f"{item.opportunity_id} - {item.opportunity}"
+            for item in self.ledger_data
+            if item.opportunity_id != self.merge_source_opp_id
+        ]
+
+    @rx.var
+    def merge_source_statement(self) -> str:
+        for item in self.ledger_data:
+            if item.opportunity_id == self.merge_source_opp_id:
+                return item.opportunity
+        return ""
+
+    @rx.var
+    def merge_source_theme(self) -> str:
+        for item in self.ledger_data:
+            if item.opportunity_id == self.merge_source_opp_id:
+                return item.theme
+        return ""
+
+    @rx.var
+    def merge_target_statement(self) -> str:
+        for item in self.ledger_data:
+            if item.opportunity_id == self.merge_target_opp_id:
+                return item.opportunity
+        return ""
+
+    @rx.var
+    def merge_target_theme(self) -> str:
+        for item in self.ledger_data:
+            if item.opportunity_id == self.merge_target_opp_id:
+                return item.theme
+        return ""
+
+    def open_merge_dialog(self, opp_id: int):
+        self.merge_source_opp_id = opp_id
+        self.merge_target_opp_id = -1
+        self.merge_keep_statement = "target"
+        self.merge_keep_theme = "target"
+        self.is_merge_dialog_open = True
+
+    def close_merge_dialog(self, _open: bool = False):
+        self.is_merge_dialog_open = False
+        self.merge_source_opp_id = -1
+        self.merge_target_opp_id = -1
+        self.merge_keep_statement = "target"
+        self.merge_keep_theme = "target"
+
+    def set_merge_target(self, val: str):
+        try:
+            self.merge_target_opp_id = int(val.split(" - ")[0])
+        except Exception:
+            self.merge_target_opp_id = -1
+
+    def set_merge_keep_statement(self, val: str):
+        self.merge_keep_statement = val
+
+    def set_merge_keep_theme(self, val: str):
+        self.merge_keep_theme = val
+
+    def confirm_merge(self):
+        """Merges source opportunity into target, transferring all evidence, solutions, and outcome links."""
+        src_id = self.merge_source_opp_id
+        tgt_id = self.merge_target_opp_id
+        if src_id == -1 or tgt_id == -1:
+            return
+
         with rx.session() as session:
-            all_opps = session.exec(
-                select(Opportunity).where(
-                    Opportunity.product_id == int(self.active_product_id)
+            src = session.get(Opportunity, src_id)
+            tgt = session.get(Opportunity, tgt_id)
+            if not src or not tgt:
+                return
+
+            # 1. Transfer evidence (InterviewOpportunityLink) — dedup by interview_id
+            existing_tgt_interviews = {
+                link.interview_id
+                for link in session.exec(
+                    select(InterviewOpportunityLink).where(
+                        InterviewOpportunityLink.opportunity_id == tgt_id
+                    )
+                ).all()
+            }
+            src_evidence = session.exec(
+                select(InterviewOpportunityLink).where(
+                    InterviewOpportunityLink.opportunity_id == src_id
                 )
             ).all()
-            for opp in all_opps:
-                opp.is_target = opp.id == opp_id and not opp.is_target
-                session.add(opp)
+            for link in src_evidence:
+                if link.interview_id not in existing_tgt_interviews:
+                    link.opportunity_id = tgt_id
+                    session.add(link)
+                else:
+                    session.delete(link)
+
+            # 2. Transfer outcome links (OutcomeOpportunityLink) — dedup by outcome_id
+            existing_tgt_outcomes = {
+                link.outcome_id
+                for link in session.exec(
+                    select(OutcomeOpportunityLink).where(
+                        OutcomeOpportunityLink.opportunity_id == tgt_id
+                    )
+                ).all()
+            }
+            src_outcome_links = session.exec(
+                select(OutcomeOpportunityLink).where(
+                    OutcomeOpportunityLink.opportunity_id == src_id
+                )
+            ).all()
+            for link in src_outcome_links:
+                if link.outcome_id not in existing_tgt_outcomes:
+                    link.opportunity_id = tgt_id
+                    session.add(link)
+                else:
+                    session.delete(link)
+
+            # 3. Transfer solutions (experiments follow automatically via solution_id)
+            src_solutions = session.exec(
+                select(Solution).where(Solution.opportunity_id == src_id)
+            ).all()
+            for sol in src_solutions:
+                sol.opportunity_id = tgt_id
+                session.add(sol)
+
+            # 4. Re-parent child opportunities that pointed to source
+            child_opps = session.exec(
+                select(Opportunity).where(Opportunity.parent_id == src_id)
+            ).all()
+            for child in child_opps:
+                child.parent_id = tgt_id
+                session.add(child)
+
+            # 5. Apply chosen statement / theme to target
+            if self.merge_keep_statement == "source":
+                tgt.statement = src.statement
+            if self.merge_keep_theme == "source":
+                tgt.theme = src.theme
+            session.add(tgt)
+
             session.commit()
+
+            # 6. Delete source (all dependents have been moved)
+            session.delete(src)
+            session.commit()
+
+        self.close_merge_dialog()
         self._load_and_sync()
+
+        # If the user was viewing the source opportunity detail, redirect to the list
+        if self.selected_opportunity_id == src_id:
+            return rx.redirect("/opportunities")
 

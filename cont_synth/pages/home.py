@@ -193,12 +193,12 @@ def _experiment_widget() -> rx.Component:
                 rx.text(State.dashboard_exp_draft.to_string(), weight="bold", size="3"),
             ),
             _stat_row(
-                "play-circle", "var(--blue-9)",
+                "circle-play", "var(--blue-9)",
                 "Running",
                 rx.text(State.dashboard_exp_running.to_string(), weight="bold", size="3", color="var(--blue-11)"),
             ),
             _stat_row(
-                "check-circle-2", "var(--gray-12)",
+                "circle-check", "var(--gray-12)",
                 "Concluded",
                 rx.text(State.dashboard_exp_concluded.to_string(), weight="bold", size="3"),
             ),

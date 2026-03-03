@@ -86,15 +86,6 @@ def show_ledger_row(item: LedgerItem):
                         rx.icon("corner-down-right", size=13, color="var(--gray-12)"),
                         rx.fragment(),
                     ),
-                    rx.cond(
-                        item.is_target,
-                        rx.badge(
-                            rx.icon("crosshair", size=10),
-                            "Target",
-                            color_scheme="green", variant="solid", size="1",
-                        ),
-                        rx.fragment(),
-                    ),
                     rx.badge(item.theme, color_scheme="gray", variant="solid", size="1"),
                     rx.cond(
                         item.is_cross_functional,
@@ -103,7 +94,7 @@ def show_ledger_row(item: LedgerItem):
                     ),
                     spacing="2", align="center", flex="1",
                 ),
-                # Right: running experiments + priority score + target toggle
+                # Right: running experiments + priority score + actions
                 rx.flex(
                     # Running experiments pill (only shown when > 0)
                     rx.cond(
@@ -122,19 +113,18 @@ def show_ledger_row(item: LedgerItem):
                         variant=rx.cond(item.priority_score > 0, "soft", "outline"),
                         size="1",
                         title="Priority = Impact + Satisfaction Gap + Frequency (evidence count)",
+                        height="20px",
                     ),
-                    # Target toggle button
-                    rx.icon_button(
-                        rx.cond(
-                            item.is_target,
-                            rx.icon("crosshair", size=12),
-                            rx.icon("crosshair", size=12),
-                        ),
+                    rx.separator(orientation="vertical", size="1"),
+                    # Merge button
+                    rx.button(
+                        rx.icon("git-merge", size=12),
+                        "Merge",
                         size="1",
-                        variant=rx.cond(item.is_target, "solid", "ghost"),
-                        color_scheme=rx.cond(item.is_target, "green", "gray"),
-                        title=rx.cond(item.is_target, "Remove target designation", "Set as target opportunity"),
-                        on_click=lambda: State.set_target_opportunity(item.opportunity_id),
+                        variant="ghost",
+                        color_scheme="gray",
+                        on_click=lambda: State.open_merge_dialog(item.opportunity_id),
+                        height="20px",
                     ),
                     spacing="2", align="center", flex_shrink="0",
                 ),
@@ -224,32 +214,24 @@ def show_ledger_row(item: LedgerItem):
         ),
         padding="16px 16px 14px 20px",
         border_left=rx.cond(
-            item.is_target,
-            "4px solid var(--green-8)",
-            rx.cond(
-                item.status_color == "green", "4px solid var(--green-6)",
-                rx.cond(item.status_color == "yellow", "4px solid var(--amber-6)", "4px solid var(--red-6)"),
-            ),
+            item.status_color == "green", "4px solid var(--green-6)",
+            rx.cond(item.status_color == "yellow", "4px solid var(--amber-6)", "4px solid var(--red-6)"),
         ),
         border_radius="8px",
         background_color=rx.cond(
-            item.is_target,
-            "var(--green-1)",
+            item.priority_score >= 11,
+            "var(--amber-1)",
             rx.cond(
-                item.priority_score >= 11,
-                "var(--amber-1)",
-                rx.cond(
-                    item.priority_score >= 6,
-                    "var(--blue-1)",
-                    rx.cond(item.indent_level > 0, "var(--gray-2)", "var(--gray-1)"),
-                ),
+                item.priority_score >= 6,
+                "var(--blue-1)",
+                rx.cond(item.indent_level > 0, "var(--gray-2)", "var(--gray-1)"),
             ),
         ),
         border="1px solid var(--gray-4)",
         width="100%",
         _hover={
-            "background_color": rx.cond(item.is_target, "var(--green-2)", "var(--blue-1)"),
-            "border_color": rx.cond(item.is_target, "var(--green-6)", "var(--blue-5)"),
+            "background_color": "var(--blue-1)",
+            "border_color": "var(--blue-5)",
         },
         transition="background-color 0.1s ease, border-color 0.1s ease",
     ),
@@ -273,11 +255,6 @@ def show_theme_group(group: ThemeGroup) -> rx.Component:
                 rx.icon(
                     rx.cond(group.collapsed, "chevron-right", "chevron-down"),
                     size=14, color="var(--gray-12)",
-                ),
-                rx.cond(
-                    group.is_target_group,
-                    rx.icon("crosshair", size=12, color="var(--green-9)"),
-                    rx.fragment(),
                 ),
                 rx.text(group.theme, weight="bold", size="3"),
                 rx.badge(
@@ -335,11 +312,6 @@ def show_board_card(item: LedgerItem) -> rx.Component:
                         ),
                         rx.fragment(),
                     ),
-                    rx.cond(
-                        item.is_target,
-                        rx.icon("crosshair", size=11, color="var(--green-9)"),
-                        rx.fragment(),
-                    ),
                     spacing="1", align="center",
                 ),
                 justify="between", width="100%", align="center",
@@ -390,19 +362,12 @@ def show_board_card(item: LedgerItem) -> rx.Component:
         padding="12px",
         border_radius="8px",
         border_left=rx.cond(
-            item.is_target,
-            "3px solid var(--green-8)",
-            rx.cond(
-                item.status_color == "green", "3px solid var(--green-6)",
-                rx.cond(item.status_color == "yellow", "3px solid var(--amber-6)", "3px solid var(--red-6)"),
-            ),
+            item.status_color == "green", "3px solid var(--green-6)",
+            rx.cond(item.status_color == "yellow", "3px solid var(--amber-6)", "3px solid var(--red-6)"),
         ),
         background_color=rx.cond(
-            item.is_target, "var(--green-1)",
-            rx.cond(
-                item.priority_score >= 8, "var(--amber-1)",
-                "var(--gray-1)",
-            ),
+            item.priority_score >= 8, "var(--amber-1)",
+            "var(--gray-1)",
         ),
         border="1px solid var(--gray-4)",
         width="100%",
@@ -464,7 +429,7 @@ def show_matrix_cell(cell: MatrixCell) -> rx.Component:
                         item.theme,
                         size="1",
                         weight="bold",
-                        color=rx.cond(item.is_target, "var(--green-11)", "var(--blue-11)"),
+                        color="var(--blue-11)",
                         overflow="hidden",
                         white_space="nowrap",
                         text_overflow="ellipsis",
@@ -483,9 +448,9 @@ def show_matrix_cell(cell: MatrixCell) -> rx.Component:
                     ),
                     padding="4px 6px",
                     border_radius="4px",
-                    background_color=rx.cond(item.is_target, "var(--green-3)", "var(--blue-3)"),
+                    background_color="var(--blue-3)",
                     border="1px solid",
-                    border_color=rx.cond(item.is_target, "var(--green-6)", "var(--blue-5)"),
+                    border_color="var(--blue-5)",
                     cursor="pointer",
                     width="100%",
                     on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
@@ -603,7 +568,7 @@ def show_matrix_view() -> rx.Component:
             State.matrix_unscored.length() > 0,
             rx.vstack(
                 rx.flex(
-                    rx.icon("alert-circle", size=14, color="var(--amber-9)"),
+                    rx.icon("circle-alert", size=14, color="var(--amber-9)"),
                     rx.text("Needs scoring", size="2", weight="bold", color="var(--amber-11)"),
                     rx.text(
                         "— click to open and set Impact + Sat. Gap scores so these appear in the matrix",
@@ -641,6 +606,173 @@ def show_matrix_view() -> rx.Component:
         width="100%",
         spacing="3",
     )
+
+def _merge_dialog() -> rx.Component:
+    """State-controlled dialog for merging two opportunities."""
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.vstack(
+                rx.vstack(
+                    rx.dialog.title("Merge Opportunities"),
+                    rx.text(
+                        "Evidence, solutions, and experiments from the source will be moved to the destination. The source opportunity will be deleted.",
+                        size="2",
+                        color="var(--gray-11)",
+                    ),
+                    spacing="1",
+                ),
+                rx.divider(),
+                # Source (read-only)
+                rx.vstack(
+                    rx.text(
+                        "SOURCE (will be deleted)",
+                        size="1",
+                        weight="bold",
+                        color="var(--red-11)",
+                        letter_spacing="0.05em",
+                    ),
+                    rx.box(
+                        rx.text(State.merge_source_statement, size="2", weight="medium"),
+                        rx.flex(
+                            rx.badge(State.merge_source_theme, size="1", color_scheme="gray", variant="soft"),
+                            margin_top="6px",
+                        ),
+                        padding="10px 12px",
+                        border_radius="6px",
+                        background="var(--red-2)",
+                        border="1px solid var(--red-6)",
+                        width="100%",
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+                # Target selector
+                rx.vstack(
+                    rx.text(
+                        "DESTINATION (will survive)",
+                        size="1",
+                        weight="bold",
+                        color="var(--blue-11)",
+                        letter_spacing="0.05em",
+                    ),
+                    rx.select(
+                        State.merge_target_choices,
+                        placeholder="Select destination opportunity...",
+                        on_change=State.set_merge_target,
+                        width="100%",
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+                # Statement / theme choice (visible only after target is selected)
+                rx.cond(
+                    State.merge_target_opp_id != -1,
+                    rx.vstack(
+                        rx.divider(),
+                        # Statement
+                        rx.vstack(
+                            rx.text("Which statement to keep?", size="1", weight="bold", color="var(--gray-10)", letter_spacing="0.05em"),
+                            rx.flex(
+                                rx.box(
+                                    rx.text("Destination's", size="1", weight="bold", color=rx.cond(State.merge_keep_statement == "target", "var(--blue-11)", "var(--gray-10)")),
+                                    rx.text(State.merge_target_statement, size="2", margin_top="4px"),
+                                    padding="8px 10px",
+                                    border_radius="6px",
+                                    border=rx.cond(State.merge_keep_statement == "target", "2px solid var(--blue-7)", "1px solid var(--gray-5)"),
+                                    background=rx.cond(State.merge_keep_statement == "target", "var(--blue-2)", "transparent"),
+                                    cursor="pointer",
+                                    on_click=State.set_merge_keep_statement("target"),
+                                    flex="1",
+                                ),
+                                rx.box(
+                                    rx.text("Source's", size="1", weight="bold", color=rx.cond(State.merge_keep_statement == "source", "var(--blue-11)", "var(--gray-10)")),
+                                    rx.text(State.merge_source_statement, size="2", margin_top="4px"),
+                                    padding="8px 10px",
+                                    border_radius="6px",
+                                    border=rx.cond(State.merge_keep_statement == "source", "2px solid var(--blue-7)", "1px solid var(--gray-5)"),
+                                    background=rx.cond(State.merge_keep_statement == "source", "var(--blue-2)", "transparent"),
+                                    cursor="pointer",
+                                    on_click=State.set_merge_keep_statement("source"),
+                                    flex="1",
+                                ),
+                                spacing="2",
+                                width="100%",
+                            ),
+                            spacing="1",
+                            width="100%",
+                        ),
+                        # Theme
+                        rx.vstack(
+                            rx.text("Which theme to keep?", size="1", weight="bold", color="var(--gray-10)", letter_spacing="0.05em"),
+                            rx.flex(
+                                rx.box(
+                                    rx.badge(
+                                        State.merge_target_theme,
+                                        size="1",
+                                        color_scheme=rx.cond(State.merge_keep_theme == "target", "blue", "gray"),
+                                        variant=rx.cond(State.merge_keep_theme == "target", "solid", "soft"),
+                                    ),
+                                    rx.text("Destination's theme", size="1", color="var(--gray-10)", margin_top="4px"),
+                                    padding="8px 10px",
+                                    border_radius="6px",
+                                    border=rx.cond(State.merge_keep_theme == "target", "2px solid var(--blue-7)", "1px solid var(--gray-5)"),
+                                    background=rx.cond(State.merge_keep_theme == "target", "var(--blue-2)", "transparent"),
+                                    cursor="pointer",
+                                    on_click=State.set_merge_keep_theme("target"),
+                                    flex="1",
+                                ),
+                                rx.box(
+                                    rx.badge(
+                                        State.merge_source_theme,
+                                        size="1",
+                                        color_scheme=rx.cond(State.merge_keep_theme == "source", "blue", "gray"),
+                                        variant=rx.cond(State.merge_keep_theme == "source", "solid", "soft"),
+                                    ),
+                                    rx.text("Source's theme", size="1", color="var(--gray-10)", margin_top="4px"),
+                                    padding="8px 10px",
+                                    border_radius="6px",
+                                    border=rx.cond(State.merge_keep_theme == "source", "2px solid var(--blue-7)", "1px solid var(--gray-5)"),
+                                    background=rx.cond(State.merge_keep_theme == "source", "var(--blue-2)", "transparent"),
+                                    cursor="pointer",
+                                    on_click=State.set_merge_keep_theme("source"),
+                                    flex="1",
+                                ),
+                                spacing="2",
+                                width="100%",
+                            ),
+                            spacing="1",
+                            width="100%",
+                        ),
+                        spacing="3",
+                        width="100%",
+                    ),
+                    rx.fragment(),
+                ),
+                # Action buttons
+                rx.flex(
+                    rx.dialog.close(
+                        rx.button("Cancel", variant="soft", color_scheme="gray"),
+                    ),
+                    rx.button(
+                        rx.icon("git-merge", size=14),
+                        "Merge Opportunities",
+                        color_scheme="blue",
+                        disabled=State.merge_target_opp_id == -1,
+                        on_click=State.confirm_merge,
+                    ),
+                    spacing="3",
+                    justify="end",
+                    width="100%",
+                ),
+                spacing="4",
+                width="100%",
+            ),
+            max_width="520px",
+        ),
+        open=State.is_merge_dialog_open,
+        on_open_change=State.close_merge_dialog,
+    )
+
 
 def render_ledger() -> rx.Component:
     """The main view for the Global Ledger."""
@@ -843,6 +975,7 @@ def render_ledger() -> rx.Component:
                 ),
             ),
         ),
+        _merge_dialog(),
         width="100%",
         max_width="1400px",
         spacing="4",

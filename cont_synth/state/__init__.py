@@ -222,6 +222,13 @@ class State(
     is_editing_opp_detail: bool = False
     parent_opp_choices: list[str] = []
 
+    # --- Merge opportunity state ---
+    is_merge_dialog_open: bool = False
+    merge_source_opp_id: int = -1
+    merge_target_opp_id: int = -1
+    merge_keep_statement: str = "target"  # "source" | "target"
+    merge_keep_theme: str = "target"      # "source" | "target"
+
     # --- Evidence tracking ---
     interview_choices: list[str] = []
     selected_interview_choice: str = ""
@@ -345,6 +352,10 @@ class State(
     # Authentication
     # -------------------------------------------------------------------------
 
+    def set_login_username(self, val: str): self.login_username = val
+    def set_login_password(self, val: str): self.login_password = val
+    def set_participant_form_notes(self, val: str): self.participant_form_notes = val
+
     def login(self):
         """Verify credentials and authenticate the user."""
         from sqlmodel import select as _select
@@ -408,6 +419,39 @@ class State(
         """Submit login on Enter key press."""
         if key == "Enter":
             yield State.login()
+
+    # Explicit setters (replaces deprecated auto-setters)
+    def set_account_section(self, val: str): self.account_section = val
+    def set_settings_username(self, val: str): self.settings_username = val
+    def set_settings_fullname(self, val: str): self.settings_fullname = val
+    def set_settings_gemini_api_key(self, val: str): self.settings_gemini_api_key = val
+    def set_settings_new_password(self, val: str): self.settings_new_password = val
+    def set_settings_confirm_password(self, val: str): self.settings_confirm_password = val
+    def set_new_product_name(self, val: str): self.new_product_name = val
+    def set_edit_product_name(self, val: str): self.edit_product_name = val
+    def set_persona_input(self, val: str): self.persona_input = val
+    def set_transcript_text(self, val: str): self.transcript_text = val
+    def set_prep_extra_context(self, val: str): self.prep_extra_context = val
+    def set_ledger_view_mode(self, val: str): self.ledger_view_mode = val
+    def set_new_solution_name(self, val: str): self.new_solution_name = val
+    def set_new_solution_desc(self, val: str): self.new_solution_desc = val
+    def set_new_solution_status(self, val: str): self.new_solution_status = val
+    def set_new_outcome_name(self, val: str): self.new_outcome_name = val
+    def set_manual_opp_theme(self, val: str): self.manual_opp_theme = val
+    def set_manual_opp_statement(self, val: str): self.manual_opp_statement = val
+    def set_manual_opp_parent_id(self, val: str): self.manual_opp_parent_id = val
+    def set_selected_interview_choice(self, val: str): self.selected_interview_choice = val
+    def set_participant_form_name(self, val: str): self.participant_form_name = val
+    def set_participant_form_persona(self, val: str): self.participant_form_persona = val
+    def set_participant_form_is_team_member(self, val: bool): self.participant_form_is_team_member = val
+    def set_participant_form_segment(self, val: str): self.participant_form_segment = val
+    def set_participant_form_notes(self, val: str): self.participant_form_notes = val
+    def set_new_experiment_name(self, val: str): self.new_experiment_name = val
+    def set_new_experiment_assumption(self, val: str): self.new_experiment_assumption = val
+    def set_new_experiment_description(self, val: str): self.new_experiment_description = val
+    def set_new_experiment_success_metric(self, val: str): self.new_experiment_success_metric = val
+    def set_new_experiment_method(self, val: str): self.new_experiment_method = val
+    def set_new_experiment_method_other(self, val: str): self.new_experiment_method_other = val
 
     def load_account_page(self):
         """On-mount handler for the /account page: pre-fill settings and load LLM usage."""

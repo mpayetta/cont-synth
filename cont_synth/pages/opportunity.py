@@ -1,5 +1,6 @@
 import reflex as rx
 from cont_synth.state import State, OppDetailSolution, ExperimentItem, QuoteItem
+from cont_synth.pages.ledger import _merge_dialog
 
 
 # --- SCORING HELPERS ---
@@ -136,7 +137,7 @@ def render_evidence_panel() -> rx.Component:
             rx.vstack(
                 rx.text("🔗 Map Missed Evidence", size="2", weight="bold", color="gray"),
                 rx.select(
-                    State.interview_choices,
+                    State.available_interview_choices,
                     value=State.selected_interview_choice,
                     on_change=State.set_selected_interview_choice,
                     placeholder="Select Source Interview...",
@@ -818,6 +819,13 @@ def render_opportunity_detail() -> rx.Component:
                         color_scheme="gray",
                         on_click=State.enter_opp_detail_edit,
                     ),
+                    rx.button(
+                        rx.icon("git-merge", size=14),
+                        "Merge",
+                        variant="soft",
+                        color_scheme="gray",
+                        on_click=State.open_merge_dialog(State.selected_opportunity_id),
+                    ),
                     rx.alert_dialog.root(
                         rx.alert_dialog.trigger(
                             rx.button(
@@ -912,6 +920,7 @@ def render_opportunity_detail() -> rx.Component:
             width="100%",
         ),
         transcript_drawer_panel(),
+        _merge_dialog(),
         width="100%",
         max_width="1400px",
         spacing="5",

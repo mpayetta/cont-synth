@@ -253,7 +253,7 @@ def _workspace_section() -> rx.Component:
 def _user_section() -> rx.Component:
     """Logged-in user row at the bottom of the sidebar with settings and logout."""
     return rx.hstack(
-        rx.icon("user-circle", size=16, color="var(--gray-9)"),
+        rx.icon("circle-user", size=16, color="var(--gray-9)"),
         rx.text(
             State.auth_fullname,
             size="2",

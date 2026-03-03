@@ -43,8 +43,6 @@ class Opportunity(rx.Model, table=True):
     # Teresa Torres prioritization scores (0 = unrated, 1–5)
     impact_score: int = Field(default=0)
     sat_gap_score: int = Field(default=0)
-    # Target opportunity designation — only one should be True at a time
-    is_target: bool = Field(default=False)
 
 
 class InterviewOpportunityLink(rx.Model, table=True):

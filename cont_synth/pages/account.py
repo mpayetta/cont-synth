@@ -207,7 +207,7 @@ def _settings_feedback() -> rx.Component:
         rx.cond(
             State.settings_success != "",
             rx.callout.root(
-                rx.callout.icon(rx.icon("check-circle", size=16)),
+                rx.callout.icon(rx.icon("circle-check", size=16)),
                 rx.callout.text(State.settings_success, size="2"),
                 color_scheme="green",
                 variant="soft",
