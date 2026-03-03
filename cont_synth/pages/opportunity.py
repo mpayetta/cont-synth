@@ -302,7 +302,7 @@ def render_detail_experiment(exp: ExperimentItem) -> rx.Component:
                 rx.vstack(
                     rx.text("Evidence / Learnings", size="1", weight="bold", color="gray"),
                     rx.text_area(
-                        value=exp.evidence_notes,
+                        default_value=exp.evidence_notes,
                         placeholder="What did you observe? What did you learn?",
                         on_blur=lambda v: State.update_experiment_evidence(exp.id, v),
                         size="1",
