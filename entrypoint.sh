@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+export PYTHONWARNINGS="ignore::DeprecationWarning"
+
 echo "Running database migrations..."
 reflex db migrate
 
