@@ -583,12 +583,11 @@ def show_matrix_view() -> rx.Component:
                             item.theme + " · " + item.opportunity,
                             color_scheme="gray",
                             variant="outline",
-                            size="1",
+                            size="3",
                             cursor="pointer",
                             on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
                             style={
                                 "overflow": "hidden",
-                                "max-width": "220px",
                                 "text-overflow": "ellipsis",
                                 "white-space": "nowrap",
                             },
