@@ -77,27 +77,33 @@ def _first_sentence(text: str) -> str:
     return text
 
 
-def _mark_fragment(escaped: str, fragment: str) -> str | None:
-    """Try to wrap fragment in <mark> inside escaped. Returns marked string or None.
+def _find_span(escaped: str, fragment: str, after: int = 0) -> tuple[int, int] | None:
+    """Return (start, end) of the first match of fragment in escaped[after:], or None.
 
-    Both passes are case-insensitive so LLM-capitalised quote fragments
-    ("O sea") match their lowercase originals in the transcript ("o sea").
+    Case-insensitive exact substring first, then flexible-whitespace word regex.
     """
     if not fragment.strip():
         return None
-    # Pass A: case-insensitive exact substring match
-    idx = escaped.lower().find(fragment.lower())
+    search_area = escaped[after:]
+    idx = search_area.lower().find(fragment.lower())
     if idx >= 0:
-        end = idx + len(fragment)
-        return escaped[:idx] + _MARK_OPEN + escaped[idx:end] + _MARK_CLOSE + escaped[end:]
-    # Pass B: word-by-word regex with flexible whitespace, case-insensitive
+        return (after + idx, after + idx + len(fragment))
     words = fragment.split()
     if len(words) >= 2:
         pattern = r"\s+".join(_re.escape(w) for w in words)
-        m = _re.search(pattern, escaped, _re.IGNORECASE)
+        m = _re.search(pattern, search_area, _re.IGNORECASE)
         if m:
-            return escaped[:m.start()] + _MARK_OPEN + escaped[m.start():m.end()] + _MARK_CLOSE + escaped[m.end():]
+            return (after + m.start(), after + m.end())
     return None
+
+
+def _mark_fragment(escaped: str, fragment: str) -> str | None:
+    """Try to wrap fragment in <mark> inside escaped. Returns marked string or None."""
+    span = _find_span(escaped, fragment)
+    if span is None:
+        return None
+    s, e = span
+    return escaped[:s] + _MARK_OPEN + escaped[s:e] + _MARK_CLOSE + escaped[e:]
 
 
 def _inject_mark(escaped: str, escaped_quote: str) -> str:
@@ -109,10 +115,10 @@ def _inject_mark(escaped: str, escaped_quote: str) -> str:
               non-adjacent transcript lines with ellipses when the surrounding
               text uses a plain '.' or newline instead.
     Pass 3 – first sentence of the quote only, as a last-resort anchor.
-    Pass 4 – progressively shorter word-prefixes (7→4 words). Handles quotes
-              that the LLM assembled from non-adjacent turns without any '...'
-              separator: the first few words will lie within a single turn and
-              can be matched even when the full quote cannot.
+    Pass 4 – prefix anchor + suffix anchor. Finds where the quote starts (first
+              N words, 7→4) and where it ends (last M words, searched after the
+              prefix), then marks the entire span between them — covering all
+              text between the two anchors even across speaker-attribution lines.
     """
     if not escaped_quote.strip():
         return escaped
@@ -137,13 +143,26 @@ def _inject_mark(escaped: str, escaped_quote: str) -> str:
         if result is not None:
             return result
 
-    # Pass 4: progressively shorter word-prefixes as a positional anchor
+    # Pass 4: prefix anchor + suffix anchor → mark the full span between them.
+    # Handles cross-turn quotes where the LLM joined non-adjacent speaker turns
+    # without an ellipsis separator. We find where the quote starts (first N words)
+    # and where it ends (last M words, searched only after the prefix match), then
+    # highlight everything in between — including any speaker attribution text that
+    # separates the two turns.
     words = escaped_quote.split()
     for n in range(min(7, len(words)), 3, -1):
-        candidate = " ".join(words[:n])
-        result = _mark_fragment(escaped, candidate)
-        if result is not None:
-            return result
+        start_span = _find_span(escaped, " ".join(words[:n]))
+        if start_span is None:
+            continue
+        # Found start; try to extend the mark to the end of the quote.
+        end_span = start_span
+        for m in range(min(7, len(words)), 3, -1):
+            maybe = _find_span(escaped, " ".join(words[-m:]), after=start_span[1])
+            if maybe is not None:
+                end_span = maybe
+                break
+        s, e = start_span[0], end_span[1]
+        return escaped[:s] + _MARK_OPEN + escaped[s:e] + _MARK_CLOSE + escaped[e:]
 
     return escaped
 
