@@ -5,7 +5,7 @@ from cont_synth.state import State, LlmUsageItem
 def _stat_card(label: str, value: rx.Var) -> rx.Component:
     return rx.box(
         rx.vstack(
-            rx.text(label, size="1", color="var(--gray-9)", weight="medium", text_transform="uppercase", letter_spacing="0.05em"),
+            rx.text(label, size="1", color="var(--gray-12)", weight="medium", text_transform="uppercase", letter_spacing="0.05em"),
             rx.text(value, size="7", weight="bold", color="var(--gray-12)"),
             spacing="1",
             align="start",
@@ -31,7 +31,7 @@ def _operation_badge(operation: str) -> rx.Component:
 
 def _show_usage_row(item: LlmUsageItem) -> rx.Component:
     return rx.table.row(
-        rx.table.cell(rx.text(item.created_at, size="2", color="var(--gray-11)")),
+        rx.table.cell(rx.text(item.created_at, size="2", color="var(--gray-12)")),
         rx.table.cell(
             rx.badge(item.model_name, color_scheme="gray", variant="outline", size="1")
         ),
@@ -39,8 +39,8 @@ def _show_usage_row(item: LlmUsageItem) -> rx.Component:
         rx.table.cell(
             rx.cond(
                 item.interview_id > 0,
-                rx.text(f"#{item.interview_id}", size="2", color="var(--gray-11)"),
-                rx.text("—", size="2", color="var(--gray-8)"),
+                rx.text(f"#{item.interview_id}", size="2", color="var(--gray-12)"),
+                rx.text("—", size="2", color="var(--gray-12)"),
             )
         ),
         rx.table.cell(rx.text(item.prompt_tokens, size="2")),
@@ -91,7 +91,7 @@ def render_llm_usage() -> rx.Component:
             State.llm_usage_logs.length() == 0,
             rx.vstack(
                 rx.icon("bar-chart-2", size=32, color="var(--gray-6)"),
-                rx.text("No LLM calls recorded yet.", color="var(--gray-9)", size="3"),
+                rx.text("No LLM calls recorded yet.", color="var(--gray-12)", size="3"),
                 align="center",
                 padding_y="40px",
                 width="100%",

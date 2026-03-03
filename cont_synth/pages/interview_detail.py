@@ -31,11 +31,11 @@ def _detail_transcript_meta() -> rx.Component:
                 rx.cond(
                     State.interview_detail_interview_date != "",
                     rx.hstack(
-                        rx.icon("calendar", size=12, color="var(--gray-9)"),
+                        rx.icon("calendar", size=12, color="var(--gray-12)"),
                         rx.text(
                             State.interview_detail_interview_date,
                             size="1",
-                            color="var(--gray-11)",
+                            color="var(--gray-12)",
                         ),
                         spacing="1",
                         align="center",
@@ -45,12 +45,12 @@ def _detail_transcript_meta() -> rx.Component:
                 rx.cond(
                     State.interview_detail_duration > 0,
                     rx.hstack(
-                        rx.icon("clock", size=12, color="var(--gray-9)"),
+                        rx.icon("clock", size=12, color="var(--gray-12)"),
                         rx.text(
                             State.interview_detail_duration.to_string(),
                             " min",
                             size="1",
-                            color="var(--gray-11)",
+                            color="var(--gray-12)",
                         ),
                         spacing="1",
                         align="center",
@@ -67,12 +67,12 @@ def _detail_transcript_meta() -> rx.Component:
             State.interview_detail_participant_items.length() > 0,
             rx.vstack(
                 rx.hstack(
-                    rx.icon("users", size=13, color="var(--gray-9)"),
+                    rx.icon("users", size=13, color="var(--gray-12)"),
                     rx.text(
                         "Participants",
                         size="1",
                         weight="bold",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                         text_transform="uppercase",
                         letter_spacing="0.05em",
                     ),
@@ -108,12 +108,12 @@ def evidence_panel() -> rx.Component:
     return rx.vstack(
         # Header — outside the card so it lines up with the "FULL TRANSCRIPT" label
         rx.hstack(
-            rx.icon("quote", size=16, color="var(--gray-9)"),
+            rx.icon("quote", size=16, color="var(--gray-12)"),
             rx.text(
                 "Evidence Snippets",
                 size="2",
                 weight="bold",
-                color="var(--gray-9)",
+                color="var(--gray-12)",
                 text_transform="uppercase",
                 letter_spacing="0.05em",
             ),
@@ -128,7 +128,7 @@ def evidence_panel() -> rx.Component:
                 rx.box(
                     rx.text(
                         "No evidence snippets were extracted from this interview.",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                         size="2",
                     ),
                     width="100%",
@@ -137,7 +137,7 @@ def evidence_panel() -> rx.Component:
                 rx.vstack(
                     # Position indicator
                     rx.hstack(
-                        rx.text(State.quote_position, size="1", color="var(--gray-9)"),
+                        rx.text(State.quote_position, size="1", color="var(--gray-12)"),
                         justify="end",
                         width="100%",
                     ),
@@ -207,7 +207,7 @@ def evidence_panel() -> rx.Component:
                     rx.text(
                         "Click a card to highlight it in the transcript",
                         size="1",
-                        color="var(--gray-8)",
+                        color="var(--gray-12)",
                         style={"font_style": "italic"},
                         text_align="center",
                         width="100%",
@@ -288,12 +288,12 @@ def render_interview_detail() -> rx.Component:
                 variant="soft",
                 size="2",
             ),
-            rx.text(State.interview_detail_date, color="var(--gray-9)", size="2"),
-            rx.text("·", color="var(--gray-7)", size="2"),
+            rx.text(State.interview_detail_date, color="var(--gray-12)", size="2"),
+            rx.text("·", color="var(--gray-12)", size="2"),
             rx.text(
                 "Interview #",
                 State.selected_interview_id.to_string(),
-                color="var(--gray-9)",
+                color="var(--gray-12)",
                 size="2",
             ),
             align="center",
@@ -305,12 +305,12 @@ def render_interview_detail() -> rx.Component:
             # ── Left: Full transcript ─────────────────────────────────────────
             rx.vstack(
                 rx.hstack(
-                    rx.icon("file-text", size=16, color="var(--gray-9)"),
+                    rx.icon("file-text", size=16, color="var(--gray-12)"),
                     rx.text(
                         "Full Transcript",
                         size="2",
                         weight="bold",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                         text_transform="uppercase",
                         letter_spacing="0.05em",
                     ),

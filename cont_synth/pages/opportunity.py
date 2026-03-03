@@ -7,13 +7,13 @@ from cont_synth.state import State, OppDetailSolution, ExperimentItem, QuoteItem
 def _info_label_detail(text, explanation: str) -> rx.Component:
     """A label + clickable ? icon that opens a popover with an explanation."""
     return rx.flex(
-        rx.text(text, size="2", color="var(--gray-11)", weight="medium"),
+        rx.text(text, size="2", color="var(--gray-12)", weight="medium"),
         rx.popover.root(
             rx.popover.trigger(
                 rx.icon(
                     "circle-help",
                     size=14,
-                    color="var(--gray-8)",
+                    color="var(--gray-12)",
                     cursor="pointer",
                     _hover={"color": "var(--gray-12)"},
                 ),
@@ -379,7 +379,7 @@ def render_solution_detail_card(sol: OppDetailSolution) -> rx.Component:
                     rx.flex(
                         rx.cond(
                             sol.indent_level > 0,
-                            rx.icon("corner-down-right", size=14, color="var(--gray-8)"),
+                            rx.icon("corner-down-right", size=14, color="var(--gray-12)"),
                             rx.fragment(),
                         ),
                         rx.text(sol.name, weight="bold", size="4", color="var(--blue-11)"),
@@ -671,7 +671,7 @@ def render_opp_view_header() -> rx.Component:
                     rx.cond(
                         State.selected_opportunity.priority_score >= 6,
                         "var(--blue-11)",
-                        "var(--gray-10)",
+                        "var(--gray-12)",
                     ),
                 ),
                 weight="medium",
@@ -695,7 +695,7 @@ def render_opp_edit_header() -> rx.Component:
             ),
             # Theme
             rx.vstack(
-                rx.text("Theme / Category", size="2", weight="bold", color="var(--gray-11)"),
+                rx.text("Theme / Category", size="2", weight="bold", color="var(--gray-12)"),
                 rx.input(
                     value=State.manual_opp_theme,
                     on_change=State.set_manual_opp_theme,
@@ -706,7 +706,7 @@ def render_opp_edit_header() -> rx.Component:
             ),
             # Opportunity statement
             rx.vstack(
-                rx.text("Opportunity Statement", size="2", weight="bold", color="var(--gray-11)"),
+                rx.text("Opportunity Statement", size="2", weight="bold", color="var(--gray-12)"),
                 rx.text_area(
                     value=State.manual_opp_statement,
                     on_change=State.set_manual_opp_statement,
@@ -718,7 +718,7 @@ def render_opp_edit_header() -> rx.Component:
             ),
             # Parent opportunity
             rx.vstack(
-                rx.text("Parent Opportunity", size="2", weight="bold", color="var(--gray-11)"),
+                rx.text("Parent Opportunity", size="2", weight="bold", color="var(--gray-12)"),
                 rx.select(
                     State.parent_opp_choices,
                     value=State.manual_opp_parent_id,
@@ -831,7 +831,7 @@ def render_opportunity_detail() -> rx.Component:
                     rx.text(
                         "EVIDENCE",
                         text_transform="uppercase", letter_spacing="0.08em",
-                        size="1", weight="bold", color="var(--gray-10)",
+                        size="1", weight="bold", color="var(--gray-12)",
                     ),
                     width="360px",
                     flex_shrink="0",
@@ -841,7 +841,7 @@ def render_opportunity_detail() -> rx.Component:
                     rx.text(
                         "SOLUTIONS & EXPERIMENTS",
                         text_transform="uppercase", letter_spacing="0.08em",
-                        size="1", weight="bold", color="var(--gray-10)",
+                        size="1", weight="bold", color="var(--gray-12)",
                     ),
                     flex="1",
                     padding_left="32px",
@@ -899,7 +899,7 @@ def transcript_drawer_panel() -> rx.Component:
                             rx.text(
                                 State.transcript_drawer_date,
                                 size="2",
-                                color="var(--gray-9)",
+                                color="var(--gray-12)",
                             ),
                             rx.spacer(),
                             rx.icon_button(
@@ -936,7 +936,7 @@ def transcript_drawer_panel() -> rx.Component:
                                         State.transcript_drawer_selection,
                                         size="2",
                                         font_style="italic",
-                                        color="var(--gray-11)",
+                                        color="var(--gray-12)",
                                     ),
                                     rx.hstack(
                                         rx.button(

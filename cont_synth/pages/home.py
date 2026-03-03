@@ -9,7 +9,7 @@ def _stat_row(icon: str, icon_color: str, label: str, value_component: rx.Compon
     """A labeled stat row: icon + label on left, value component on right."""
     return rx.hstack(
         rx.icon(icon, size=14, color=icon_color),
-        rx.text(label, size="3", color="var(--gray-11)"),
+        rx.text(label, size="3", color="var(--gray-12)"),
         rx.spacer(),
         value_component,
         width="100%",
@@ -47,7 +47,7 @@ def _render_bar(item: DashboardBarItem) -> rx.Component:
         rx.text(
             item.week_label,
             size="1",
-            color="var(--gray-7)",
+            color="var(--gray-12)",
             text_align="center",
             white_space="nowrap",
         ),
@@ -62,11 +62,11 @@ def _render_recent_interview(item: RecentInterviewItem) -> rx.Component:
     """One row in the recent activity feed."""
     return rx.hstack(
         rx.badge(item.persona, color_scheme=item.persona_color, variant="soft", size="2"),
-        rx.text(item.date_str, size="2", color="var(--gray-9)", min_width="90px"),
+        rx.text(item.date_str, size="2", color="var(--gray-12)", min_width="90px"),
         rx.spacer(),
         rx.hstack(
-            rx.icon("quote", size=13, color="var(--gray-7)"),
-            rx.text(item.quote_count.to_string(), " quotes", size="2", color="var(--gray-9)"),
+            rx.icon("quote", size=13, color="var(--gray-12)"),
+            rx.text(item.quote_count.to_string(), " quotes", size="2", color="var(--gray-12)"),
             spacing="1",
             align="center",
         ),
@@ -118,8 +118,8 @@ def _cadence_widget() -> rx.Component:
                             ),
                         ),
                         rx.vstack(
-                            rx.text("days since", size="2", color="var(--gray-9)"),
-                            rx.text("last interview", size="2", color="var(--gray-9)"),
+                            rx.text("days since", size="2", color="var(--gray-12)"),
+                            rx.text("last interview", size="2", color="var(--gray-12)"),
                             spacing="0",
                             align="start",
                         ),
@@ -138,13 +138,13 @@ def _cadence_widget() -> rx.Component:
                     spacing="2",
                     align="start",
                 ),
-                rx.text("No interviews ingested yet.", color="var(--gray-9)", size="3"),
+                rx.text("No interviews ingested yet.", color="var(--gray-12)", size="3"),
             ),
             rx.divider(),
             # 8-week bar chart
             rx.vstack(
                 rx.hstack(
-                    rx.text("Past 8 weeks", size="2", color="var(--gray-9)"),
+                    rx.text("Past 8 weeks", size="2", color="var(--gray-12)"),
                     rx.spacer(),
                     rx.hstack(
                         rx.text(
@@ -152,7 +152,7 @@ def _cadence_widget() -> rx.Component:
                             weight="bold",
                             size="2",
                         ),
-                        rx.text("total interviews", size="2", color="var(--gray-9)"),
+                        rx.text("total interviews", size="2", color="var(--gray-12)"),
                         spacing="1",
                         align="baseline",
                     ),
@@ -188,7 +188,7 @@ def _experiment_widget() -> rx.Component:
             ),
             rx.divider(),
             _stat_row(
-                "circle-dashed", "var(--gray-8)",
+                "circle-dashed", "var(--gray-12)",
                 "Draft",
                 rx.text(State.dashboard_exp_draft.to_string(), weight="bold", size="3"),
             ),
@@ -198,7 +198,7 @@ def _experiment_widget() -> rx.Component:
                 rx.text(State.dashboard_exp_running.to_string(), weight="bold", size="3", color="var(--blue-11)"),
             ),
             _stat_row(
-                "check-circle-2", "var(--gray-9)",
+                "check-circle-2", "var(--gray-12)",
                 "Concluded",
                 rx.text(State.dashboard_exp_concluded.to_string(), weight="bold", size="3"),
             ),
@@ -259,7 +259,7 @@ def _opp_health_widget() -> rx.Component:
             ),
             rx.divider(),
             rx.hstack(
-                rx.text("Total opportunities", size="2", color="var(--gray-9)"),
+                rx.text("Total opportunities", size="2", color="var(--gray-12)"),
                 rx.spacer(),
                 rx.text(
                     State.dashboard_total_opps.to_string(),
@@ -284,7 +284,7 @@ def _opp_health_widget() -> rx.Component:
                         " / ",
                         State.dashboard_total_opps.to_string(),
                         size="3",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                     ),
                     spacing="0",
                     align="baseline",
@@ -304,7 +304,7 @@ def _opp_health_widget() -> rx.Component:
                         " / ",
                         State.dashboard_total_opps.to_string(),
                         size="3",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                     ),
                     spacing="0",
                     align="baseline",
@@ -333,7 +333,7 @@ def _recent_activity_widget() -> rx.Component:
     return rx.card(
         rx.vstack(
             rx.hstack(
-                rx.icon("activity", size=16, color="var(--gray-10)"),
+                rx.icon("activity", size=16, color="var(--gray-12)"),
                 rx.text("Recent Interviews", weight="bold", size="4"),
                 spacing="2",
                 align="center",
@@ -350,7 +350,7 @@ def _recent_activity_widget() -> rx.Component:
                 rx.box(
                     rx.text(
                         "No interviews ingested yet. Synthesize your first interview to get started.",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                         size="2",
                     ),
                     padding_y="8px",
@@ -406,7 +406,7 @@ def render_home() -> rx.Component:
                 rx.heading("Dashboard", size="6", weight="bold"),
                 rx.text(
                     "Continuous Discovery requires ≥1 customer interview per week.",
-                    color="var(--gray-9)",
+                    color="var(--gray-12)",
                     size="3",
                 ),
                 spacing="1",

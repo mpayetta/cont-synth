@@ -13,7 +13,7 @@ def login_page() -> rx.Component:
                     rx.text(
                         "Continuous Discovery",
                         size="2",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                         text_align="center",
                     ),
                     spacing="1",

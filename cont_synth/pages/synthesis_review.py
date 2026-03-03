@@ -42,11 +42,11 @@ def _transcript_header_meta() -> rx.Component:
                 rx.cond(
                     State.pending_synthesis_interview_date != "",
                     rx.hstack(
-                        rx.icon("calendar", size=12, color="var(--gray-9)"),
+                        rx.icon("calendar", size=12, color="var(--gray-12)"),
                         rx.text(
                             State.pending_synthesis_interview_date,
                             size="1",
-                            color="var(--gray-11)",
+                            color="var(--gray-12)",
                         ),
                         spacing="1",
                         align="center",
@@ -56,12 +56,12 @@ def _transcript_header_meta() -> rx.Component:
                 rx.cond(
                     State.pending_synthesis_duration > 0,
                     rx.hstack(
-                        rx.icon("clock", size=12, color="var(--gray-9)"),
+                        rx.icon("clock", size=12, color="var(--gray-12)"),
                         rx.text(
                             State.pending_synthesis_duration.to_string(),
                             " min",
                             size="1",
-                            color="var(--gray-11)",
+                            color="var(--gray-12)",
                         ),
                         spacing="1",
                         align="center",
@@ -78,19 +78,19 @@ def _transcript_header_meta() -> rx.Component:
             State.pending_synthesis_participants.length() > 0,
             rx.vstack(
                 rx.hstack(
-                    rx.icon("users", size=13, color="var(--gray-9)"),
+                    rx.icon("users", size=13, color="var(--gray-12)"),
                     rx.text(
                         "Participants",
                         size="1",
                         weight="bold",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                         text_transform="uppercase",
                         letter_spacing="0.05em",
                     ),
                     rx.text(
                         "· set each person's role before confirming",
                         size="1",
-                        color="var(--gray-8)",
+                        color="var(--gray-12)",
                         style={"font_style": "italic"},
                     ),
                     spacing="2",
@@ -236,19 +236,19 @@ def render_synthesis_review() -> rx.Component:
             # ── Left: Full transcript ─────────────────────────────────────────
             rx.vstack(
                 rx.hstack(
-                    rx.icon("file-text", size=16, color="var(--gray-9)"),
+                    rx.icon("file-text", size=16, color="var(--gray-12)"),
                     rx.text(
                         "Full Transcript",
                         size="2",
                         weight="bold",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                         text_transform="uppercase",
                         letter_spacing="0.05em",
                     ),
                     rx.text(
                         "· click a quote on the right to highlight",
                         size="1",
-                        color="var(--gray-8)",
+                        color="var(--gray-12)",
                         style={"font_style": "italic"},
                     ),
                     align="center",
@@ -280,7 +280,7 @@ def render_synthesis_review() -> rx.Component:
                         "Extracted Opportunities",
                         size="2",
                         weight="bold",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                         text_transform="uppercase",
                         letter_spacing="0.05em",
                     ),

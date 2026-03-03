@@ -66,7 +66,7 @@ def render_solution(sol: SolutionItem):
                         rx.cond(
                             sol.indent_level > 0,
                             rx.icon(
-                                "corner-down-right", size=14, color="var(--gray-8)"
+                                "corner-down-right", size=14, color="var(--gray-12)"
                             ),
                             rx.fragment(),
                         ),
@@ -136,13 +136,13 @@ def render_solution(sol: SolutionItem):
 def _info_label(text, explanation: str) -> rx.Component:
     """A label + clickable ? icon that opens a popover with an explanation."""
     return rx.flex(
-        rx.text(text, size="2", color="var(--gray-11)", weight="medium"),
+        rx.text(text, size="2", color="var(--gray-12)", weight="medium"),
         rx.popover.root(
             rx.popover.trigger(
                 rx.icon(
                     "circle-help",
                     size=14,
-                    color="var(--gray-8)",
+                    color="var(--gray-12)",
                     cursor="pointer",
                     _hover={"color": "var(--gray-12)"},
                 ),
@@ -200,7 +200,7 @@ def show_ledger_row(item: LedgerItem):
                 rx.flex(
                     rx.cond(
                         item.indent_level > 0,
-                        rx.icon("corner-down-right", size=13, color="var(--gray-7)"),
+                        rx.icon("corner-down-right", size=13, color="var(--gray-12)"),
                         rx.fragment(),
                     ),
                     rx.cond(
@@ -285,14 +285,14 @@ def show_ledger_row(item: LedgerItem):
                 ),
                 rx.flex(
                     rx.flex(
-                        rx.icon("quote", size=11, color="var(--gray-8)"),
-                        rx.text(f"{item.evidence.length()} quotes", size="1", color="var(--gray-8)"),
+                        rx.icon("quote", size=11, color="var(--gray-12)"),
+                        rx.text(f"{item.evidence.length()} quotes", size="1", color="var(--gray-12)"),
                         spacing="1", align="center",
                     ),
                     rx.text("·", size="1", color="var(--gray-6)"),
                     rx.flex(
-                        rx.icon("lightbulb", size=11, color="var(--gray-8)"),
-                        rx.text(f"{item.solutions.length()} solutions", size="1", color="var(--gray-8)"),
+                        rx.icon("lightbulb", size=11, color="var(--gray-12)"),
+                        rx.text(f"{item.solutions.length()} solutions", size="1", color="var(--gray-12)"),
                         spacing="1", align="center",
                     ),
                     rx.text("·", size="1", color="var(--gray-6)"),
@@ -389,7 +389,7 @@ def show_theme_group(group: ThemeGroup) -> rx.Component:
             rx.flex(
                 rx.icon(
                     rx.cond(group.collapsed, "chevron-right", "chevron-down"),
-                    size=14, color="var(--gray-8)",
+                    size=14, color="var(--gray-12)",
                 ),
                 rx.cond(
                     group.is_target_group,
@@ -486,11 +486,11 @@ def show_board_card(item: LedgerItem) -> rx.Component:
             ),
             # Quick metrics
             rx.flex(
-                rx.icon("quote", size=10, color="var(--gray-7)"),
-                rx.text(f"{item.evidence.length()}", size="1", color="var(--gray-7)"),
+                rx.icon("quote", size=10, color="var(--gray-12)"),
+                rx.text(f"{item.evidence.length()}", size="1", color="var(--gray-12)"),
                 rx.text("·", size="1", color="var(--gray-5)"),
-                rx.icon("lightbulb", size=10, color="var(--gray-7)"),
-                rx.text(f"{item.solutions.length()}", size="1", color="var(--gray-7)"),
+                rx.icon("lightbulb", size=10, color="var(--gray-12)"),
+                rx.text(f"{item.solutions.length()}", size="1", color="var(--gray-12)"),
                 rx.text("·", size="1", color="var(--gray-5)"),
                 rx.text(
                     f"{item.days_old}d",
@@ -535,7 +535,7 @@ def show_board_column(col: BoardColumn) -> rx.Component:
     return rx.vstack(
         rx.flex(
             rx.badge(col.label, color_scheme=col.color, variant="soft", size="2"),
-            rx.text(f"{col.opps.length()}", size="1", color="var(--gray-8)"),
+            rx.text(f"{col.opps.length()}", size="1", color="var(--gray-12)"),
             spacing="2", align="center", justify="between", width="100%",
         ),
         rx.scroll_area(
@@ -590,7 +590,7 @@ def show_matrix_cell(cell: MatrixCell) -> rx.Component:
                     rx.text(
                         item.opportunity,
                         size="1",
-                        color="var(--gray-11)",
+                        color="var(--gray-12)",
                         style={
                             "overflow": "hidden",
                             "display": "-webkit-box",
@@ -639,34 +639,34 @@ def show_matrix_view() -> rx.Component:
                 rx.flex(
                     rx.box(width="12px", height="12px", background_color="var(--green-3)",
                            border="1px solid var(--green-5)", border_radius="2px", flex_shrink="0"),
-                    rx.text("Priority zone", size="1", color="var(--gray-8)"),
+                    rx.text("Priority zone", size="1", color="var(--gray-12)"),
                     spacing="1", align="center",
                 ),
                 justify="between", width="100%", align="center",
             ),
             rx.flex(
                 rx.flex(
-                    rx.text("X-axis — ", size="1", color="var(--gray-9)", weight="medium"),
+                    rx.text("X-axis — ", size="1", color="var(--gray-12)", weight="medium"),
                     rx.text(
                         "Impact (1–5):",
-                        size="1", color="var(--gray-9)", weight="bold",
+                        size="1", color="var(--gray-12)", weight="bold",
                     ),
                     rx.text(
                         " How much does solving this move your business outcome?",
-                        size="1", color="var(--gray-8)",
+                        size="1", color="var(--gray-12)",
                     ),
                     spacing="1", align="center",
                 ),
                 rx.text("·", size="1", color="var(--gray-5)"),
                 rx.flex(
-                    rx.text("Y-axis — ", size="1", color="var(--gray-9)", weight="medium"),
+                    rx.text("Y-axis — ", size="1", color="var(--gray-12)", weight="medium"),
                     rx.text(
                         "Sat. Gap (1–5):",
-                        size="1", color="var(--gray-9)", weight="bold",
+                        size="1", color="var(--gray-12)", weight="bold",
                     ),
                     rx.text(
                         " How unhappy are users with the current situation? (5 = severe pain)",
-                        size="1", color="var(--gray-8)",
+                        size="1", color="var(--gray-12)",
                     ),
                     spacing="1", align="center",
                 ),
@@ -679,11 +679,11 @@ def show_matrix_view() -> rx.Component:
         rx.flex(
             rx.box(width="32px", flex_shrink="0"),  # gutter for row labels
             rx.grid(
-                rx.text("I:1", size="1", color="var(--gray-7)", text_align="center"),
-                rx.text("I:2", size="1", color="var(--gray-7)", text_align="center"),
-                rx.text("I:3", size="1", color="var(--gray-7)", text_align="center"),
-                rx.text("I:4", size="1", color="var(--gray-7)", text_align="center"),
-                rx.text("I:5", size="1", color="var(--gray-7)", text_align="center"),
+                rx.text("I:1", size="1", color="var(--gray-12)", text_align="center"),
+                rx.text("I:2", size="1", color="var(--gray-12)", text_align="center"),
+                rx.text("I:3", size="1", color="var(--gray-12)", text_align="center"),
+                rx.text("I:4", size="1", color="var(--gray-12)", text_align="center"),
+                rx.text("I:5", size="1", color="var(--gray-12)", text_align="center"),
                 columns="5",
                 width="100%",
                 spacing="1",
@@ -696,11 +696,11 @@ def show_matrix_view() -> rx.Component:
         rx.flex(
             # Y-axis labels (sat_gap 5→1, top to bottom)
             rx.vstack(
-                rx.text("G:5", size="1", color="var(--gray-7)", width="32px", text_align="center"),
-                rx.text("G:4", size="1", color="var(--gray-7)", width="32px", text_align="center"),
-                rx.text("G:3", size="1", color="var(--gray-7)", width="32px", text_align="center"),
-                rx.text("G:2", size="1", color="var(--gray-7)", width="32px", text_align="center"),
-                rx.text("G:1", size="1", color="var(--gray-7)", width="32px", text_align="center"),
+                rx.text("G:5", size="1", color="var(--gray-12)", width="32px", text_align="center"),
+                rx.text("G:4", size="1", color="var(--gray-12)", width="32px", text_align="center"),
+                rx.text("G:3", size="1", color="var(--gray-12)", width="32px", text_align="center"),
+                rx.text("G:2", size="1", color="var(--gray-12)", width="32px", text_align="center"),
+                rx.text("G:1", size="1", color="var(--gray-12)", width="32px", text_align="center"),
                 justify="between",
                 height="350px",
                 flex_shrink="0",
@@ -724,7 +724,7 @@ def show_matrix_view() -> rx.Component:
                     rx.text("Needs scoring", size="2", weight="bold", color="var(--amber-11)"),
                     rx.text(
                         "— click to open and set Impact + Sat. Gap scores so these appear in the matrix",
-                        size="2", color="var(--gray-8)",
+                        size="2", color="var(--gray-12)",
                     ),
                     spacing="2", align="center",
                 ),
@@ -1010,7 +1010,7 @@ def render_experiments_tab() -> rx.Component:
                         weight="bold",
                         color=rx.cond(
                             State.editing_experiment_id != -1,
-                            "var(--gray-11)",
+                            "var(--gray-12)",
                             rx.cond(
                                 State.experiment_target_solution_name != "",
                                 "var(--purple-11)",
@@ -1405,7 +1405,7 @@ def render_ledger() -> rx.Component:
             State.ledger_data.length() == 0,
             rx.center(
                 rx.vstack(
-                    rx.icon("inbox", size=36, color="var(--gray-7)"),
+                    rx.icon("inbox", size=36, color="var(--gray-12)"),
                     rx.text("No opportunities found.", weight="medium", color="gray"),
                     rx.text(
                         "Create one with the button above, or run a synthesis from an interview.",

@@ -40,9 +40,9 @@ def _render_prep_exp_row(exp: PrepExperimentItem) -> rx.Component:
             rx.vstack(
                 rx.hstack(
                     rx.badge("Running", color_scheme="green", variant="soft", size="1"),
-                    rx.text(exp.solution_name, size="1", color="var(--gray-10)", weight="medium"),
-                    rx.text("·", size="1", color="var(--gray-7)"),
-                    rx.text(exp.experiment_name, size="1", color="var(--gray-10)"),
+                    rx.text(exp.solution_name, size="1", color="var(--gray-12)", weight="medium"),
+                    rx.text("·", size="1", color="var(--gray-12)"),
+                    rx.text(exp.experiment_name, size="1", color="var(--gray-12)"),
                     spacing="2",
                     align="center",
                     flex_wrap="wrap",
@@ -92,7 +92,7 @@ def render_prep() -> rx.Component:
             rx.text(
                 "Check the opportunities you want to probe in this interview. The guide will include discovery questions for each.",
                 size="2",
-                color="var(--gray-10)",
+                color="var(--gray-12)",
             ),
             rx.cond(
                 State.prep_opportunities.length() > 0,
@@ -105,7 +105,7 @@ def render_prep() -> rx.Component:
                     rx.text(
                         "No opportunities found. Add some in the Opportunity Ledger first.",
                         size="2",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                         style={"font_style": "italic"},
                     ),
                     padding="12px",
@@ -132,7 +132,7 @@ def render_prep() -> rx.Component:
                 rx.text(
                     "These are running experiments for your selected opportunities. Check the ones you want the guide to probe indirectly.",
                     size="2",
-                    color="var(--gray-10)",
+                    color="var(--gray-12)",
                 ),
                 rx.vstack(
                     rx.foreach(State.visible_prep_experiments, _render_prep_exp_row),
@@ -157,7 +157,7 @@ def render_prep() -> rx.Component:
             rx.text(
                 "Optionally select a persona to give the LLM context about who you're interviewing. Required if generating the legacy battle plan (no opportunities selected).",
                 size="2",
-                color="var(--gray-10)",
+                color="var(--gray-12)",
             ),
             rx.select(
                 State.prep_persona_options,
@@ -183,7 +183,7 @@ def render_prep() -> rx.Component:
             rx.text(
                 "Describe the goal of this interview, topics to cover, or any background the LLM should know. Useful when the conversation isn't tied to specific opportunities.",
                 size="2",
-                color="var(--gray-10)",
+                color="var(--gray-12)",
             ),
             rx.text_area(
                 placeholder="e.g. This is an onboarding call with a new enterprise customer. I want to understand their workflow before any product training happens.",

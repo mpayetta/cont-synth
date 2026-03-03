@@ -13,21 +13,21 @@ def show_history_row(item: InterviewHistoryItem):
             rx.cond(
                 item.interview_date != "",
                 rx.text(item.interview_date, size="2"),
-                rx.text("—", size="2", color="var(--gray-7)"),
+                rx.text("—", size="2", color="var(--gray-12)"),
             )
         ),
         rx.table.cell(
             rx.cond(
                 item.duration_minutes > 0,
                 rx.text(item.duration_minutes.to_string(), " min", size="2"),
-                rx.text("—", size="2", color="var(--gray-7)"),
+                rx.text("—", size="2", color="var(--gray-12)"),
             )
         ),
         rx.table.cell(
             rx.cond(
                 item.participants != "",
                 rx.text(item.participants, size="2"),
-                rx.text("—", size="2", color="var(--gray-7)"),
+                rx.text("—", size="2", color="var(--gray-12)"),
             )
         ),
         rx.table.cell(

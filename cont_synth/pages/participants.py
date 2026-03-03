@@ -22,7 +22,7 @@ _INPUT_STYLE = {
 def _field(label: str, input_el: rx.Component) -> rx.Component:
     """Label + input, stacked, equal width."""
     return rx.vstack(
-        rx.text(label, size="2", color="var(--gray-11)", weight="medium"),
+        rx.text(label, size="2", color="var(--gray-12)", weight="medium"),
         input_el,
         spacing="1",
         align_items="stretch",
@@ -101,7 +101,7 @@ def _participant_form_card() -> rx.Component:
                     rx.text(
                         "Check this if they are part of your team, not a customer being researched.",
                         size="1",
-                        color="var(--gray-9)",
+                        color="var(--gray-12)",
                     ),
                     spacing="0",
                     align_items="start",
@@ -180,21 +180,21 @@ def _participant_row(item: ParticipantItem) -> rx.Component:
             rx.cond(
                 item.persona_name != "",
                 rx.badge(item.persona_name, color_scheme=item.persona_color, variant="soft", size="1"),
-                rx.text("—", size="2", color="var(--gray-7)"),
+                rx.text("—", size="2", color="var(--gray-12)"),
             )
         ),
         rx.table.cell(
             rx.cond(
                 item.segment != "",
                 rx.badge(item.segment, color_scheme="gray", variant="soft", size="1"),
-                rx.text("—", size="2", color="var(--gray-7)"),
+                rx.text("—", size="2", color="var(--gray-12)"),
             )
         ),
         rx.table.cell(
             rx.cond(
                 item.recruited_via != "",
                 rx.text(item.recruited_via, size="2"),
-                rx.text("—", size="2", color="var(--gray-7)"),
+                rx.text("—", size="2", color="var(--gray-12)"),
             )
         ),
         rx.table.cell(
@@ -208,7 +208,7 @@ def _participant_row(item: ParticipantItem) -> rx.Component:
             rx.cond(
                 item.last_interviewed != "",
                 rx.text(item.last_interviewed, size="2"),
-                rx.text("—", size="2", color="var(--gray-7)"),
+                rx.text("—", size="2", color="var(--gray-12)"),
             )
         ),
         rx.table.cell(
@@ -222,9 +222,9 @@ def _participant_row(item: ParticipantItem) -> rx.Component:
                     text_overflow="ellipsis",
                     white_space="nowrap",
                     display="block",
-                    color="var(--gray-11)",
+                    color="var(--gray-12)",
                 ),
-                rx.text("—", size="2", color="var(--gray-7)"),
+                rx.text("—", size="2", color="var(--gray-12)"),
             )
         ),
         rx.table.cell(
@@ -281,7 +281,7 @@ def render_participants() -> rx.Component:
             rx.text("Participants", weight="bold", size="6"),
             rx.text(
                 "Track who you've talked to. Customers only by default — use the toggle to include interviewers. Orange badge = 6+ interviews (over-indexed voice).",
-                color="var(--gray-10)",
+                color="var(--gray-12)",
                 size="3",
             ),
             spacing="1",

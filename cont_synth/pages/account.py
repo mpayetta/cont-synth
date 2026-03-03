@@ -12,13 +12,13 @@ def _nav_item(label: str, icon: str, section: str) -> rx.Component:
         rx.icon(
             icon,
             size=15,
-            color=rx.cond(is_active, "var(--blue-11)", "var(--gray-9)"),
+            color=rx.cond(is_active, "var(--blue-11)", "var(--gray-12)"),
         ),
         rx.text(
             label,
             size="2",
             weight=rx.cond(is_active, "medium", "regular"),
-            color=rx.cond(is_active, "var(--blue-11)", "var(--gray-11)"),
+            color=rx.cond(is_active, "var(--blue-11)", "var(--gray-12)"),
         ),
         spacing="3",
         align="center",
@@ -65,7 +65,7 @@ def _section_header(title: str, description: str = "") -> rx.Component:
         rx.text(title, size="3", weight="bold", color="var(--gray-12)"),
         rx.cond(
             description != "",
-            rx.text(description, size="2", color="var(--gray-9)"),
+            rx.text(description, size="2", color="var(--gray-12)"),
             rx.fragment(),
         ),
         spacing="1",
@@ -115,7 +115,7 @@ def _api_keys_section() -> rx.Component:
         ),
         rx.vstack(
             rx.hstack(
-                rx.icon("bot", size=14, color="var(--gray-9)"),
+                rx.icon("bot", size=14, color="var(--gray-12)"),
                 rx.text("Gemini API Key", size="2", weight="medium"),
                 spacing="2",
                 align="center",
@@ -123,7 +123,7 @@ def _api_keys_section() -> rx.Component:
             rx.text(
                 "Used for synthesis, deduplication, and pre-meeting prep generation.",
                 size="1",
-                color="var(--gray-9)",
+                color="var(--gray-12)",
             ),
             rx.hstack(
                 rx.input(
@@ -253,7 +253,7 @@ def _stat_card(label: str, value: rx.Var) -> rx.Component:
             rx.text(
                 label,
                 size="1",
-                color="var(--gray-9)",
+                color="var(--gray-12)",
                 weight="medium",
                 text_transform="uppercase",
                 letter_spacing="0.05em",
@@ -283,7 +283,7 @@ def _operation_badge(operation: str) -> rx.Component:
 
 def _show_usage_row(item: LlmUsageItem) -> rx.Component:
     return rx.table.row(
-        rx.table.cell(rx.text(item.created_at, size="2", color="var(--gray-11)")),
+        rx.table.cell(rx.text(item.created_at, size="2", color="var(--gray-12)")),
         rx.table.cell(
             rx.badge(item.model_name, color_scheme="gray", variant="outline", size="1")
         ),
@@ -302,7 +302,7 @@ def _show_usage_row(item: LlmUsageItem) -> rx.Component:
                     cursor="pointer",
                     _hover={"opacity": "0.75"},
                 ),
-                rx.text("—", size="2", color="var(--gray-8)"),
+                rx.text("—", size="2", color="var(--gray-12)"),
             )
         ),
         rx.table.cell(rx.text(item.prompt_tokens, size="2")),
@@ -317,7 +317,7 @@ def _llm_usage_view() -> rx.Component:
         rx.text(
             "Track token consumption and cost drivers across all AI operations.",
             size="2",
-            color="var(--gray-9)",
+            color="var(--gray-12)",
         ),
         rx.hstack(
             _stat_card("Total Tokens Used", State.llm_total_tokens),
@@ -346,7 +346,7 @@ def _llm_usage_view() -> rx.Component:
             State.llm_usage_logs.length() == 0,
             rx.vstack(
                 rx.icon("bar-chart-2", size=32, color="var(--gray-6)"),
-                rx.text("No LLM calls recorded yet.", color="var(--gray-9)", size="3"),
+                rx.text("No LLM calls recorded yet.", color="var(--gray-12)", size="3"),
                 align="center",
                 padding_y="40px",
                 width="100%",
@@ -373,7 +373,7 @@ def _danger_zone_view() -> rx.Component:
                         rx.text(
                             "Permanently delete all interviews, opportunities, solutions, outcomes, participants, and personas. Your user account is preserved.",
                             size="2",
-                            color="var(--gray-9)",
+                            color="var(--gray-12)",
                         ),
                         spacing="1",
                         flex="1",
@@ -441,7 +441,7 @@ def render_account() -> rx.Component:
             rx.text(
                 "Manage your profile, API keys, and application data.",
                 size="3",
-                color="var(--gray-9)",
+                color="var(--gray-12)",
             ),
             spacing="1",
             margin_bottom="8px",

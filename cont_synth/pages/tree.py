@@ -105,7 +105,7 @@ def render_ost_opportunity(item: LedgerItem) -> rx.Component:
             rx.text(
                 "No solutions yet",
                 size="1",
-                color="var(--gray-8)",
+                color="var(--gray-12)",
                 font_style="italic",
             ),
             rx.flex(
@@ -188,7 +188,7 @@ def render_tree() -> rx.Component:
                 # Empty state
                 rx.center(
                     rx.vstack(
-                        rx.icon("network", size=40, color="var(--gray-8)"),
+                        rx.icon("network", size=40, color="var(--gray-12)"),
                         rx.text(
                             "Select a specific Business Outcome to render its tree.",
                             color="gray",
