@@ -2,6 +2,8 @@ import reflex as rx
 from sqlmodel import Field, SQLModel
 from datetime import datetime, timezone
 from typing import Optional
+from sqlalchemy import Column
+from pgvector.sqlalchemy import Vector
 
 
 class Product(rx.Model, table=True):
@@ -140,3 +142,15 @@ class LlmUsageLog(rx.Model, table=True):
     output_tokens: int
     total_tokens: int
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class KnowledgeChunk(rx.Model, table=True):
+    """A chunk of text from a document, with a vector embedding for RAG."""
+
+    workspace_id: int
+    document_name: str
+    text_content: str
+    # 384-dimensional embedding from all-MiniLM-L6-v2
+    embedding: Optional[list] = Field(
+        default=None, sa_column=Column(Vector(384))
+    )
