@@ -570,7 +570,9 @@ class State(
     def load_opportunity_page(self):
         self.current_view = "opportunity"
         id_str = self.router.page.params.get("opportunity_id", "0")
-        self.selected_opportunity_id = int(id_str) if id_str.isdigit() else 0
+        parsed_id = int(id_str) if id_str.isdigit() else 0
+        if parsed_id > 0:
+            self.selected_opportunity_id = parsed_id
         return self._ensure_auth_and_load()
 
     def load_interviews_page(self):
@@ -580,7 +582,11 @@ class State(
     def load_interview_detail_page(self):
         self.current_view = "interview_detail"
         id_str = self.router.page.params.get("interview_id", "0")
-        self.selected_interview_id = int(id_str) if id_str.isdigit() else 0
+        parsed_id = int(id_str) if id_str.isdigit() else 0
+        if parsed_id > 0:
+            self.selected_interview_id = parsed_id
+        # If params are empty (production client-side navigation timing issue),
+        # keep the value already set by open_interview_detail().
         return self._ensure_auth_and_load()
 
     def load_prep_page(self):
