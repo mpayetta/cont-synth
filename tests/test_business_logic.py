@@ -714,3 +714,115 @@ class TestOpportunitySortedFlattening:
 
     def test_empty_list_returns_empty(self):
         assert _flatten_and_sort([]) == []
+
+
+# ---------------------------------------------------------------------------
+# Experiment method resolution ("Other" free-text logic from add_experiment)
+# ---------------------------------------------------------------------------
+
+_STANDARD_METHODS = {"Prototype Interview", "Fake Door", "A/B Test", "Usability Test", "Survey", "Other"}
+
+
+def resolve_method(method: str, method_other: str) -> str:
+    """Replica of the method-resolution logic in LedgerStateMixin.add_experiment()."""
+    if method == "Other":
+        return method_other.strip() or "Other"
+    return method
+
+
+class TestExperimentMethodResolution:
+    def test_standard_method_returned_directly(self):
+        for method in ["Prototype Interview", "Fake Door", "A/B Test", "Usability Test", "Survey"]:
+            assert resolve_method(method, "") == method
+
+    def test_other_with_free_text_returns_free_text(self):
+        assert resolve_method("Other", "Dogfooding") == "Dogfooding"
+
+    def test_other_with_empty_free_text_returns_other(self):
+        assert resolve_method("Other", "") == "Other"
+
+    def test_other_with_whitespace_only_returns_other(self):
+        assert resolve_method("Other", "   ") == "Other"
+
+    def test_other_with_padded_free_text_strips_whitespace(self):
+        assert resolve_method("Other", "  Field Study  ") == "Field Study"
+
+
+# ---------------------------------------------------------------------------
+# Synthesis theme formatting (prompt preparation in run_synthesis)
+# ---------------------------------------------------------------------------
+
+
+def format_existing_themes(themes_dict: dict) -> str:
+    """Replica of the theme-list formatting used when building the synthesis prompt."""
+    themes = sorted(set(themes_dict.values())) if themes_dict else []
+    return ", ".join(themes) if themes else "None yet — create new themes as needed."
+
+
+class TestSynthesisThemeFormatting:
+    def test_empty_dict_returns_fallback(self):
+        result = format_existing_themes({})
+        assert result == "None yet — create new themes as needed."
+
+    def test_single_theme_returned(self):
+        result = format_existing_themes({1: "Onboarding"})
+        assert result == "Onboarding"
+
+    def test_multiple_themes_sorted_and_comma_separated(self):
+        result = format_existing_themes({1: "Billing", 2: "Onboarding", 3: "Performance"})
+        assert result == "Billing, Onboarding, Performance"
+
+    def test_duplicate_themes_deduplicated(self):
+        # Two opportunities share the same theme — only one copy should appear.
+        result = format_existing_themes({1: "Billing", 2: "Billing", 3: "Onboarding"})
+        assert result == "Billing, Onboarding"
+
+    def test_themes_are_sorted_alphabetically(self):
+        result = format_existing_themes({1: "Zebra", 2: "Alpha", 3: "Mango"})
+        assert result == "Alpha, Mango, Zebra"
+
+
+# ---------------------------------------------------------------------------
+# Theme inheritance (confirm_synthesis opportunity matching logic)
+# ---------------------------------------------------------------------------
+
+
+def resolve_theme(matched_id, existing_themes: dict, synthesized_theme: str) -> str:
+    """
+    Replica of the theme-resolution logic in confirm_synthesis():
+    inherit the existing theme when a duplicate is matched; otherwise
+    use the LLM-synthesized theme (or fall back to "General").
+    """
+    theme = existing_themes.get(matched_id) if matched_id else None
+    if not theme:
+        theme = synthesized_theme or "General"
+    return theme
+
+
+class TestThemeInheritance:
+    def test_no_match_uses_synthesized_theme(self):
+        result = resolve_theme(None, {1: "Billing"}, "Onboarding")
+        assert result == "Onboarding"
+
+    def test_match_found_inherits_existing_theme(self):
+        result = resolve_theme(1, {1: "Billing"}, "Onboarding")
+        assert result == "Billing"
+
+    def test_match_found_but_theme_empty_falls_back_to_synthesized(self):
+        result = resolve_theme(1, {1: ""}, "Performance")
+        assert result == "Performance"
+
+    def test_no_match_and_no_synthesized_theme_returns_general(self):
+        result = resolve_theme(None, {}, "")
+        assert result == "General"
+
+    def test_match_found_synthesized_theme_ignored(self):
+        # Even if the LLM synthesized a different theme, the matched opp's
+        # existing theme takes precedence.
+        result = resolve_theme(42, {42: "Workflow"}, "Onboarding")
+        assert result == "Workflow"
+
+    def test_no_match_with_none_themes_dict_key_missing(self):
+        # matched_id present but not in the dict → falls back to synthesized
+        result = resolve_theme(99, {1: "Billing"}, "Search")
+        assert result == "Search"

@@ -123,6 +123,8 @@ class TestExperimentItem:
             solution_name="Solution A",
             name="Fake Door Test",
             assumption="Users will click it",
+            description="",
+            success_metric="",
             method="Fake Door",
             status="Running",
             signal="Pending",
@@ -137,8 +139,8 @@ class TestExperimentItem:
         for method in ["Fake Door", "A/B Test", "Prototype Interview"]:
             exp = ExperimentItem(
                 id=1, solution_id=1, solution_name="S",
-                name="N", assumption="A", method=method,
-                status="Draft", signal="Pending", evidence_notes="",
+                name="N", assumption="A", description="", success_metric="",
+                method=method, status="Draft", signal="Pending", evidence_notes="",
             )
             assert exp.method == method
 
@@ -146,8 +148,8 @@ class TestExperimentItem:
         for status in ["Draft", "Running", "Concluded"]:
             exp = ExperimentItem(
                 id=1, solution_id=1, solution_name="S",
-                name="N", assumption="A", method="Fake Door",
-                status=status, signal="Pending", evidence_notes="",
+                name="N", assumption="A", description="", success_metric="",
+                method="Fake Door", status=status, signal="Pending", evidence_notes="",
             )
             assert exp.status == status
 
@@ -155,10 +157,21 @@ class TestExperimentItem:
         for signal in ["Pending", "Validated", "Invalidated"]:
             exp = ExperimentItem(
                 id=1, solution_id=1, solution_name="S",
-                name="N", assumption="A", method="A/B Test",
-                status="Concluded", signal=signal, evidence_notes="",
+                name="N", assumption="A", description="", success_metric="",
+                method="A/B Test", status="Concluded", signal=signal, evidence_notes="",
             )
             assert exp.signal == signal
+
+    def test_new_fields_exist_and_default_to_empty_string(self):
+        exp = ExperimentItem(
+            id=1, solution_id=1, solution_name="S",
+            name="N", assumption="A", description="", success_metric="",
+            method="Fake Door", status="Draft", signal="Pending", evidence_notes="",
+        )
+        assert exp.description == ""
+        assert exp.success_metric == ""
+        assert isinstance(exp.description, str)
+        assert isinstance(exp.success_metric, str)
 
 
 class TestOppDetailSolution:
@@ -173,8 +186,8 @@ class TestOppDetailSolution:
     def test_create_with_experiments(self):
         exp = ExperimentItem(
             id=1, solution_id=5, solution_name="Redesign flow",
-            name="Fake Door", assumption="Users want it", method="Fake Door",
-            status="Draft", signal="Pending", evidence_notes="",
+            name="Fake Door", assumption="Users want it", description="", success_metric="",
+            method="Fake Door", status="Draft", signal="Pending", evidence_notes="",
         )
         sol = OppDetailSolution(
             id=5, name="Redesign flow", description="", status="Testing",
@@ -627,3 +640,79 @@ class TestPendingParticipantItem:
         for role in ["interviewee", "interviewer"]:
             item = PendingParticipantItem(index=0, name="N", role=role)
             assert item.role == role
+
+
+# ---------------------------------------------------------------------------
+# ExperimentItem — new description / success_metric fields + start_edit logic
+# ---------------------------------------------------------------------------
+
+_STANDARD_METHODS = {"Prototype Interview", "Fake Door", "A/B Test", "Usability Test", "Survey", "Other"}
+
+
+def _resolve_method_for_edit(method: str):
+    """
+    Pure-function replica of the method-resolution logic in
+    LedgerStateMixin.start_edit_experiment().
+
+    Returns (new_experiment_method, new_experiment_method_other).
+    """
+    if method in _STANDARD_METHODS:
+        return method, ""
+    else:
+        return "Other", method
+
+
+class TestExperimentItemNewFields:
+    def _make_exp(self, **kwargs):
+        defaults = dict(
+            id=1, solution_id=1, solution_name="S",
+            name="N", assumption="A", description="", success_metric="",
+            method="Fake Door", status="Draft", signal="Pending", evidence_notes="",
+        )
+        defaults.update(kwargs)
+        return ExperimentItem(**defaults)
+
+    def test_description_field_accessible(self):
+        exp = self._make_exp(description="Run a 2-week fake door test")
+        assert exp.description == "Run a 2-week fake door test"
+
+    def test_success_metric_field_accessible(self):
+        exp = self._make_exp(success_metric="Click-through rate > 5%")
+        assert exp.success_metric == "Click-through rate > 5%"
+
+    def test_description_defaults_to_empty_string(self):
+        exp = self._make_exp()
+        assert exp.description == ""
+
+    def test_success_metric_defaults_to_empty_string(self):
+        exp = self._make_exp()
+        assert exp.success_metric == ""
+
+    def test_both_fields_are_strings(self):
+        exp = self._make_exp(description="desc", success_metric="metric")
+        assert isinstance(exp.description, str)
+        assert isinstance(exp.success_metric, str)
+
+    # --- start_edit_experiment method-resolution logic ---
+
+    def test_standard_method_returned_directly(self):
+        for method in ["Prototype Interview", "Fake Door", "A/B Test", "Usability Test", "Survey", "Other"]:
+            resolved, other = _resolve_method_for_edit(method)
+            assert resolved == method
+            assert other == ""
+
+    def test_custom_method_sets_other_sentinel(self):
+        resolved, other = _resolve_method_for_edit("Dogfooding")
+        assert resolved == "Other"
+        assert other == "Dogfooding"
+
+    def test_empty_custom_method_uses_other_sentinel(self):
+        resolved, other = _resolve_method_for_edit("")
+        assert resolved == "Other"
+        assert other == ""
+
+    def test_whitespace_custom_method_preserved_in_other(self):
+        # Whitespace is not a standard method, so it goes to the free-text slot.
+        resolved, other = _resolve_method_for_edit("   ")
+        assert resolved == "Other"
+        assert other == "   "

@@ -312,6 +312,8 @@ class TestExperiment:
         assert exp.status == "Draft"
         assert exp.signal == "Pending"
         assert exp.evidence_notes == ""
+        assert exp.description == ""
+        assert exp.success_metric == ""
 
     def test_all_methods(self, db_session: Session):
         sol = self._setup(db_session)
@@ -358,6 +360,38 @@ class TestExperiment:
             db_session.commit()
             db_session.refresh(exp)
             assert exp.signal == signal
+
+    def test_description_and_success_metric_default_empty(self, db_session: Session):
+        sol = self._setup(db_session)
+        exp = Experiment(
+            solution_id=sol.id, name="Defaults Test", assumption="A", method="Survey"
+        )
+        db_session.add(exp)
+        db_session.commit()
+        db_session.refresh(exp)
+
+        assert exp.description == ""
+        assert exp.success_metric == ""
+
+    def test_description_and_success_metric_persisted(self, db_session: Session):
+        sol = self._setup(db_session)
+        exp = Experiment(
+            solution_id=sol.id,
+            name="Persist Test",
+            assumption="Users will sign up",
+            method="Fake Door",
+            description="Place a sign-up button on the landing page and track clicks.",
+            success_metric="Sign-up click rate > 10% within one week.",
+        )
+        db_session.add(exp)
+        db_session.commit()
+        exp_id = exp.id
+
+        # Reload from DB to confirm persistence
+        reloaded = db_session.get(Experiment, exp_id)
+        assert reloaded is not None
+        assert reloaded.description == "Place a sign-up button on the landing page and track clicks."
+        assert reloaded.success_metric == "Sign-up click rate > 10% within one week."
 
 
 # ---------------------------------------------------------------------------
