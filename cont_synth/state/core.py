@@ -4,7 +4,7 @@ from datetime import datetime
 import google.generativeai as genai
 import reflex as rx
 from pydantic import BaseModel
-from sqlmodel import Field
+from sqlmodel import Field, SQLModel
 from dotenv import load_dotenv
 
 
@@ -249,7 +249,7 @@ class PrepExperimentItem(BaseModel):
     selected: bool = False
 
 
-class PersonaPrep(rx.Model, table=True):
+class PersonaPrep(SQLModel, table=True):
     """Stores the latest generated prep script for a specific persona."""
 
     persona: str = Field(primary_key=True)

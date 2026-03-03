@@ -354,7 +354,6 @@ class State(
 
     def set_login_username(self, val: str): self.login_username = val
     def set_login_password(self, val: str): self.login_password = val
-    def set_participant_form_notes(self, val: str): self.participant_form_notes = val
 
     def login(self):
         """Verify credentials and authenticate the user."""
@@ -445,6 +444,7 @@ class State(
     def set_participant_form_persona(self, val: str): self.participant_form_persona = val
     def set_participant_form_is_team_member(self, val: bool): self.participant_form_is_team_member = val
     def set_participant_form_segment(self, val: str): self.participant_form_segment = val
+    def set_participant_form_recruited_via(self, val: str): self.participant_form_recruited_via = val
     def set_participant_form_notes(self, val: str): self.participant_form_notes = val
     def set_new_experiment_name(self, val: str): self.new_experiment_name = val
     def set_new_experiment_assumption(self, val: str): self.new_experiment_assumption = val

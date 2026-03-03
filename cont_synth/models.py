@@ -1,5 +1,5 @@
 import reflex as rx
-from sqlmodel import Field
+from sqlmodel import Field, SQLModel
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -45,7 +45,7 @@ class Opportunity(rx.Model, table=True):
     sat_gap_score: int = Field(default=0)
 
 
-class InterviewOpportunityLink(rx.Model, table=True):
+class InterviewOpportunityLink(SQLModel, table=True):
     """The Many-to-Many bridge storing the specific quote for that specific interview."""
 
     interview_id: int = Field(foreign_key="interview.id", primary_key=True)
@@ -63,7 +63,7 @@ class Outcome(rx.Model, table=True):
     is_active: bool = True
 
 
-class OutcomeOpportunityLink(rx.Model, table=True):
+class OutcomeOpportunityLink(SQLModel, table=True):
     """Bridge table: Maps Opportunities to Business Outcomes."""
 
     outcome_id: int = Field(foreign_key="outcome.id", primary_key=True)
@@ -114,7 +114,7 @@ class Participant(rx.Model, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class InterviewParticipantLink(rx.Model, table=True):
+class InterviewParticipantLink(SQLModel, table=True):
     """Many-to-many bridge: one interview can have many participants and vice versa."""
 
     interview_id: int = Field(foreign_key="interview.id", primary_key=True)
