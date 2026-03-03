@@ -141,8 +141,8 @@ def _participant_form_card() -> rx.Component:
                 "Notes",
                 rx.el.textarea(
                     placeholder="Any context about this participant...",
-                    value=State.participant_form_notes,
-                    on_change=State.set_participant_form_notes,
+                    default_value=State.participant_form_notes,
+                    on_blur=State.set_participant_form_notes,
                     width="100%",
                     style={
                         **_INPUT_STYLE,

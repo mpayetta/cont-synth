@@ -674,8 +674,8 @@ def render_ledger() -> rx.Component:
                         ),
                         rx.input(
                             placeholder="e.g., Increase Q3 Retention",
-                            value=State.new_outcome_name,
-                            on_change=State.set_new_outcome_name,
+                            default_value=State.new_outcome_name,
+                            on_blur=State.set_new_outcome_name,
                             margin_bottom="12px",
                         ),
                         rx.flex(
@@ -738,8 +738,8 @@ def render_ledger() -> rx.Component:
                         rx.text("Theme / Category", size="2", weight="bold"),
                         rx.input(
                             placeholder="e.g., Usability, Pricing...",
-                            value=State.manual_opp_theme,
-                            on_change=State.set_manual_opp_theme,
+                            default_value=State.manual_opp_theme,
+                            on_blur=State.set_manual_opp_theme,
                             width="100%",
                         ),
                         rx.text(
@@ -750,8 +750,8 @@ def render_ledger() -> rx.Component:
                         ),
                         rx.text_area(
                             placeholder="I need a way to...",
-                            value=State.manual_opp_statement,
-                            on_change=State.set_manual_opp_statement,
+                            default_value=State.manual_opp_statement,
+                            on_blur=State.set_manual_opp_statement,
                             width="100%",
                         ),
                         spacing="2",
