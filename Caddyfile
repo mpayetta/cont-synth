@@ -1,8 +1,8 @@
 # Replace YOUR_DOMAIN with your DuckDNS subdomain, e.g. cont-synth.duckdns.org
-{env.DOMAIN}:443 {
+{$DOMAIN}:443 {
     reverse_proxy app:3000
 }
 
-{env.DOMAIN}:8000 {
+{$DOMAIN}:8000 {
     reverse_proxy app:8000
 }
