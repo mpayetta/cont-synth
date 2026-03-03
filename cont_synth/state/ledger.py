@@ -835,7 +835,9 @@ class LedgerStateMixin(rx.State, mixin=True):
         
     def navigate_to_opportunity(self, opp_id: int):
         """Navigate to the opportunity detail page via URL routing."""
+        self.current_view = "opportunity"
         self.selected_opportunity_id = opp_id
+        self.load_data_for_current_view()
         return rx.redirect(f"/opportunities/{opp_id}")
 
     def enter_opp_detail_edit(self):
