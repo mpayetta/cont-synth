@@ -2,15 +2,14 @@ services:
   app:
     build: .
     restart: unless-stopped
-    ports:
-      - "3000:3000"   # Reflex frontend (Next.js)
-      - "8000:8000"   # Reflex backend (FastAPI + WebSocket)
+    expose:
+      - "3000"   # Reflex frontend (Next.js) — only accessible to Caddy
+      - "8000"   # Reflex backend (FastAPI + WebSocket) — only accessible to Caddy
     environment:
       # Required: your Google Gemini API key
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       # The URL the browser uses to reach the backend.
-      # For local QNAP access: http://<nas-ip>:8000
-      # For external access via hostname: https://<your-hostname>:8000
+      # For HTTPS: https://<your-domain>:8000
       # Changing this requires rebuilding the image (docker compose up --build)
       # because it gets baked into the React frontend bundle.
       - API_URL=${API_URL:-http://localhost:8000}
@@ -22,6 +21,24 @@ services:
       # Reflex runtime cache (bun, node modules, etc.)
       - reflex_cache:/root/.local/share/reflex
 
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"     # HTTP → HTTPS redirect + Let's Encrypt ACME challenge
+      - "443:443"   # Frontend HTTPS
+      - "8000:8000" # Backend WebSocket HTTPS
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # Let's Encrypt certs (persisted)
+      - caddy_config:/config
+    depends_on:
+      - app
+
 volumes:
   reflex_web:
   reflex_cache:
+  caddy_data:
+  caddy_config:
