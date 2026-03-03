@@ -109,6 +109,10 @@ def _inject_mark(escaped: str, escaped_quote: str) -> str:
               non-adjacent transcript lines with ellipses when the surrounding
               text uses a plain '.' or newline instead.
     Pass 3 – first sentence of the quote only, as a last-resort anchor.
+    Pass 4 – progressively shorter word-prefixes (7→4 words). Handles quotes
+              that the LLM assembled from non-adjacent turns without any '...'
+              separator: the first few words will lie within a single turn and
+              can be matched even when the full quote cannot.
     """
     if not escaped_quote.strip():
         return escaped
@@ -130,6 +134,14 @@ def _inject_mark(escaped: str, escaped_quote: str) -> str:
     first = _first_sentence(escaped_quote)
     if first != escaped_quote:
         result = _mark_fragment(escaped, first)
+        if result is not None:
+            return result
+
+    # Pass 4: progressively shorter word-prefixes as a positional anchor
+    words = escaped_quote.split()
+    for n in range(min(7, len(words)), 3, -1):
+        candidate = " ".join(words[:n])
+        result = _mark_fragment(escaped, candidate)
         if result is not None:
             return result
 
