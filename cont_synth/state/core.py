@@ -71,6 +71,8 @@ class ExperimentItem(rx.Base):
     solution_name: str  # carry this for display in the tab
     name: str
     assumption: str
+    description: str
+    success_metric: str
     method: str         # "Fake Door", "A/B Test", "Prototype Interview"
     status: str         # "Draft", "Running", "Concluded"
     signal: str         # "Pending", "Validated", "Invalidated"

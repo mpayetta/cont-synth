@@ -359,6 +359,8 @@ class LedgerStateMixin(rx.State, mixin=True):
                             solution_name=sol.name,
                             name=exp.name,
                             assumption=exp.assumption,
+                            description=exp.description,
+                            success_metric=exp.success_metric,
                             method=exp.method,
                             status=exp.status,
                             signal=exp.signal,
@@ -453,27 +455,6 @@ class LedgerStateMixin(rx.State, mixin=True):
                 choices.append(f"{inv.id} - {p.name} ({date_str})")
             self.interview_choices = choices[::-1]
 
-    # Drawer / workspace
-    def open_drawer(self, item: LedgerItem):
-        """Opens the workspace and syncs state to the selected opportunity."""
-        self.selected_opportunity = item
-
-        if len(item.linked_outcomes) > 0:
-            self.selected_opp_outcome_name = item.linked_outcomes[0].name
-        else:
-            self.selected_opp_outcome_name = "None (Unmapped)"
-
-        self.active_drawer_tab = "evidence"
-        self.cancel_edit()
-        self.is_drawer_open = True
-
-    def close_drawer(self):
-        self.is_drawer_open = False
-
-    def handle_drawer_change(self, is_open: bool):
-        """Catches when the drawer is opened/closed via UI."""
-        self.is_drawer_open = is_open
-
     # Solutions tree
     def set_target_parent(self, sol_id: int, sol_name: str):
         """Activates branching mode and remembers the parent's name."""
@@ -517,7 +498,6 @@ class LedgerStateMixin(rx.State, mixin=True):
             session.commit()
 
         self.load_ledger()
-        self._sync_drawer()
 
     def start_edit_solution(self, sol: SolutionItem):
         """Populates the input form with an existing solution's data."""
@@ -525,19 +505,6 @@ class LedgerStateMixin(rx.State, mixin=True):
         self.new_solution_name = sol.name
         self.new_solution_desc = sol.description
         self.new_solution_status = sol.status
-
-    def _sync_drawer(self):
-        """Refreshes the drawer UI after database changes."""
-        if self.selected_opportunity and self.selected_opportunity.opportunity_id != 0:
-            for item in self.ledger_data:
-                if item.opportunity_id == self.selected_opportunity.opportunity_id:
-                    self.selected_opportunity = item
-                    self.selected_opp_outcome_name = (
-                        item.linked_outcomes[0].name
-                        if len(item.linked_outcomes) > 0
-                        else ""
-                    )
-                    break
 
     def add_manual_solution(self, opportunity_id: int):
         """Saves a human-brainstormed solution or updates an existing one."""
@@ -571,7 +538,6 @@ class LedgerStateMixin(rx.State, mixin=True):
         self.new_solution_desc = ""
 
         self.load_ledger()
-        self._sync_drawer()
 
     # Outcomes
     def create_outcome(self):
@@ -625,7 +591,6 @@ class LedgerStateMixin(rx.State, mixin=True):
             session.commit()
 
         self.load_ledger()
-        self._sync_drawer()
 
     # Opportunity CRUD
     def handle_opp_dialog_change(self, is_open: bool):
@@ -732,7 +697,6 @@ class LedgerStateMixin(rx.State, mixin=True):
 
         self.close_opp_dialog()
         self.load_ledger()
-        self._sync_drawer()
 
     def delete_opportunity(self, opp_id: int):
         """Safely deletes an opportunity and all nested relationships."""
@@ -783,12 +747,6 @@ class LedgerStateMixin(rx.State, mixin=True):
             session.delete(opp)
             session.commit()
 
-        if (
-            self.selected_opportunity
-            and self.selected_opportunity.opportunity_id == opp_id
-        ):
-            self.close_drawer()
-
         self.load_ledger()
 
     # Evidence mapping
@@ -820,7 +778,6 @@ class LedgerStateMixin(rx.State, mixin=True):
         self.manual_quote_text = ""
         self.selected_interview_choice = ""
         self.load_ledger()
-        self._sync_drawer()
 
     def delete_evidence(self, opportunity_id: int, interview_id: int):
         """Unlinks an interview quote from an opportunity."""
@@ -831,7 +788,6 @@ class LedgerStateMixin(rx.State, mixin=True):
                 session.commit()
 
         self.load_ledger()
-        self._sync_drawer()
         
     def navigate_to_opportunity(self, opp_id: int):
         """Navigate to the opportunity detail page via URL routing."""
@@ -889,7 +845,10 @@ class LedgerStateMixin(rx.State, mixin=True):
         self.selected_solution_for_experiment = ""
         self.new_experiment_name = ""
         self.new_experiment_assumption = ""
+        self.new_experiment_description = ""
+        self.new_experiment_success_metric = ""
         self.new_experiment_method = "Prototype Interview"
+        self.new_experiment_method_other = ""
 
     def set_selected_solution_for_experiment(self, choice: str):
         """Parses the select string and sets the target solution fields."""
@@ -910,13 +869,20 @@ class LedgerStateMixin(rx.State, mixin=True):
         self.editing_experiment_id = -1
         self.new_experiment_name = ""
         self.new_experiment_assumption = ""
+        self.new_experiment_description = ""
+        self.new_experiment_success_metric = ""
         self.new_experiment_method = "Prototype Interview"
-        self.active_drawer_tab = "experiments"
+        self.new_experiment_method_other = ""
 
     def add_experiment(self, opportunity_id: int):
         """Creates a new experiment (or saves an edit) and bumps the solution to 'Testing'."""
         if not self.new_experiment_name.strip():
             return rx.window_alert("Experiment name cannot be empty.")
+        method = (
+            self.new_experiment_method_other.strip() or "Other"
+            if self.new_experiment_method == "Other"
+            else self.new_experiment_method
+        )
         with rx.session() as session:
             if self.editing_experiment_id != -1:
                 # Edit path: update existing experiment fields
@@ -924,7 +890,9 @@ class LedgerStateMixin(rx.State, mixin=True):
                 if exp:
                     exp.name = self.new_experiment_name.strip()
                     exp.assumption = self.new_experiment_assumption.strip()
-                    exp.method = self.new_experiment_method
+                    exp.description = self.new_experiment_description.strip()
+                    exp.success_metric = self.new_experiment_success_metric.strip()
+                    exp.method = method
                     session.add(exp)
             else:
                 # Create path: new experiment + auto-bump solution to Testing
@@ -932,7 +900,9 @@ class LedgerStateMixin(rx.State, mixin=True):
                     solution_id=self.experiment_target_solution_id,
                     name=self.new_experiment_name.strip(),
                     assumption=self.new_experiment_assumption.strip(),
-                    method=self.new_experiment_method,
+                    description=self.new_experiment_description.strip(),
+                    success_metric=self.new_experiment_success_metric.strip(),
+                    method=method,
                 ))
                 sol = session.get(Solution, self.experiment_target_solution_id)
                 if sol and sol.status == "Ideation":
@@ -946,8 +916,10 @@ class LedgerStateMixin(rx.State, mixin=True):
         self.selected_solution_for_experiment = ""
         self.new_experiment_name = ""
         self.new_experiment_assumption = ""
+        self.new_experiment_description = ""
+        self.new_experiment_success_metric = ""
+        self.new_experiment_method_other = ""
         self.load_ledger()
-        self._sync_drawer()
 
     def update_experiment_status(self, exp_id: int, status: str):
         """Advances Draft → Running → Concluded."""
@@ -958,7 +930,6 @@ class LedgerStateMixin(rx.State, mixin=True):
                 session.add(exp)
                 session.commit()
         self.load_ledger()
-        self._sync_drawer()
 
     def update_experiment_signal(self, exp_id: int, signal: str):
         """Marks an experiment as Validated or Invalidated."""
@@ -969,7 +940,6 @@ class LedgerStateMixin(rx.State, mixin=True):
                 session.add(exp)
                 session.commit()
         self.load_ledger()
-        self._sync_drawer()
 
     def delete_experiment(self, exp_id: int):
         with rx.session() as session:
@@ -978,14 +948,22 @@ class LedgerStateMixin(rx.State, mixin=True):
                 session.delete(exp)
                 session.commit()
         self.load_ledger()
-        self._sync_drawer()
+
+    _STANDARD_METHODS = {"Prototype Interview", "Fake Door", "A/B Test", "Usability Test", "Survey", "Other"}
 
     def start_edit_experiment(self, exp: ExperimentItem):
         """Populates the creation form with an existing experiment's data for editing."""
         self.editing_experiment_id = exp.id
         self.new_experiment_name = exp.name
         self.new_experiment_assumption = exp.assumption
-        self.new_experiment_method = exp.method
+        self.new_experiment_description = exp.description
+        self.new_experiment_success_metric = exp.success_metric
+        if exp.method in self._STANDARD_METHODS:
+            self.new_experiment_method = exp.method
+            self.new_experiment_method_other = ""
+        else:
+            self.new_experiment_method = "Other"
+            self.new_experiment_method_other = exp.method
         self.experiment_target_solution_id = exp.solution_id
         self.experiment_target_solution_name = exp.solution_name
         self.selected_solution_for_experiment = f"{exp.solution_id} - {exp.solution_name}"
@@ -999,7 +977,6 @@ class LedgerStateMixin(rx.State, mixin=True):
                 session.add(exp)
                 session.commit()
         self.load_ledger()
-        self._sync_drawer()
 
     def apply_solution_outcome(self, exp_id: int):
         """Applies the experiment's signal as the solution's outcome status (user-confirmed)."""
@@ -1012,7 +989,6 @@ class LedgerStateMixin(rx.State, mixin=True):
                     session.add(sol)
                     session.commit()
         self.load_ledger()
-        self._sync_drawer()
 
     def update_opp_score(self, opp_id: int, field: str, score_str: str):
         """Updates impact_score or sat_gap_score for an opportunity (1-5, 0 = unrated)."""
@@ -1031,7 +1007,6 @@ class LedgerStateMixin(rx.State, mixin=True):
                 session.add(opp)
                 session.commit()
         self.load_ledger()
-        self._sync_drawer()
 
     def set_target_opportunity(self, opp_id: int):
         """Designates one opportunity as the current team focus; clears all others."""
@@ -1046,5 +1021,4 @@ class LedgerStateMixin(rx.State, mixin=True):
                 session.add(opp)
             session.commit()
         self.load_ledger()
-        self._sync_drawer()
 

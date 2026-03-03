@@ -90,8 +90,10 @@ class Experiment(rx.Model, table=True):
 
     solution_id: int = Field(foreign_key="solution.id")
     name: str
-    assumption: str # e.g., "Users are willing to pay for this."
-    method: str # e.g., "Fake Door", "A/B Test", "Prototype Interview"
+    assumption: str       # e.g., "Users are willing to pay for this."
+    description: str = "" # What exactly will we do / how will we run it?
+    success_metric: str = "" # How will we know it worked?
+    method: str           # e.g., "Fake Door", "A/B Test", "Prototype Interview"
 
     # State management
     status: str = "Draft" # Draft -> Running -> Concluded

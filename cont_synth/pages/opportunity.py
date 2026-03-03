@@ -231,6 +231,20 @@ def render_detail_experiment(exp: ExperimentItem) -> rx.Component:
                 f'Assumption: "{exp.assumption}"',
                 size="1", color="gray", font_style="italic",
             ),
+            rx.cond(
+                exp.description != "",
+                rx.text(f"Description: {exp.description}", size="1", color="gray"),
+                rx.fragment(),
+            ),
+            rx.cond(
+                exp.success_metric != "",
+                rx.hstack(
+                    rx.icon("chart-line", size=12, color="var(--green-9)"),
+                    rx.text(exp.success_metric, size="1", color="var(--green-11)", weight="medium"),
+                    spacing="1", align="center",
+                ),
+                rx.fragment(),
+            ),
             # Progress action buttons
             rx.flex(
                 rx.cond(
@@ -324,17 +338,43 @@ def render_inline_experiment_form() -> rx.Component:
                 on_change=State.set_new_experiment_name,
                 width="100%", size="1",
             ),
+            rx.text("Assumption", size="1", weight="bold", color="gray"),
             rx.text_area(
-                placeholder="What assumption are you testing?",
+                placeholder="What assumption are you testing? (e.g., Users will pay for faster exports)",
                 value=State.new_experiment_assumption,
                 on_change=State.set_new_experiment_assumption,
                 width="100%", rows="2",
             ),
+            rx.text("Description", size="1", weight="bold", color="gray"),
+            rx.text_area(
+                placeholder="What will you do? How will you run it?",
+                value=State.new_experiment_description,
+                on_change=State.set_new_experiment_description,
+                width="100%", rows="2",
+            ),
+            rx.text("Success Metric", size="1", weight="bold", color="gray"),
+            rx.input(
+                placeholder="How will you know it worked? (e.g., ≥30% click-through on CTA)",
+                value=State.new_experiment_success_metric,
+                on_change=State.set_new_experiment_success_metric,
+                width="100%", size="1",
+            ),
+            rx.text("Method", size="1", weight="bold", color="gray"),
             rx.select(
                 ["Prototype Interview", "Fake Door", "A/B Test", "Usability Test", "Survey", "Other"],
                 value=State.new_experiment_method,
                 on_change=State.set_new_experiment_method,
                 width="100%", size="1",
+            ),
+            rx.cond(
+                State.new_experiment_method == "Other",
+                rx.input(
+                    placeholder="Describe the experiment type...",
+                    value=State.new_experiment_method_other,
+                    on_change=State.set_new_experiment_method_other,
+                    width="100%", size="1",
+                ),
+                rx.fragment(),
             ),
             rx.flex(
                 rx.button(

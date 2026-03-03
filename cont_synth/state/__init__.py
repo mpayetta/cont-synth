@@ -191,7 +191,6 @@ class State(
     interview_history: list[InterviewHistoryItem] = []
 
     # --- Ledger & personas ---
-    is_drawer_open: bool = False
     ledger_data: list[LedgerItem] = []
     available_personas: list[str] = []
     target_persona: str = ""
@@ -265,9 +264,6 @@ class State(
     # hasn't changed (e.g. clicking the pre-selected first item).
     scroll_trigger: int = 0
 
-    # --- Drawer tab control ---
-    active_drawer_tab: str = "evidence"
-
     # --- Transcript drawer (from opportunity evidence cards) ---
     transcript_drawer_open: bool = False
     transcript_drawer_mode: str = "view"           # "view" | "select"
@@ -303,7 +299,10 @@ class State(
     selected_solution_for_experiment: str = ""
     new_experiment_name: str = ""
     new_experiment_assumption: str = ""
+    new_experiment_description: str = ""
+    new_experiment_success_metric: str = ""
     new_experiment_method: str = "Prototype Interview"
+    new_experiment_method_other: str = ""
     editing_experiment_id: int = -1
 
     # --- Home dashboard ---

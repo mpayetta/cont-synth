@@ -35,8 +35,8 @@ def _field(label: str, input_el: rx.Component) -> rx.Component:
 def _plain_input(placeholder: str, value, on_change) -> rx.Component:
     return rx.el.input(
         placeholder=placeholder,
-        value=value,
-        on_change=on_change,
+        default_value=value,
+        on_blur=on_change,
         style=_INPUT_STYLE,
     )
 
@@ -45,8 +45,8 @@ def _auto_input(placeholder: str, value, on_change, list_id: str, suggestions) -
     return rx.fragment(
         rx.el.input(
             placeholder=placeholder,
-            value=value,
-            on_change=on_change,
+            default_value=value,
+            on_blur=on_change,
             list=list_id,
             style=_INPUT_STYLE,
         ),
@@ -314,6 +314,7 @@ def render_participants() -> rx.Component:
             width="100%",
             padding_y="4px",
             spacing="3",
+            align="center",
         ),
         rx.cond(
             State.is_participant_form_open,

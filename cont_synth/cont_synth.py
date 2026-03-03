@@ -7,7 +7,7 @@ from .pages.logs import render_logs
 from .pages.synthesize import render_synthesize
 from .pages.synthesis_review import render_synthesis_review
 from .pages.prep import render_prep
-from .pages.ledger import render_ledger, opportunity_drawer
+from .pages.ledger import render_ledger
 from .pages.opportunity import render_opportunity_detail
 from .pages.interview_detail import render_interview_detail
 from .pages.llm_usage import render_llm_usage
@@ -320,7 +320,6 @@ def sidebar() -> rx.Component:
 def _page_layout(content: rx.Component, on_mount) -> rx.Component:
     """Authenticated app shell: sidebar + content area, guarded by is_authenticated."""
     return rx.box(
-        opportunity_drawer(),
         rx.cond(
             State.is_authenticated,
             rx.hstack(
