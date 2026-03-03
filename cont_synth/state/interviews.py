@@ -176,7 +176,18 @@ class InterviewStateMixin(rx.State, mixin=True):
         yield
 
         try:
-            synthesis_prompt = load_prompt("synthesis.txt")
+            # Load existing opps before synthesis so we can pass themes to the prompt
+            with rx.session() as session:
+                existing_opps = session.exec(
+                    select(Opportunity).where(Opportunity.product_id == int(self.active_product_id))
+                ).all()
+                existing_opps_dict = {opp.id: opp.statement for opp in existing_opps}
+                existing_opps_themes = {opp.id: opp.theme for opp in existing_opps}
+
+            existing_themes = sorted(set(existing_opps_themes.values())) if existing_opps_themes else []
+            existing_themes_str = ", ".join(existing_themes) if existing_themes else "None yet — create new themes as needed."
+
+            synthesis_prompt = load_prompt("synthesis.txt").format(existing_themes=existing_themes_str)
             response = pro_model.generate_content(
                 f"{synthesis_prompt}\n\nTranscript:\n{self.transcript_text}",
                 generation_config=genai.GenerationConfig(
@@ -196,13 +207,6 @@ class InterviewStateMixin(rx.State, mixin=True):
                     total_tokens=response.usage_metadata.total_token_count,
                 )
             ]
-
-            # Load existing opps for deduplication (outside session to avoid holding it)
-            with rx.session() as session:
-                existing_opps = session.exec(
-                    select(Opportunity).where(Opportunity.product_id == int(self.active_product_id))
-                ).all()
-                existing_opps_dict = {opp.id: opp.statement for opp in existing_opps}
 
             matched_results: list[dict] = []
 
@@ -259,9 +263,12 @@ class InterviewStateMixin(rx.State, mixin=True):
                         if original_opp
                         else "No quote found."
                     )
-                    theme = original_opp["theme"] if original_opp else "General"
                     matched_id = match.get("matched_existing_id")
                     matched_statement = existing_opps_dict.get(matched_id, "") if matched_id else ""
+                    # Inherit theme from the existing opp when matched; otherwise use synthesized theme
+                    theme = existing_opps_themes.get(matched_id) if matched_id else None
+                    if not theme:
+                        theme = original_opp["theme"] if original_opp else "General"
 
                     matched_results.append(
                         {

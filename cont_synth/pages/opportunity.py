@@ -442,7 +442,7 @@ def render_solution_detail_card(sol: OppDetailSolution) -> rx.Component:
                 # Description
                 rx.cond(
                     sol.description != "",
-                    rx.text(sol.description, size="2", color="gray"),
+                    rx.text(sol.description, size="2", color="var(--gray-11)", white_space="pre-wrap"),
                     rx.fragment(),
                 ),
                 # Inline experiments (attached to this solution)
@@ -519,6 +519,7 @@ def render_solutions_panel() -> rx.Component:
                     value=State.new_solution_desc,
                     on_change=State.set_new_solution_desc,
                     width="100%",
+                    rows="8",
                 ),
                 # Status selector (shown only when editing)
                 rx.cond(
