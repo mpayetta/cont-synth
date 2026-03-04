@@ -8,14 +8,14 @@ services:
     environment:
       # Required: your Google Gemini API key
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # PostgreSQL connection URL — must point at your external Postgres instance
+      - DATABASE_URL=${DATABASE_URL}
       # The URL the browser uses to reach the backend.
       # For HTTPS: https://<your-domain>:8000
       # Changing this requires rebuilding the image (docker compose up --build)
       # because it gets baked into the React frontend bundle.
       - API_URL=${API_URL:-http://localhost:8000}
     volumes:
-      # SQLite database — persisted to host disk so data survives container rebuilds
-      - ./data/reflex.db:/app/reflex.db
       # Next.js build cache — avoids re-building the frontend on every restart
       - reflex_web:/app/.web
       # Reflex runtime cache (bun, node modules, etc.)

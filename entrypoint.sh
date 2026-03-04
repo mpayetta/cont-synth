@@ -4,7 +4,7 @@ set -e
 export PYTHONWARNINGS="ignore::DeprecationWarning"
 
 echo "Running database migrations..."
-reflex db migrate
+alembic upgrade head
 
 # Fix: vaul 1.1.2 calls document.body.style.backgroundColor inside a useMemo
 # which runs during React Router SSR prerendering → "document is not defined".
