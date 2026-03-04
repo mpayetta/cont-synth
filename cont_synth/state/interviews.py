@@ -14,6 +14,7 @@ from ..models import (
     Persona,
     Interview,
     InterviewFeedback,
+    PrepGuideLog,
     Opportunity,
     InterviewOpportunityLink,
     LlmUsageLog,
@@ -31,6 +32,7 @@ from .core import (
     DetailParticipantItem,
     PrepOppItem,
     PrepExperimentItem,
+    PrepGuideItem,
     CoachDetailItem,
     load_prompt,
     pro_model,
@@ -754,6 +756,43 @@ class InterviewStateMixin(rx.State, mixin=True):
 
             self.prep_running_experiments = running_exps
 
+    def load_coach_feedback_for_prep(self):
+        """Fetches the most recent InterviewFeedback to surface in the pre-game brief."""
+        with rx.session() as session:
+            latest_fb = session.exec(
+                select(InterviewFeedback)
+                .order_by(InterviewFeedback.created_at.desc())
+                .limit(1)
+            ).first()
+        if latest_fb:
+            self.last_interview_score = latest_fb.score
+            self.last_stop_doing = json.loads(latest_fb.stop_doing) if latest_fb.stop_doing else []
+        else:
+            self.last_interview_score = 0
+            self.last_stop_doing = []
+
+    def load_guide_history(self):
+        """Fetches all PrepGuideLog records ordered newest-first."""
+        with rx.session() as session:
+            rows = session.exec(
+                select(PrepGuideLog).order_by(PrepGuideLog.created_at.desc())
+            ).all()
+        self.guide_history = [
+            PrepGuideItem(
+                id=r.id,
+                created_at=r.created_at.strftime("%Y-%m-%d %H:%M"),
+                guide_type=r.guide_type,
+                target_persona=r.target_persona,
+                content=r.content,
+                used_coach_feedback=r.used_coach_feedback,
+                input_opportunities=json.loads(r.input_opportunities) if r.input_opportunities else [],
+                input_extra_context=r.input_extra_context,
+                input_coach_score=r.input_coach_score,
+                input_stop_doing=json.loads(r.input_stop_doing) if r.input_stop_doing else [],
+            )
+            for r in rows
+        ]
+
     def toggle_prep_opportunity(self, opp_id: int):
         """Toggle selection of an opportunity in the prep page selector."""
         new_list = []
@@ -808,15 +847,11 @@ class InterviewStateMixin(rx.State, mixin=True):
         yield
 
         try:
-            if selected_opps or has_extra_context:
-                # --- OST-based interview guide (or open-topic guide when only extra context is provided) ---
+            if selected_opps:
+                # --- OST-based interview guide: only when opportunities are explicitly selected ---
                 selected_exps = [e for e in self.prep_running_experiments if e.selected]
 
-                opps_section = (
-                    "\n".join(f"- [{o.theme}] {o.statement}" for o in selected_opps)
-                    if selected_opps
-                    else "None — this interview is not tied to specific opportunities."
-                )
+                opps_section = "\n".join(f"- [{o.theme}] {o.statement}" for o in selected_opps)
                 exps_section = (
                     "\n".join(
                         f"- Solution '{e.solution_name}' | Experiment '{e.experiment_name}' | Assumption: {e.assumption}"
@@ -855,27 +890,64 @@ class InterviewStateMixin(rx.State, mixin=True):
                         output_tokens=guide_response.usage_metadata.candidates_token_count,
                         total_tokens=guide_response.usage_metadata.total_token_count,
                     ))
+                    session.add(PrepGuideLog(
+                        guide_type="interview_guide",
+                        target_persona=self.target_persona,
+                        content=generated_text,
+                        used_coach_feedback=False,
+                        input_opportunities=json.dumps([
+                            {"theme": o.theme, "statement": o.statement} for o in selected_opps
+                        ]),
+                        input_extra_context=self.prep_extra_context.strip(),
+                        input_coach_score=0,
+                        input_stop_doing="[]",
+                    ))
                     session.commit()
 
                 self.prep_questions = generated_text
                 self.prep_last_updated = datetime.now().strftime("%Y-%m-%d %H:%M")
+                self.load_guide_history()
 
             else:
-                # --- Legacy persona-only battle plan ---
+                # --- Persona battle plan: no opportunities selected; extra context is passed as additional direction ---
                 target_opps: list[str] = []
                 for item in getattr(self, "ledger_data", []):
                     if any(p.name == self.target_persona for p in item.personas_affected):
                         target_opps.append(item.opportunity)
 
-                if not target_opps:
-                    self.prep_questions = "No identified opportunities. Start fresh!"
+                # If no prior opps exist for this persona, use extra context as the only direction
+                if not target_opps and not has_extra_context:
+                    self.prep_questions = "No identified opportunities for this persona. Add some via synthesis first, or provide additional context."
                     self.prep_last_updated = ""
                     return
+
+                use_coaching = self.apply_coach_feedback and bool(self.last_stop_doing)
+                if use_coaching:
+                    stop_list = "\n".join(f"- {item}" for item in self.last_stop_doing)
+                    coaching_guardrails = (
+                        f"### 🛑 Coach's Guardrails:\n\n"
+                        f"Based on your last interview (score: {self.last_interview_score}/10), "
+                        f"you must actively avoid these habits during this conversation:\n{stop_list}"
+                    )
+                else:
+                    coaching_guardrails = (
+                        "### 🛑 Coach's Guardrails:\n\n"
+                        "No prior coaching data available. General reminder: do not lead the witness, "
+                        "avoid hypotheticals, and let silence do the work — resist filling pauses."
+                    )
+
+                extra_direction = (
+                    f"\nADDITIONAL DIRECTION FROM INTERVIEWER:\n{self.prep_extra_context.strip()}"
+                    if has_extra_context
+                    else ""
+                )
 
                 prep_template = load_prompt("prep.txt")
                 prep_prompt = prep_template.format(
                     target_persona=self.target_persona,
-                    target_opps=target_opps,
+                    target_opps=target_opps if target_opps else ["(No prior opportunities — use the additional direction below as the focus)"],
+                    coaching_guardrails=coaching_guardrails,
+                    extra_direction=extra_direction,
                 )
                 prep_response = flash_model.generate_content(prep_prompt)
                 generated_text = prep_response.text
@@ -888,6 +960,18 @@ class InterviewStateMixin(rx.State, mixin=True):
                         prompt_tokens=prep_response.usage_metadata.prompt_token_count,
                         output_tokens=prep_response.usage_metadata.candidates_token_count,
                         total_tokens=prep_response.usage_metadata.total_token_count,
+                    ))
+                    session.add(PrepGuideLog(
+                        guide_type="battle_plan",
+                        target_persona=self.target_persona,
+                        content=generated_text,
+                        used_coach_feedback=use_coaching,
+                        input_opportunities=json.dumps([
+                            {"theme": "", "statement": o} for o in target_opps
+                        ]),
+                        input_extra_context=self.prep_extra_context.strip(),
+                        input_coach_score=self.last_interview_score if use_coaching else 0,
+                        input_stop_doing=json.dumps(self.last_stop_doing) if use_coaching else "[]",
                     ))
                     session.commit()
                     existing_entry = session.get(PersonaPrep, self.target_persona)
@@ -907,6 +991,7 @@ class InterviewStateMixin(rx.State, mixin=True):
 
                 self.prep_questions = generated_text
                 self.prep_last_updated = datetime.now().strftime("%Y-%m-%d %H:%M")
+                self.load_guide_history()
 
         except Exception as e:  # pragma: no cover - UI alert path
             self.prep_questions = f"Failed to generate: {str(e)}"

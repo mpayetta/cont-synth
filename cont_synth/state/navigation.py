@@ -79,6 +79,9 @@ class NavigationStateMixin(rx.State, mixin=True):
     def handle_navigation(self, view_name: str):
         """Navigate to the URL corresponding to view_name."""
         self.highlighted_quote_text = ""
+        if self.current_view == "prep":
+            self.prep_questions = ""
+            self.prep_extra_context = ""
         return rx.redirect(_URL_MAP.get(view_name, "/"))
 
     def load_llm_usage(self):
@@ -114,6 +117,8 @@ class NavigationStateMixin(rx.State, mixin=True):
         elif self.current_view == "prep":
             self.load_ledger()  # loads available_personas for the persona selector
             self.load_prep_data()  # loads opportunities and running experiments for OST selectors
+            self.load_coach_feedback_for_prep()
+            self.load_guide_history()
         elif self.current_view in ("llm_usage", "account"):
             self.load_llm_usage()
             if self.current_view == "account":

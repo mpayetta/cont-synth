@@ -156,6 +156,21 @@ class LlmUsageLog(rx.Model, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class PrepGuideLog(rx.Model, table=True):
+    """Historical log of every generated interview prep guide, including full input context."""
+
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    guide_type: str = Field(default="battle_plan")  # "battle_plan" | "interview_guide"
+    target_persona: str = Field(default="")
+    content: str
+    used_coach_feedback: bool = Field(default=False)
+    # Input snapshot — everything the LLM received
+    input_opportunities: str = Field(default="")   # JSON list of {"theme": str, "statement": str}
+    input_extra_context: str = Field(default="")
+    input_coach_score: int = Field(default=0)
+    input_stop_doing: str = Field(default="")      # JSON list of strings
+
+
 class KnowledgeChunk(rx.Model, table=True):
     """A chunk of text from a document, with a vector embedding for RAG."""
 

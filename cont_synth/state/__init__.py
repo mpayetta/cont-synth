@@ -27,6 +27,7 @@ from .core import (
     RecentInterviewItem,
     PrepOppItem,
     PrepExperimentItem,
+    PrepGuideItem,
     CoachFreqItem,
     CoachDetailItem,
     configure_genai,
@@ -41,6 +42,7 @@ from ..models import (
     LlmUsageLog,
     Interview,
     InterviewFeedback,
+    PrepGuideLog,
     Solution,
     Opportunity,
     Outcome,
@@ -221,6 +223,12 @@ class State(
     # --- Interview guide prep (OST-based) ---
     prep_opportunities: list[PrepOppItem] = []
     prep_running_experiments: list[PrepExperimentItem] = []
+    apply_coach_feedback: bool = True
+    last_interview_score: int = 0
+    last_stop_doing: list[str] = []
+    guide_history: list[PrepGuideItem] = []
+    selected_guide_id: int = -1
+    guide_drawer_open: bool = False
 
     interview_history: list[InterviewHistoryItem] = []
 
@@ -485,6 +493,15 @@ class State(
     def set_persona_input(self, val: str): self.persona_input = val
     def set_transcript_text(self, val: str): self.transcript_text = val
     def set_prep_extra_context(self, val: str): self.prep_extra_context = val
+    def set_apply_coach_feedback(self, val: bool): self.apply_coach_feedback = val
+    def set_selected_guide_id(self, guide_id: int): self.selected_guide_id = guide_id
+
+    def open_guide_drawer(self, guide_id: int):
+        self.selected_guide_id = guide_id
+        self.guide_drawer_open = True
+
+    def close_guide_drawer(self):
+        self.guide_drawer_open = False
     def set_ledger_view_mode(self, val: str): self.ledger_view_mode = val
     def set_new_solution_name(self, val: str): self.new_solution_name = val
     def set_new_solution_desc(self, val: str): self.new_solution_desc = val
@@ -826,6 +843,14 @@ class State(
         if not sel_ids:
             return []
         return [e for e in self.prep_running_experiments if e.opp_id in sel_ids]
+
+    @rx.var
+    def selected_guide_item(self) -> PrepGuideItem:
+        """The currently selected guide entry for the history side panel."""
+        for g in self.guide_history:
+            if g.id == self.selected_guide_id:
+                return g
+        return PrepGuideItem(id=-1, created_at="", guide_type="", target_persona="", content="", used_coach_feedback=False)
 
     def copy_guide_to_clipboard(self):
         """Copies the generated prep guide text to the system clipboard."""

@@ -249,6 +249,21 @@ class PrepExperimentItem(BaseModel):
     selected: bool = False
 
 
+class PrepGuideItem(BaseModel):
+    """One saved guide entry shown in the Guide History tab."""
+    id: int
+    created_at: str
+    guide_type: str
+    target_persona: str
+    content: str
+    used_coach_feedback: bool
+    # Saved input snapshot
+    input_opportunities: list[dict] = []   # [{"theme": str, "statement": str}]
+    input_extra_context: str = ""
+    input_coach_score: int = 0
+    input_stop_doing: list[str] = []
+
+
 class CoachScorePoint(BaseModel):
     """One data point in the coach score trend chart."""
     date: str           # x-axis label, e.g. "2026-02-15"
