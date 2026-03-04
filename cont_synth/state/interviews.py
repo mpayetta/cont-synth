@@ -886,6 +886,7 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.interview_detail_duration = interview.duration_minutes or 0
         self.interview_detail_participants = participants_str
         self.interview_detail_participant_items = participant_items
+        self.interview_detail_quality = interview.quality_score
 
     async def next_quote(self):
         if self.active_quote_index < len(self.interview_detail_quotes) - 1:

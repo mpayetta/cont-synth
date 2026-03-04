@@ -59,10 +59,10 @@ class NavigationStateMixin(rx.State, mixin=True):
                 self.active_product_id = str(self.products[0].id)
 
     def change_product(self, product_id: str):
-        """Switches the global product context, persists to localStorage, and refreshes data."""
+        """Switches the global product context, persists to localStorage, and redirects to home."""
         self.active_product_id = product_id
-        self.load_data_for_current_view()
-        return rx.call_script(f"localStorage.setItem('active_product_id', '{product_id}')")
+        rx.call_script(f"localStorage.setItem('active_product_id', '{product_id}')")
+        return rx.redirect("/")
 
     def handle_navigation(self, view_name: str):
         """Navigate to the URL corresponding to view_name."""

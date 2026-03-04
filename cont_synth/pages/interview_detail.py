@@ -280,7 +280,7 @@ def render_interview_detail() -> rx.Component:
             on_click=State.handle_navigation("logs"),
             margin_bottom="4px",
         ),
-        # Header: persona badge + date logged + interview ID
+        # Header: persona badge + date logged + interview ID + quality score
         rx.hstack(
             rx.badge(
                 State.interview_detail_persona,
@@ -296,8 +296,17 @@ def render_interview_detail() -> rx.Component:
                 color="var(--gray-12)",
                 size="2",
             ),
+            rx.spacer(),
+            rx.badge(
+                "Quality: ",
+                State.interview_detail_quality.to_string(),
+                "/10",
+                color_scheme="blue",
+                size="2",
+            ),
             align="center",
             spacing="2",
+            width="100%",
         ),
         rx.divider(),
         # Two-column body

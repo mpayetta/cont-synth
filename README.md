@@ -24,7 +24,7 @@ Catalyst ingests raw user interview transcripts and uses LLMs to extract underly
 | Layer | Technology |
 |---|---|
 | **Framework** | [Reflex](https://reflex.dev/) v0.8.27 (Python → React/Next.js) |
-| **Database** | SQLite via SQLModel + Alembic migrations |
+| **Database** | PostgreSQL via SQLModel + Alembic migrations (with pgvector for embeddings) |
 | **AI / LLM** | Google Gemini 2.5 Pro (synthesis) + Gemini 2.5 Flash (deduplication) |
 | **Auth** | bcrypt password hashing via `passlib` |
 | **UI** | Radix UI v3 + Tailwind CSS v4 |
@@ -38,7 +38,11 @@ Before you begin, make sure you have the following installed:
 - **Python 3.10+** — [python.org](https://www.python.org/downloads/)
 - **Node.js 18+** — [nodejs.org](https://nodejs.org/) (required by Reflex for the React build)
 - **Git** — [git-scm.com](https://git-scm.com/)
+- **PostgreSQL 14+** with the **pgvector** extension — [postgresql.org](https://www.postgresql.org/download/) / [pgvector](https://github.com/pgvector/pgvector)
 - **A Google Gemini API key** — Get one free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+
+> **pgvector on macOS:** `brew install pgvector`
+> **pgvector with Docker:** use the `pgvector/pgvector:pg17` image instead of plain `postgres`.
 
 ---
 
@@ -58,14 +62,18 @@ source .venv/bin/activate
 # 3. Install Python dependencies
 pip install -r requirements.txt
 
-# 4. Set your Gemini API key
-echo "GEMINI_API_KEY=your_key_here" > .env
+# 4. Create a PostgreSQL database and enable pgvector
+createdb contsynth
+psql contsynth -c "CREATE EXTENSION IF NOT EXISTS vector;"
 
-# 5. Initialize the database and run migrations
-reflex db init
-reflex db migrate
+# 5. Copy the example env file and fill in your values
+cp .env.example .env
+# Edit .env: set GEMINI_API_KEY and DATABASE_URL
 
-# 6. Start the development server
+# 6. Apply database migrations
+alembic upgrade head
+
+# 7. Start the development server
 reflex run
 ```
 
@@ -87,15 +95,20 @@ python -m venv .venv
 # 3. Install Python dependencies
 pip install -r requirements.txt
 
-# 4. Set your Gemini API key
-# Create a .env file in the project root:
-Set-Content .env "GEMINI_API_KEY=your_key_here"
+# 4. Create a PostgreSQL database and enable pgvector
+# (run these in psql or pgAdmin)
+# CREATE DATABASE contsynth;
+# \c contsynth
+# CREATE EXTENSION IF NOT EXISTS vector;
 
-# 5. Initialize the database and run migrations
-reflex db init
-reflex db migrate
+# 5. Copy the example env file and fill in your values
+Copy-Item .env.example .env
+# Edit .env: set GEMINI_API_KEY and DATABASE_URL
 
-# 6. Start the development server
+# 6. Apply database migrations
+alembic upgrade head
+
+# 7. Start the development server
 reflex run
 ```
 
@@ -110,11 +123,17 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Environment Variables
 
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` and fill in your values:
+
+```bash
+cp .env.example .env
+```
 
 | Variable | Required | Description |
 |---|---|---|
 | `GEMINI_API_KEY` | Yes | Your Google Gemini API key — get one at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| `DATABASE_URL` | Yes | PostgreSQL connection string — defaults to `postgresql://postgres:postgres@localhost:5432/contsynth` |
+| `API_URL` | No (prod only) | Public URL of the backend, e.g. `https://yourdomain.com:8000` — baked into the React bundle at build time |
 
 > The `.env` file is gitignored and will never be committed.
 
@@ -168,7 +187,8 @@ Product (workspace)
 │   └── Solution (competing idea, nestable via parent_id)
 │       └── Experiment (Draft → Running → Concluded)
 ├── Outcome (business goal, e.g. "Reduce churn by 5%")
-└── Persona (user archetype, e.g. "Consultant", "Data Analyst")
+├── Persona (user archetype, e.g. "Consultant", "Data Analyst")
+└── KnowledgeChunk (text chunk + 384-dim pgvector embedding, for future RAG)
 ```
 
 ---
@@ -179,7 +199,7 @@ Product (workspace)
 cont-synth/
 ├── cont_synth/
 │   ├── cont_synth.py          # App shell (sidebar + routing)
-│   ├── models.py              # SQLModel table definitions
+│   ├── models.py              # SQLModel table definitions (incl. KnowledgeChunk)
 │   ├── state/                 # Mixin-based state management
 │   │   ├── __init__.py        # Main State class (composition)
 │   │   ├── core.py            # Shared data classes + helpers
@@ -189,14 +209,18 @@ cont-synth/
 │   │   └── auth.py            # Password hashing helpers
 │   └── pages/                 # One file per route
 ├── alembic/                   # Database migrations (committed to Git)
+│   ├── env.py                 # Reads DATABASE_URL env var for connection
 │   └── versions/
+├── scripts/
+│   └── migrate_sqlite_to_postgres.py  # One-time SQLite → PostgreSQL data migration
 ├── prompts/                   # LLM prompt templates (plain text)
 │   ├── synthesis.txt          # Opportunity extraction prompt
 │   ├── dedupe.txt             # Deduplication/merge prompt
 │   └── prep.txt               # Interview question generation prompt
 ├── schema.py                  # Pydantic schemas for LLM responses
-├── rxconfig.py                # Reflex configuration
+├── rxconfig.py                # Reflex configuration (reads DATABASE_URL)
 ├── requirements.txt           # Python dependencies
+├── .env.example               # Template for environment variables
 └── .env                       # Secrets (not committed)
 ```
 
@@ -252,12 +276,35 @@ pytest tests/test_highlight.py -v
 The project uses [Alembic](https://alembic.sqlalchemy.org/) for schema versioning. All migrations live in `alembic/versions/` and are committed to Git.
 
 ```bash
-# Apply all pending migrations
-reflex db migrate
+# Apply all pending migrations (use alembic directly — bypasses Reflex's pre-check,
+# which does not handle the pgvector column type correctly)
+alembic upgrade head
 
 # Create a new migration after changing models.py
 reflex db makemigrations --message "describe your change"
+# Then open the generated file and verify it before applying.
 ```
+
+> **Why `alembic upgrade head` instead of `reflex db migrate`?**
+> Reflex's `db migrate` command runs a pre-flight schema diff using autogenerate before applying migrations. The pgvector `Vector` column type is not recognised by the autogenerate comparison engine, so Reflex always reports "Detected database schema changes" and refuses to proceed. `alembic upgrade head` applies migrations directly without that check.
+
+### Migrating from SQLite to PostgreSQL
+
+If you have an existing SQLite database (`reflex.db`) and want to move its data into PostgreSQL:
+
+```bash
+# 1. Apply the schema to the new PostgreSQL database first
+alembic upgrade head
+
+# 2. Run the data migration script
+python scripts/migrate_sqlite_to_postgres.py
+
+# Optional flags:
+#   --sqlite-path /path/to/reflex.db   (default: ./reflex.db)
+#   --postgres-url postgresql://...    (default: $DATABASE_URL)
+```
+
+The script clears all destination tables, copies every row in FK-dependency order, and resets PostgreSQL sequences so future inserts don't collide with migrated IDs. It is safe to re-run.
 
 ---
 
@@ -265,7 +312,8 @@ reflex db makemigrations --message "describe your change"
 
 - **First run:** Reflex compiles the React frontend on first launch — this can take 1–2 minutes. Subsequent starts are much faster.
 - **Hot reload:** Both the Python backend and the React frontend hot-reload automatically during `reflex run`.
-- **Database file:** `reflex.db` is created in the project root and is gitignored — never commit it.
+- **Database:** PostgreSQL is required. The connection URL is read from `DATABASE_URL` in `.env` (or the environment). The old `reflex.db` SQLite file is no longer used.
+- **pgvector:** The `vector` PostgreSQL extension must be installed on the server **and** enabled in the database (`CREATE EXTENSION IF NOT EXISTS vector`). The first Alembic migration handles the `CREATE EXTENSION` call automatically.
 - **Build artifacts:** `.web/` and `.states/` are auto-generated by Reflex and gitignored.
 - **Gemini costs:** The synthesis pipeline uses `gemini-2.5-pro` for extraction and `gemini-2.5-flash` for deduplication. All API costs are tracked in the LLM Usage page.
 

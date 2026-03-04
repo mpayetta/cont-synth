@@ -279,6 +279,7 @@ class State(
     interview_detail_duration: int = 0
     interview_detail_participants: str = ""  # comma-joined display string
     interview_detail_participant_items: list[DetailParticipantItem] = []
+    interview_detail_quality: int = 0
 
     # --- Pending synthesis (confirmation step) ---
     pending_synthesis_transcript: str = ""

@@ -403,7 +403,7 @@ def render_home() -> rx.Component:
         # Page header + quick actions
         rx.hstack(
             rx.vstack(
-                rx.heading("Dashboard", size="6", weight="bold"),
+                rx.heading(State.active_product_name, " Dashboard", size="6", weight="bold"),
                 rx.text(
                     "Continuous Discovery requires ≥1 customer interview per week.",
                     color="var(--gray-12)",
