@@ -8,11 +8,6 @@ def _coach_feedback_item(text: str) -> rx.Component:
 
 def _render_coach_panel() -> rx.Component:
     """Coach's Corner card shown below the opportunity list during synthesis review."""
-    score_color = rx.cond(
-        State.pending_coach_score >= 8,
-        "green",
-        rx.cond(State.pending_coach_score >= 5, "amber", "red"),
-    )
     return rx.cond(
         State.pending_coach_score > 0,
         rx.vstack(
@@ -26,14 +21,6 @@ def _render_coach_panel() -> rx.Component:
                     color="#8338EC",
                     text_transform="uppercase",
                     letter_spacing="0.05em",
-                ),
-                rx.spacer(),
-                rx.badge(
-                    "Score: ",
-                    State.pending_coach_score.to_string(),
-                    "/10",
-                    color_scheme=score_color,
-                    size="2",
                 ),
                 align="center",
                 width="100%",
@@ -349,12 +336,26 @@ def render_synthesis_review() -> rx.Component:
             ),
             rx.spacer(),
             rx.hstack(
-                rx.badge(
-                    "Quality: ",
-                    State.pending_synthesis_quality.to_string(),
-                    "/10",
-                    color_scheme="blue",
-                    size="2",
+                rx.cond(
+                    State.pending_coach_score > 0,
+                    rx.badge(
+                        "Coach Score: ",
+                        State.pending_coach_score.to_string(),
+                        "/10",
+                        color_scheme=rx.cond(
+                            State.pending_coach_score >= 8,
+                            "green",
+                            rx.cond(State.pending_coach_score >= 5, "amber", "red"),
+                        ),
+                        size="2",
+                    ),
+                    rx.badge(
+                        "Quality: ",
+                        State.pending_synthesis_quality.to_string(),
+                        "/10",
+                        color_scheme="blue",
+                        size="2",
+                    ),
                 ),
                 rx.badge(State.pending_synthesis_persona, color_scheme="purple", size="2"),
                 spacing="2",
