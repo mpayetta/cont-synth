@@ -441,17 +441,46 @@ def evidence_panel() -> rx.Component:
                     width="100%",
                 ),
             ),
-            # Divider + delete
-            rx.divider(margin_top="8px", margin_bottom="8px"),
-            rx.alert_dialog.root(
+            spacing="3",
+            width="100%",
+            padding="20px",
+            background_color="var(--gray-2)",
+            border_radius="10px",
+            border="1px solid var(--gray-5)",
+            align_items="stretch",
+        ),
+        spacing="3",
+        width="100%",
+        align_items="stretch",
+        min_width="280px",
+        max_width="360px",
+    )
+
+
+def render_interview_detail() -> rx.Component:
+    return rx.vstack(
+        rx.hstack(
+        # Back navigation
+        rx.button(
+            rx.icon("arrow-left", size=16),
+            "Back to Interviews",
+            variant="ghost",
+            color_scheme="gray",
+            size="2",
+            on_click=State.handle_navigation("logs"),
+            margin_bottom="4px",
+            margin_right="8px",
+            width="140px",
+        ),
+        rx.alert_dialog.root(
                 rx.alert_dialog.trigger(
                     rx.button(
                         rx.icon("trash", size=14),
                         "Delete Interview",
                         color_scheme="red",
-                        variant="soft",
+                        variant="ghost",
                         size="2",
-                        width="100%",
+                        width="140px",
                     )
                 ),
                 rx.alert_dialog.content(
@@ -477,33 +506,6 @@ def evidence_panel() -> rx.Component:
                     ),
                 ),
             ),
-            spacing="3",
-            width="100%",
-            padding="20px",
-            background_color="var(--gray-2)",
-            border_radius="10px",
-            border="1px solid var(--gray-5)",
-            align_items="stretch",
-        ),
-        spacing="3",
-        width="100%",
-        align_items="stretch",
-        min_width="280px",
-        max_width="360px",
-    )
-
-
-def render_interview_detail() -> rx.Component:
-    return rx.vstack(
-        # Back navigation
-        rx.button(
-            rx.icon("arrow-left", size=16),
-            "Back to Interviews",
-            variant="ghost",
-            color_scheme="gray",
-            size="2",
-            on_click=State.handle_navigation("logs"),
-            margin_bottom="4px",
         ),
         # Header: persona badge + created-at date + interview ID + quality score
         rx.hstack(
@@ -571,6 +573,7 @@ def render_interview_detail() -> rx.Component:
                     ),
                     align="center",
                     spacing="2",
+                    margin_top="16px",
                 ),
                 rx.box(
                     rx.html(State.detail_transcript_html),
