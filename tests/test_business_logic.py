@@ -73,8 +73,12 @@ class TestEvidenceStatus:
 # ---------------------------------------------------------------------------
 
 _PERSONA_COLORS = [
-    "blue", "purple", "orange", "green", "pink",
-    "teal", "ruby", "iris", "indigo",
+    "red",
+    "amber",
+    "green",
+    "blue",
+    "violet",
+    "crimson",
 ]
 
 

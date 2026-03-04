@@ -81,7 +81,12 @@ class InterviewStateMixin(rx.State, mixin=True):
     """
 
     _PERSONA_COLORS = [
-        "blue", "purple", "orange", "green", "pink", "teal", "ruby", "iris", "indigo",
+        "red",
+        "amber",
+        "green",
+        "blue",
+        "violet",
+        "crimson",
     ]
 
     def _persona_color(self, name: str) -> str:

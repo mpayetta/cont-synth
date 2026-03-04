@@ -3,6 +3,7 @@
 These classes carry data between the backend state and the frontend.
 Tests ensure correct instantiation, field types, and defaults.
 """
+
 import pytest
 
 # conftest.py has mocked google.generativeai before this import.
@@ -51,7 +52,17 @@ class TestPersonaBadge:
         assert badge.color == "blue"
 
     def test_all_valid_colors(self):
-        colors = ["blue", "purple", "orange", "green", "pink", "teal", "ruby", "iris", "indigo"]
+        colors = [
+            "blue",
+            "purple",
+            "orange",
+            "green",
+            "pink",
+            "teal",
+            "ruby",
+            "iris",
+            "indigo",
+        ]
         for color in colors:
             badge = PersonaBadge(name="User", color=color)
             assert badge.color == color
@@ -81,7 +92,9 @@ class TestQuoteItem:
 
     def test_text_preserves_newlines(self):
         text = "Line one\nLine two\nLine three"
-        quote = QuoteItem(interview_id=1, persona_name="U", persona_color="blue", text=text)
+        quote = QuoteItem(
+            interview_id=1, persona_name="U", persona_color="blue", text=text
+        )
         assert quote.text == text
 
 
@@ -138,35 +151,67 @@ class TestExperimentItem:
     def test_all_methods(self):
         for method in ["Fake Door", "A/B Test", "Prototype Interview"]:
             exp = ExperimentItem(
-                id=1, solution_id=1, solution_name="S",
-                name="N", assumption="A", description="", success_metric="",
-                method=method, status="Draft", signal="Pending", evidence_notes="",
+                id=1,
+                solution_id=1,
+                solution_name="S",
+                name="N",
+                assumption="A",
+                description="",
+                success_metric="",
+                method=method,
+                status="Draft",
+                signal="Pending",
+                evidence_notes="",
             )
             assert exp.method == method
 
     def test_all_statuses(self):
         for status in ["Draft", "Running", "Concluded"]:
             exp = ExperimentItem(
-                id=1, solution_id=1, solution_name="S",
-                name="N", assumption="A", description="", success_metric="",
-                method="Fake Door", status=status, signal="Pending", evidence_notes="",
+                id=1,
+                solution_id=1,
+                solution_name="S",
+                name="N",
+                assumption="A",
+                description="",
+                success_metric="",
+                method="Fake Door",
+                status=status,
+                signal="Pending",
+                evidence_notes="",
             )
             assert exp.status == status
 
     def test_all_signals(self):
         for signal in ["Pending", "Validated", "Invalidated"]:
             exp = ExperimentItem(
-                id=1, solution_id=1, solution_name="S",
-                name="N", assumption="A", description="", success_metric="",
-                method="A/B Test", status="Concluded", signal=signal, evidence_notes="",
+                id=1,
+                solution_id=1,
+                solution_name="S",
+                name="N",
+                assumption="A",
+                description="",
+                success_metric="",
+                method="A/B Test",
+                status="Concluded",
+                signal=signal,
+                evidence_notes="",
             )
             assert exp.signal == signal
 
     def test_new_fields_exist_and_default_to_empty_string(self):
         exp = ExperimentItem(
-            id=1, solution_id=1, solution_name="S",
-            name="N", assumption="A", description="", success_metric="",
-            method="Fake Door", status="Draft", signal="Pending", evidence_notes="",
+            id=1,
+            solution_id=1,
+            solution_name="S",
+            name="N",
+            assumption="A",
+            description="",
+            success_metric="",
+            method="Fake Door",
+            status="Draft",
+            signal="Pending",
+            evidence_notes="",
         )
         assert exp.description == ""
         assert exp.success_metric == ""
@@ -177,7 +222,10 @@ class TestExperimentItem:
 class TestOppDetailSolution:
     def test_create_with_defaults(self):
         sol = OppDetailSolution(
-            id=5, name="Redesign flow", description="Full UX overhaul", status="Ideation"
+            id=5,
+            name="Redesign flow",
+            description="Full UX overhaul",
+            status="Ideation",
         )
         assert sol.experiments == []
         assert sol.parent_id is None
@@ -185,12 +233,23 @@ class TestOppDetailSolution:
 
     def test_create_with_experiments(self):
         exp = ExperimentItem(
-            id=1, solution_id=5, solution_name="Redesign flow",
-            name="Fake Door", assumption="Users want it", description="", success_metric="",
-            method="Fake Door", status="Draft", signal="Pending", evidence_notes="",
+            id=1,
+            solution_id=5,
+            solution_name="Redesign flow",
+            name="Fake Door",
+            assumption="Users want it",
+            description="",
+            success_metric="",
+            method="Fake Door",
+            status="Draft",
+            signal="Pending",
+            evidence_notes="",
         )
         sol = OppDetailSolution(
-            id=5, name="Redesign flow", description="", status="Testing",
+            id=5,
+            name="Redesign flow",
+            description="",
+            status="Testing",
             experiments=[exp],
         )
         assert len(sol.experiments) == 1
@@ -225,7 +284,9 @@ class TestPendingOppItem:
 
     def test_index_tracks_position(self):
         items = [
-            PendingOppItem(index=i, opportunity_statement=f"Need {i}", theme="T", source_quote="Q")
+            PendingOppItem(
+                index=i, opportunity_statement=f"Need {i}", theme="T", source_quote="Q"
+            )
             for i in range(5)
         ]
         for i, item in enumerate(items):
@@ -261,15 +322,23 @@ class TestLedgerItem:
 
     def test_default_parent_id_is_minus_one(self):
         item = LedgerItem(
-            opportunity_id=2, theme="T", personas_affected=[],
-            opportunity="O", status="FRESH", status_color="green",
-            days_old=0, is_cross_functional=False, evidence=[],
+            opportunity_id=2,
+            theme="T",
+            personas_affected=[],
+            opportunity="O",
+            status="FRESH",
+            status_color="green",
+            days_old=0,
+            is_cross_functional=False,
+            evidence=[],
         )
         assert item.parent_id == -1
 
     def test_create_with_full_data(self):
         badge = PersonaBadge(name="Admin", color="blue")
-        quote = QuoteItem(interview_id=1, persona_name="Admin", persona_color="blue", text="Q")
+        quote = QuoteItem(
+            interview_id=1, persona_name="Admin", persona_color="blue", text="Q"
+        )
         sol = SolutionItem(id=1, name="Sol", description="D", status="Ideation")
         outcome = OutcomeItem(id=1, name="Revenue Growth")
 
@@ -302,9 +371,15 @@ class TestLedgerItem:
             ("STALE (>45 Days)", "red"),
         ]:
             item = LedgerItem(
-                opportunity_id=1, theme="T", personas_affected=[],
-                opportunity="O", status=status, status_color=color,
-                days_old=0, is_cross_functional=False, evidence=[],
+                opportunity_id=1,
+                theme="T",
+                personas_affected=[],
+                opportunity="O",
+                status=status,
+                status_color=color,
+                days_old=0,
+                is_cross_functional=False,
+                evidence=[],
             )
             assert item.status == status
             assert item.status_color == color
@@ -384,7 +459,9 @@ class TestInterviewHistoryItem:
 
 class TestPrepOppItem:
     def test_create_with_required_fields(self):
-        item = PrepOppItem(id=1, theme="Workflow", statement="Users can't batch-export invoices")
+        item = PrepOppItem(
+            id=1, theme="Workflow", statement="Users can't batch-export invoices"
+        )
         assert item.id == 1
         assert item.theme == "Workflow"
         assert item.statement == "Users can't batch-export invoices"
@@ -436,8 +513,12 @@ class TestPrepExperimentItem:
 
     def test_selected_can_be_true(self):
         item = PrepExperimentItem(
-            id=1, opp_id=1, solution_name="S", experiment_name="E",
-            assumption="A", selected=True,
+            id=1,
+            opp_id=1,
+            solution_name="S",
+            experiment_name="E",
+            assumption="A",
+            selected=True,
         )
         assert item.selected is True
 
@@ -448,8 +529,22 @@ class TestPrepExperimentItem:
         assert item.opp_id == 42
 
     def test_multiple_items_are_independent(self):
-        a = PrepExperimentItem(id=1, opp_id=10, solution_name="S", experiment_name="E", assumption="A", selected=True)
-        b = PrepExperimentItem(id=2, opp_id=10, solution_name="S", experiment_name="E", assumption="A", selected=False)
+        a = PrepExperimentItem(
+            id=1,
+            opp_id=10,
+            solution_name="S",
+            experiment_name="E",
+            assumption="A",
+            selected=True,
+        )
+        b = PrepExperimentItem(
+            id=2,
+            opp_id=10,
+            solution_name="S",
+            experiment_name="E",
+            assumption="A",
+            selected=False,
+        )
         assert a.selected is True
         assert b.selected is False
 
@@ -457,6 +552,7 @@ class TestPrepExperimentItem:
 # ---------------------------------------------------------------------------
 # DashboardBarItem (home dashboard weekly sparkline)
 # ---------------------------------------------------------------------------
+
 
 class TestDashboardBarItem:
     def test_create(self):
@@ -497,6 +593,7 @@ class TestDashboardBarItem:
 # RecentInterviewItem (home dashboard activity feed)
 # ---------------------------------------------------------------------------
 
+
 class TestRecentInterviewItem:
     def test_create(self):
         item = RecentInterviewItem(
@@ -514,32 +611,51 @@ class TestRecentInterviewItem:
 
     def test_zero_quotes(self):
         item = RecentInterviewItem(
-            interview_id=1, persona="SMB Owner", persona_color="green",
-            date_str="2026-01-01", quote_count=0,
+            interview_id=1,
+            persona="SMB Owner",
+            persona_color="green",
+            date_str="2026-01-01",
+            quote_count=0,
         )
         assert item.quote_count == 0
 
     def test_all_persona_colors(self):
-        colors = ["blue", "purple", "orange", "green", "pink", "teal", "ruby", "iris", "indigo"]
+        colors = [
+            "red",
+            "amber",
+            "green",
+            "blue",
+            "violet",
+            "crimson",
+        ]
         for color in colors:
             item = RecentInterviewItem(
-                interview_id=1, persona="User", persona_color=color,
-                date_str="2026-01-01", quote_count=1,
+                interview_id=1,
+                persona="User",
+                persona_color=color,
+                date_str="2026-01-01",
+                quote_count=1,
             )
             assert item.persona_color == color
 
     def test_interview_id_is_int(self):
         item = RecentInterviewItem(
-            interview_id=99, persona="P", persona_color="blue",
-            date_str="2026-01-01", quote_count=3,
+            interview_id=99,
+            persona="P",
+            persona_color="blue",
+            date_str="2026-01-01",
+            quote_count=3,
         )
         assert isinstance(item.interview_id, int)
 
     def test_date_str_formats(self):
         for date_str in ["2026-01-15", "2025-12-31", "2026-03-01"]:
             item = RecentInterviewItem(
-                interview_id=1, persona="P", persona_color="blue",
-                date_str=date_str, quote_count=0,
+                interview_id=1,
+                persona="P",
+                persona_color="blue",
+                date_str=date_str,
+                quote_count=0,
             )
             assert item.date_str == date_str
 
@@ -548,12 +664,18 @@ class TestRecentInterviewItem:
 # ParticipantItem (CRM)
 # ---------------------------------------------------------------------------
 
+
 class TestParticipantItem:
     def test_create_customer(self):
         item = ParticipantItem(
-            id=1, name="Alice Chen", persona_name="VP of Engineering",
-            persona_color="blue", is_team_member=False,
-            segment="Enterprise", recruited_via="LinkedIn", notes="",
+            id=1,
+            name="Alice Chen",
+            persona_name="VP of Engineering",
+            persona_color="blue",
+            is_team_member=False,
+            segment="Enterprise",
+            recruited_via="LinkedIn",
+            notes="",
         )
         assert item.id == 1
         assert item.name == "Alice Chen"
@@ -561,15 +683,24 @@ class TestParticipantItem:
 
     def test_create_team_member(self):
         item = ParticipantItem(
-            id=2, name="Bob Smith", persona_name="",
-            persona_color="gray", is_team_member=True,
-            segment="", recruited_via="", notes="",
+            id=2,
+            name="Bob Smith",
+            persona_name="",
+            persona_color="gray",
+            is_team_member=True,
+            segment="",
+            recruited_via="",
+            notes="",
         )
         assert item.is_team_member is True
 
     def test_defaults(self):
         item = ParticipantItem(
-            id=3, name="Charlie", segment="SMB", recruited_via="Referral", notes="",
+            id=3,
+            name="Charlie",
+            segment="SMB",
+            recruited_via="Referral",
+            notes="",
         )
         assert item.persona_name == ""
         assert item.persona_color == "gray"
@@ -579,8 +710,13 @@ class TestParticipantItem:
 
     def test_interview_count_and_last_interviewed(self):
         item = ParticipantItem(
-            id=4, name="Dana", segment="", recruited_via="", notes="",
-            interview_count=7, last_interviewed="2026-02-15",
+            id=4,
+            name="Dana",
+            segment="",
+            recruited_via="",
+            notes="",
+            interview_count=7,
+            last_interviewed="2026-02-15",
         )
         assert item.interview_count == 7
         assert item.last_interviewed == "2026-02-15"
@@ -588,7 +724,11 @@ class TestParticipantItem:
     def test_notes_preserved(self):
         notes = "Key customer. Runs a 50-person team. Very opinionated about UX."
         item = ParticipantItem(
-            id=5, name="Eve", segment="", recruited_via="", notes=notes,
+            id=5,
+            name="Eve",
+            segment="",
+            recruited_via="",
+            notes=notes,
         )
         assert item.notes == notes
 
@@ -596,6 +736,7 @@ class TestParticipantItem:
 # ---------------------------------------------------------------------------
 # DetailParticipantItem (read-only chip in interview detail view)
 # ---------------------------------------------------------------------------
+
 
 class TestDetailParticipantItem:
     def test_create_customer(self):
@@ -619,6 +760,7 @@ class TestDetailParticipantItem:
 # ---------------------------------------------------------------------------
 # PendingParticipantItem (role editor during synthesis review)
 # ---------------------------------------------------------------------------
+
 
 class TestPendingParticipantItem:
     def test_create_with_defaults(self):
@@ -646,7 +788,14 @@ class TestPendingParticipantItem:
 # ExperimentItem — new description / success_metric fields + start_edit logic
 # ---------------------------------------------------------------------------
 
-_STANDARD_METHODS = {"Prototype Interview", "Fake Door", "A/B Test", "Usability Test", "Survey", "Other"}
+_STANDARD_METHODS = {
+    "Prototype Interview",
+    "Fake Door",
+    "A/B Test",
+    "Usability Test",
+    "Survey",
+    "Other",
+}
 
 
 def _resolve_method_for_edit(method: str):
@@ -665,9 +814,17 @@ def _resolve_method_for_edit(method: str):
 class TestExperimentItemNewFields:
     def _make_exp(self, **kwargs):
         defaults = dict(
-            id=1, solution_id=1, solution_name="S",
-            name="N", assumption="A", description="", success_metric="",
-            method="Fake Door", status="Draft", signal="Pending", evidence_notes="",
+            id=1,
+            solution_id=1,
+            solution_name="S",
+            name="N",
+            assumption="A",
+            description="",
+            success_metric="",
+            method="Fake Door",
+            status="Draft",
+            signal="Pending",
+            evidence_notes="",
         )
         defaults.update(kwargs)
         return ExperimentItem(**defaults)
@@ -696,7 +853,14 @@ class TestExperimentItemNewFields:
     # --- start_edit_experiment method-resolution logic ---
 
     def test_standard_method_returned_directly(self):
-        for method in ["Prototype Interview", "Fake Door", "A/B Test", "Usability Test", "Survey", "Other"]:
+        for method in [
+            "Prototype Interview",
+            "Fake Door",
+            "A/B Test",
+            "Usability Test",
+            "Survey",
+            "Other",
+        ]:
             resolved, other = _resolve_method_for_edit(method)
             assert resolved == method
             assert other == ""

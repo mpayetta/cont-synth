@@ -300,6 +300,7 @@ def sidebar() -> rx.Component:
                     rx.text("I", color="#30A46C", weight="bold", size="6"),
                     rx.text("S", color="#0090FF", weight="bold", size="6"),
                     rx.text("M", color="#6E56CF", weight="bold", size="6"),
+                    rx.text("A", color="#E93D82", weight="bold", size="6"),
                     spacing="1",
                 ),
                 spacing="2",

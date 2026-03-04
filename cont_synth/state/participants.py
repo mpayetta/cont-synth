@@ -4,11 +4,14 @@ from ..models import Participant, InterviewParticipantLink, Interview, Persona
 from .core import ParticipantItem
 
 
-
 _PERSONA_COLORS = [
-    "blue", "purple", "orange", "green", "pink", "teal", "ruby", "iris", "indigo",
+    "red",
+    "amber",
+    "green",
+    "blue",
+    "violet",
+    "crimson",
 ]
-
 
 def _persona_color(name: str) -> str:
     idx = sum(ord(c) for c in name) % len(_PERSONA_COLORS)
