@@ -14,7 +14,6 @@ from .pages.llm_usage import render_llm_usage
 from .pages.participants import render_participants
 from .pages.login import login_page
 from .pages.account import render_account
-from .pages.coach import render_coach
 
 
 # --- SIDEBAR COMPONENT ---
@@ -26,31 +25,29 @@ def sidebar_item(text: str, icon: str, view_name: str) -> rx.Component:
         is_active = (State.current_view == "synthesize") | (State.current_view == "synthesis_review")
     elif view_name == "logs":
         is_active = (State.current_view == "logs") | (State.current_view == "interview_detail")
-    elif view_name == "coach":
-        is_active = State.current_view == "coach"
     else:
         is_active = State.current_view == view_name
     return rx.hstack(
         rx.icon(
             icon,
             size=17,
-            color=rx.cond(is_active, "var(--blue-11)", "var(--gray-9)"),
+            color=rx.cond(is_active, "#118AB2", "var(--gray-9)"),
         ),
         rx.text(
             text,
             size="3",
             weight=rx.cond(is_active, "medium", "regular"),
-            color=rx.cond(is_active, "var(--blue-11)", "var(--gray-11)"),
+            color=rx.cond(is_active, "#118AB2", "var(--gray-11)"),
         ),
         spacing="3",
         align="center",
         width="100%",
         padding="8px 12px",
         border_radius="6px",
-        background_color=rx.cond(is_active, "var(--blue-3)", "transparent"),
+        background_color=rx.cond(is_active, "rgba(17, 138, 178, 0.1)", "transparent"),
         cursor="pointer",
         on_click=State.handle_navigation(view_name),
-        _hover={"background_color": rx.cond(is_active, "var(--blue-3)", "var(--gray-3)")},
+        _hover={"background_color": rx.cond(is_active, "rgba(17, 138, 178, 0.1)", "var(--gray-3)")},
     )
 
 
@@ -119,7 +116,7 @@ def _workspace_section() -> rx.Component:
                     width="100%",
                 ),
                 # New Workspace + Manage row
-                rx.hstack(
+                rx.grid(
                     # Create Product Dialog
                     rx.dialog.root(
                         rx.dialog.trigger(
@@ -129,7 +126,7 @@ def _workspace_section() -> rx.Component:
                                 variant="ghost",
                                 size="2",
                                 color_scheme="gray",
-                                flex="1",
+                                width="100%",
                             )
                         ),
                         rx.dialog.content(
@@ -166,7 +163,7 @@ def _workspace_section() -> rx.Component:
                                 variant="ghost",
                                 size="2",
                                 color_scheme="gray",
-                                flex="1",
+                                width="100%",
                                 on_click=State.open_manage_product,
                             )
                         ),
@@ -237,8 +234,9 @@ def _workspace_section() -> rx.Component:
                             max_width="450px",
                         ),
                     ),
-                    width="100%",
+                    columns="2",
                     spacing="2",
+                    width="100%",
                 ),
                 spacing="2",
                 width="100%",
@@ -294,8 +292,20 @@ def sidebar() -> rx.Component:
     return rx.vstack(
         # App title
         rx.vstack(
-            rx.heading("The Catalyst", size="6", weight="bold"),
-            rx.text("Continuous Discovery", color="gray", size="2"),
+            rx.hstack(
+                rx.icon("triangle", size=28, color="#ffffff"),
+                rx.hstack(
+                    rx.text("P", color="#EF476F", weight="bold", size="6"),
+                    rx.text("R", color="#F78C6B", weight="bold", size="6"),
+                    rx.text("I", color="#06D6A0", weight="bold", size="6"),
+                    rx.text("S", color="#118AB2", weight="bold", size="6"),
+                    rx.text("M", color="#8338EC", weight="bold", size="6"),
+                    spacing="1",
+                ),
+                spacing="2",
+                align="center",
+            ),
+            rx.text("Refract insights into action", color="gray", size="2"),
             spacing="1",
             margin_bottom="6",
         ),
@@ -305,13 +315,16 @@ def sidebar() -> rx.Component:
         sidebar_item("Opportunities", "table", "ledger"),
         sidebar_item("Pre-Meeting Prep", "target", "prep"),
         sidebar_item("Interviews", "archive", "logs"),
-        sidebar_item("Interview Coach", "graduation-cap", "coach"),
         sidebar_item("Participants", "users", "participants"),
         # Push workspace section to the bottom
         rx.spacer(),
         _workspace_section(),
         _user_section(),
         width="300px",
+        min_width="300px",
+        max_width="300px",
+        flex_shrink="0",
+        overflow="hidden",
         height="100vh",
         padding="24px",
         background_color="var(--gray-2)",
@@ -331,7 +344,8 @@ def _page_layout(content: rx.Component, on_mount) -> rx.Component:
                 rx.box(
                     content,
                     padding="40px",
-                    width="100%",
+                    flex="1",
+                    min_width="0",
                     height="100%",
                     overflow_y="auto",
                 ),
@@ -390,16 +404,12 @@ def account_page() -> rx.Component:
     return _page_layout(render_account(), State.load_account_page)
 
 
-def coach_page() -> rx.Component:
-    return _page_layout(render_coach(), State.load_coach_page)
-
-
 def login_route() -> rx.Component:
     return rx.box(login_page(), on_mount=State.load_app)
 
 
 # STRICTLY ONLY ONE APP INSTANTIATION
-app = rx.App()
+app = rx.App(theme=rx.theme(accent_color="sky"))
 app.add_page(home_page, route="/")
 app.add_page(synthesize_page, route="/synthesize")
 app.add_page(synthesis_review_page, route="/review")
@@ -411,5 +421,4 @@ app.add_page(prep_page, route="/prep")
 app.add_page(participants_page, route="/participants")
 app.add_page(llm_usage_page, route="/llm-usage")
 app.add_page(account_page, route="/account")
-app.add_page(coach_page, route="/coach")
 app.add_page(login_route, route="/login")

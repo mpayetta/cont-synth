@@ -12,23 +12,23 @@ def _nav_item(label: str, icon: str, section: str) -> rx.Component:
         rx.icon(
             icon,
             size=15,
-            color=rx.cond(is_active, "var(--blue-11)", "var(--gray-12)"),
+            color=rx.cond(is_active, "#118AB2", "var(--gray-12)"),
         ),
         rx.text(
             label,
             size="2",
             weight=rx.cond(is_active, "medium", "regular"),
-            color=rx.cond(is_active, "var(--blue-11)", "var(--gray-12)"),
+            color=rx.cond(is_active, "#118AB2", "var(--gray-12)"),
         ),
         spacing="3",
         align="center",
         width="100%",
         padding="8px 12px",
         border_radius="6px",
-        background_color=rx.cond(is_active, "var(--blue-3)", "transparent"),
+        background_color=rx.cond(is_active, "rgba(17, 138, 178, 0.1)", "transparent"),
         cursor="pointer",
         on_click=State.set_account_section(section),
-        _hover={"background_color": rx.cond(is_active, "var(--blue-3)", "var(--gray-3)")},
+        _hover={"background_color": rx.cond(is_active, "rgba(17, 138, 178, 0.1)", "var(--gray-3)")},
     )
 
 
@@ -364,7 +364,7 @@ def _llm_usage_view() -> rx.Component:
 
 def _danger_zone_view() -> rx.Component:
     return rx.vstack(
-        rx.text("Danger Zone", size="5", weight="bold", color="var(--red-11)"),
+        rx.text("Danger Zone", size="5", weight="bold", color="#EF476F"),
         rx.box(
             rx.vstack(
                 rx.hstack(

@@ -627,7 +627,7 @@ def _merge_dialog() -> rx.Component:
                         "SOURCE (will be deleted)",
                         size="1",
                         weight="bold",
-                        color="var(--red-11)",
+                        color="#EF476F",
                         letter_spacing="0.05em",
                     ),
                     rx.box(

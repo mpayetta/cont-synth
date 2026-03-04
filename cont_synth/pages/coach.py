@@ -94,7 +94,7 @@ def render_coach() -> rx.Component:
                     rx.recharts.line_chart(
                         rx.recharts.line(
                             data_key="score",
-                            stroke="var(--blue-9)",
+                            stroke="#06D6A0",
                             dot=True,
                             type_="monotone",
                             stroke_width=2,
@@ -128,7 +128,7 @@ def render_coach() -> rx.Component:
             # Top Keep Doing
             rx.vstack(
                 rx.hstack(
-                    rx.icon("check-circle", size=16, color="var(--green-9)"),
+                    rx.icon("check-circle", size=16, color="#06D6A0"),
                     rx.text(
                         "Top Keep Doing",
                         size="3",
@@ -160,16 +160,16 @@ def render_coach() -> rx.Component:
                 ),
                 spacing="3",
                 padding="20px",
-                background_color="var(--green-2)",
+                background_color="rgba(6, 214, 160, 0.08)",
                 border_radius="10px",
-                border="1px solid var(--green-5)",
+                border="1px solid rgba(6, 214, 160, 0.3)",
                 align_items="stretch",
                 flex="1",
             ),
             # Top Stop Doing
             rx.vstack(
                 rx.hstack(
-                    rx.icon("x-circle", size=16, color="var(--red-9)"),
+                    rx.icon("x-circle", size=16, color="#EF476F"),
                     rx.text(
                         "Top Stop Doing",
                         size="3",
@@ -201,9 +201,9 @@ def render_coach() -> rx.Component:
                 ),
                 spacing="3",
                 padding="20px",
-                background_color="var(--red-2)",
+                background_color="rgba(239, 71, 111, 0.08)",
                 border_radius="10px",
-                border="1px solid var(--red-5)",
+                border="1px solid rgba(239, 71, 111, 0.3)",
                 align_items="stretch",
                 flex="1",
             ),

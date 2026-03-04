@@ -28,6 +28,7 @@ from .core import (
     PrepOppItem,
     PrepExperimentItem,
     CoachFreqItem,
+    CoachDetailItem,
     configure_genai,
 )
 from .auth import _hash_password, _verify_password
@@ -284,9 +285,9 @@ class State(
     interview_detail_quality: int = 0
     # Coach feedback (loaded from DB on interview detail page)
     interview_detail_coach_score: int = 0
-    interview_detail_coach_keep: list[str] = []
-    interview_detail_coach_stop: list[str] = []
-    interview_detail_coach_start: list[str] = []
+    interview_detail_coach_keep: list[CoachDetailItem] = []
+    interview_detail_coach_stop: list[CoachDetailItem] = []
+    interview_detail_coach_start: list[CoachDetailItem] = []
     interview_detail_coach_trend: str = ""
     is_generating_coach: bool = False
 
@@ -512,10 +513,38 @@ class State(
         self.account_section = "settings"
         return self._ensure_auth_and_load()
 
-    def load_coach_page(self):
-        """On-mount handler for the /coach page."""
-        self.current_view = "coach"
-        return self._ensure_auth_and_load()
+    def scroll_to_timestamp(self, ts: str):
+        """Scroll the transcript to the line containing the given timestamp."""
+        return rx.call_script(
+            f"""
+            (function() {{
+                var ts = {repr(ts)};
+                var container = document.getElementById('interview-transcript');
+                if (!container) return;
+                var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+                var node, found = false;
+                while (!found && (node = walker.nextNode())) {{
+                    var text = node.textContent;
+                    var idx = 0;
+                    while ((idx = text.indexOf(ts, idx)) !== -1) {{
+                        var before = idx > 0 ? text[idx - 1] : ' ';
+                        var after = idx + ts.length < text.length ? text[idx + ts.length] : ' ';
+                        if (!/\d/.test(before) && !/[\d:]/.test(after)) {{
+                            var range = document.createRange();
+                            range.setStart(node, idx);
+                            range.setEnd(node, idx + ts.length);
+                            var rect = range.getBoundingClientRect();
+                            var contRect = container.getBoundingClientRect();
+                            container.scrollTop += rect.top - contRect.top - contRect.height / 2 + rect.height / 2;
+                            found = true;
+                            break;
+                        }}
+                        idx++;
+                    }}
+                }}
+            }})()
+            """
+        )
 
     def _prefill_account_settings(self):
         """Pre-fill account settings form fields from the current user record."""

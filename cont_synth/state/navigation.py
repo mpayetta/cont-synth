@@ -1,4 +1,5 @@
 import json
+import re
 from collections import Counter
 import reflex as rx
 from datetime import date, timedelta
@@ -17,6 +18,14 @@ from ..models import (
     OutcomeOpportunityLink,
     InterviewOpportunityLink,
 )
+
+_TS_GROUP_RE = re.compile(r'\s*\([^)]*\d+:\d{2}[^)]*\)')
+
+
+def _strip_ts(text: str) -> str:
+    """Remove timestamp parentheticals like ' (0:47)' or ' (6:43 \'quote\')' from a string."""
+    return _TS_GROUP_RE.sub('', text).strip()
+
 
 _PERSONA_COLORS = [
     "blue", "purple", "orange", "green", "pink", "teal", "ruby", "iris", "indigo",
@@ -39,7 +48,6 @@ _URL_MAP: dict[str, str] = {
     "llm_usage": "/llm-usage",
     "participants": "/participants",
     "account": "/account",
-    "coach": "/coach",
 }
 
 
@@ -100,6 +108,7 @@ class NavigationStateMixin(rx.State, mixin=True):
             self.load_dashboard()
         elif self.current_view == "logs":
             self.load_history()
+            self.load_coach_data()
         elif self.current_view == "ledger":
             self.load_ledger()  # Ledger loads outcomes, opportunities, and personas
         elif self.current_view == "prep":
@@ -111,8 +120,6 @@ class NavigationStateMixin(rx.State, mixin=True):
                 self._prefill_account_settings()
         elif self.current_view == "participants":
             self.load_participants()
-        elif self.current_view == "coach":
-            self.load_coach_data()
         elif self.current_view == "interview_detail":
             self.load_interview_detail_data()
         elif self.current_view == "opportunity":
@@ -157,8 +164,8 @@ class NavigationStateMixin(rx.State, mixin=True):
                         "score": fb.score,
                         "interview_id": inv.id,
                     })
-                    all_stop.extend(json.loads(fb.stop_doing) if fb.stop_doing else [])
-                    all_keep.extend(json.loads(fb.keep_doing) if fb.keep_doing else [])
+                    all_stop.extend(_strip_ts(x) for x in (json.loads(fb.stop_doing) if fb.stop_doing else []))
+                    all_keep.extend(_strip_ts(x) for x in (json.loads(fb.keep_doing) if fb.keep_doing else []))
 
         self.coach_score_history = score_history
 

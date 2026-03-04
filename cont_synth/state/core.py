@@ -262,6 +262,13 @@ class CoachFreqItem(BaseModel):
     count: int
 
 
+class CoachDetailItem(BaseModel):
+    """A single coach feedback item with clean text and extracted timestamps."""
+    text: str
+    first_timestamp: str = ""       # used as scroll target on click
+    all_timestamps_str: str = ""    # display string, e.g. "0:47, 6:43"
+
+
 class PersonaPrep(SQLModel, table=True):
     """Stores the latest generated prep script for a specific persona."""
 

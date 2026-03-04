@@ -1,5 +1,6 @@
 import io
 import json
+import re
 from datetime import datetime, timezone
 
 import google.generativeai as genai
@@ -30,11 +31,29 @@ from .core import (
     DetailParticipantItem,
     PrepOppItem,
     PrepExperimentItem,
+    CoachDetailItem,
     load_prompt,
     pro_model,
     flash_model,
 )
 from schema import InterviewSnapshot, DedupeResult
+
+_TS_PATTERN = re.compile(r'\b\d+:\d{2}\b')
+_TS_GROUP_PATTERN = re.compile(r'\s*\([^)]*\d+:\d{2}[^)]*\)')
+
+
+def _parse_coach_items(raw: list[str]) -> list[CoachDetailItem]:
+    """Split each raw coach string into clean text + scalar timestamp fields."""
+    result = []
+    for item in raw:
+        timestamps = _TS_PATTERN.findall(item)
+        clean = _TS_GROUP_PATTERN.sub('', item).strip()
+        result.append(CoachDetailItem(
+            text=clean,
+            first_timestamp=timestamps[0] if timestamps else "",
+            all_timestamps_str=", ".join(timestamps),
+        ))
+    return result
 
 _SCROLL_TO_MARK = (
     "setTimeout(() => {"
@@ -972,9 +991,9 @@ class InterviewStateMixin(rx.State, mixin=True):
             ).first()
         if fb:
             self.interview_detail_coach_score = fb.score
-            self.interview_detail_coach_keep = json.loads(fb.keep_doing) if fb.keep_doing else []
-            self.interview_detail_coach_stop = json.loads(fb.stop_doing) if fb.stop_doing else []
-            self.interview_detail_coach_start = json.loads(fb.start_doing) if fb.start_doing else []
+            self.interview_detail_coach_keep = _parse_coach_items(json.loads(fb.keep_doing) if fb.keep_doing else [])
+            self.interview_detail_coach_stop = _parse_coach_items(json.loads(fb.stop_doing) if fb.stop_doing else [])
+            self.interview_detail_coach_start = _parse_coach_items(json.loads(fb.start_doing) if fb.start_doing else [])
             self.interview_detail_coach_trend = fb.trend_analysis or ""
         else:
             self.interview_detail_coach_score = 0
@@ -1040,9 +1059,9 @@ class InterviewStateMixin(rx.State, mixin=True):
 
             # Reload coach fields into detail state
             self.interview_detail_coach_score = coach.get("score", 0)
-            self.interview_detail_coach_keep = coach.get("keep_doing", [])
-            self.interview_detail_coach_stop = coach.get("stop_doing", [])
-            self.interview_detail_coach_start = coach.get("start_doing", [])
+            self.interview_detail_coach_keep = _parse_coach_items(coach.get("keep_doing", []))
+            self.interview_detail_coach_stop = _parse_coach_items(coach.get("stop_doing", []))
+            self.interview_detail_coach_start = _parse_coach_items(coach.get("start_doing", []))
             self.interview_detail_coach_trend = coach.get("trend_analysis", "")
 
         except Exception as e:
