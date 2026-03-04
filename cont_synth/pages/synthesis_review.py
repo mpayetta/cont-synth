@@ -2,6 +2,139 @@ import reflex as rx
 from cont_synth.state import State, PendingOppItem, PendingParticipantItem
 
 
+def _coach_feedback_item(text: str) -> rx.Component:
+    return rx.text("· ", text, size="2", color="var(--gray-12)")
+
+
+def _render_coach_panel() -> rx.Component:
+    """Coach's Corner card shown below the opportunity list during synthesis review."""
+    score_color = rx.cond(
+        State.pending_coach_score >= 8,
+        "green",
+        rx.cond(State.pending_coach_score >= 5, "amber", "red"),
+    )
+    return rx.cond(
+        State.pending_coach_score > 0,
+        rx.vstack(
+            # Header row
+            rx.hstack(
+                rx.icon("graduation-cap", size=16, color="var(--gray-12)"),
+                rx.text(
+                    "Coach's Corner",
+                    size="2",
+                    weight="bold",
+                    color="var(--gray-12)",
+                    text_transform="uppercase",
+                    letter_spacing="0.05em",
+                ),
+                rx.spacer(),
+                rx.badge(
+                    "Score: ",
+                    State.pending_coach_score.to_string(),
+                    "/10",
+                    color_scheme=score_color,
+                    size="2",
+                ),
+                align="center",
+                width="100%",
+                spacing="2",
+            ),
+            # Keep Doing
+            rx.cond(
+                State.pending_coach_keep.length() > 0,
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("check-circle", size=13, color="var(--green-9)"),
+                        rx.text(
+                            "Keep Doing",
+                            size="1",
+                            weight="bold",
+                            color="var(--green-9)",
+                            text_transform="uppercase",
+                            letter_spacing="0.05em",
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.foreach(State.pending_coach_keep, _coach_feedback_item),
+                    spacing="1",
+                    align_items="start",
+                    width="100%",
+                    padding="10px 12px",
+                    background_color="var(--green-2)",
+                    border_radius="6px",
+                    border="1px solid var(--green-5)",
+                ),
+                rx.fragment(),
+            ),
+            # Stop Doing
+            rx.cond(
+                State.pending_coach_stop.length() > 0,
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("x-circle", size=13, color="var(--red-9)"),
+                        rx.text(
+                            "Stop Doing",
+                            size="1",
+                            weight="bold",
+                            color="var(--red-9)",
+                            text_transform="uppercase",
+                            letter_spacing="0.05em",
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.foreach(State.pending_coach_stop, _coach_feedback_item),
+                    spacing="1",
+                    align_items="start",
+                    width="100%",
+                    padding="10px 12px",
+                    background_color="var(--red-2)",
+                    border_radius="6px",
+                    border="1px solid var(--red-5)",
+                ),
+                rx.fragment(),
+            ),
+            # Start Doing
+            rx.cond(
+                State.pending_coach_start.length() > 0,
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("lightbulb", size=13, color="var(--blue-9)"),
+                        rx.text(
+                            "Start Doing",
+                            size="1",
+                            weight="bold",
+                            color="var(--blue-9)",
+                            text_transform="uppercase",
+                            letter_spacing="0.05em",
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.foreach(State.pending_coach_start, _coach_feedback_item),
+                    spacing="1",
+                    align_items="start",
+                    width="100%",
+                    padding="10px 12px",
+                    background_color="var(--blue-2)",
+                    border_radius="6px",
+                    border="1px solid var(--blue-5)",
+                ),
+                rx.fragment(),
+            ),
+            spacing="3",
+            padding="16px",
+            background_color="var(--gray-2)",
+            border_radius="10px",
+            border="1px solid var(--gray-5)",
+            align_items="stretch",
+            width="100%",
+        ),
+        rx.fragment(),
+    )
+
+
 def _render_participant_role(item: PendingParticipantItem) -> rx.Component:
     """One participant chip with Customer / Team toggle buttons."""
     return rx.hstack(
@@ -338,6 +471,8 @@ def render_synthesis_review() -> rx.Component:
                     align_items="stretch",
                     width="100%",
                 ),
+                # Coach's Corner (shown when coach feedback was generated)
+                _render_coach_panel(),
                 spacing="3",
                 width="400px",
                 min_width="320px",

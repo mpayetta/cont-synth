@@ -1,13 +1,16 @@
+import json
+from collections import Counter
 import reflex as rx
 from datetime import date, timedelta
 from sqlmodel import select
-from .core import LlmUsageItem, ProductItem, DashboardBarItem, RecentInterviewItem
+from .core import LlmUsageItem, ProductItem, DashboardBarItem, RecentInterviewItem, CoachFreqItem
 from ..models import (
     Product,
     LlmUsageLog,
     Opportunity,
     Outcome,
     Interview,
+    InterviewFeedback,
     Solution,
     Experiment,
     Persona,
@@ -36,6 +39,7 @@ _URL_MAP: dict[str, str] = {
     "llm_usage": "/llm-usage",
     "participants": "/participants",
     "account": "/account",
+    "coach": "/coach",
 }
 
 
@@ -107,6 +111,8 @@ class NavigationStateMixin(rx.State, mixin=True):
                 self._prefill_account_settings()
         elif self.current_view == "participants":
             self.load_participants()
+        elif self.current_view == "coach":
+            self.load_coach_data()
         elif self.current_view == "interview_detail":
             self.load_interview_detail_data()
         elif self.current_view == "opportunity":
@@ -125,6 +131,45 @@ class NavigationStateMixin(rx.State, mixin=True):
             self.selected_solution_for_experiment = ""
             self.is_editing_opp_detail = False
             self.editing_solution_id = -1
+
+    def load_coach_data(self):
+        """Loads all InterviewFeedback records for the coaching dashboard."""
+        prod_id = int(self.active_product_id)
+        with rx.session() as session:
+            interviews = session.exec(
+                select(Interview)
+                .where(Interview.product_id == prod_id)
+                .order_by(Interview.date_logged.asc())
+            ).all()
+
+            score_history: list[dict] = []
+            all_stop: list[str] = []
+            all_keep: list[str] = []
+
+            for inv in interviews:
+                fb = session.exec(
+                    select(InterviewFeedback).where(InterviewFeedback.interview_id == inv.id)
+                ).first()
+                if fb:
+                    date_str = inv.interview_date or inv.date_logged.strftime("%Y-%m-%d")
+                    score_history.append({
+                        "date": date_str,
+                        "score": fb.score,
+                        "interview_id": inv.id,
+                    })
+                    all_stop.extend(json.loads(fb.stop_doing) if fb.stop_doing else [])
+                    all_keep.extend(json.loads(fb.keep_doing) if fb.keep_doing else [])
+
+        self.coach_score_history = score_history
+
+        stop_counts = Counter(all_stop)
+        keep_counts = Counter(all_keep)
+        self.coach_top_stop_doing = [
+            CoachFreqItem(text=t, count=c) for t, c in stop_counts.most_common(5)
+        ]
+        self.coach_top_keep_doing = [
+            CoachFreqItem(text=t, count=c) for t, c in keep_counts.most_common(5)
+        ]
 
     def load_dashboard(self):
         """Loads all data needed for the home dashboard."""

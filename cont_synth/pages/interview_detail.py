@@ -2,6 +2,169 @@ import reflex as rx
 from cont_synth.state import State, DetailParticipantItem
 
 
+def _coach_item(text: str) -> rx.Component:
+    return rx.text("· ", text, size="2", color="var(--gray-12)")
+
+
+def _coach_corner() -> rx.Component:
+    """Coach feedback card shown below the evidence panel in the interview detail view."""
+    return rx.cond(
+        State.interview_detail_coach_score > 0,
+        rx.vstack(
+            # Header
+            rx.hstack(
+                rx.icon("graduation-cap", size=16, color="var(--gray-12)"),
+                rx.text(
+                    "Coach's Corner",
+                    size="2",
+                    weight="bold",
+                    color="var(--gray-12)",
+                    text_transform="uppercase",
+                    letter_spacing="0.05em",
+                ),
+                align="center",
+                width="100%",
+                spacing="2",
+            ),
+            # Keep Doing
+            rx.cond(
+                State.interview_detail_coach_keep.length() > 0,
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("check-circle", size=13, color="var(--green-9)"),
+                        rx.text(
+                            "Keep Doing",
+                            size="1",
+                            weight="bold",
+                            color="var(--green-9)",
+                            text_transform="uppercase",
+                            letter_spacing="0.05em",
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.foreach(State.interview_detail_coach_keep, _coach_item),
+                    spacing="1",
+                    align_items="start",
+                    width="100%",
+                    padding="10px 12px",
+                    background_color="var(--green-2)",
+                    border_radius="6px",
+                    border="1px solid var(--green-5)",
+                ),
+                rx.fragment(),
+            ),
+            # Stop Doing
+            rx.cond(
+                State.interview_detail_coach_stop.length() > 0,
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("x-circle", size=13, color="var(--red-9)"),
+                        rx.text(
+                            "Stop Doing",
+                            size="1",
+                            weight="bold",
+                            color="var(--red-9)",
+                            text_transform="uppercase",
+                            letter_spacing="0.05em",
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.foreach(State.interview_detail_coach_stop, _coach_item),
+                    spacing="1",
+                    align_items="start",
+                    width="100%",
+                    padding="10px 12px",
+                    background_color="var(--red-2)",
+                    border_radius="6px",
+                    border="1px solid var(--red-5)",
+                ),
+                rx.fragment(),
+            ),
+            # Start Doing
+            rx.cond(
+                State.interview_detail_coach_start.length() > 0,
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("lightbulb", size=13, color="var(--blue-9)"),
+                        rx.text(
+                            "Start Doing",
+                            size="1",
+                            weight="bold",
+                            color="var(--blue-9)",
+                            text_transform="uppercase",
+                            letter_spacing="0.05em",
+                        ),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.foreach(State.interview_detail_coach_start, _coach_item),
+                    spacing="1",
+                    align_items="start",
+                    width="100%",
+                    padding="10px 12px",
+                    background_color="var(--blue-2)",
+                    border_radius="6px",
+                    border="1px solid var(--blue-5)",
+                ),
+                rx.fragment(),
+            ),
+            spacing="3",
+            padding="16px",
+            background_color="var(--gray-2)",
+            border_radius="10px",
+            border="1px solid var(--gray-5)",
+            align_items="stretch",
+            width="100%",
+        ),
+        # No feedback yet — show generate button
+        rx.vstack(
+            rx.hstack(
+                rx.icon("graduation-cap", size=16, color="var(--gray-12)"),
+                rx.text(
+                    "Coach's Corner",
+                    size="2",
+                    weight="bold",
+                    color="var(--gray-12)",
+                    text_transform="uppercase",
+                    letter_spacing="0.05em",
+                ),
+                align="center",
+                spacing="2",
+                width="100%",
+            ),
+            rx.text(
+                "No coaching analysis for this interview yet.",
+                size="2",
+                color="var(--gray-10)",
+            ),
+            rx.button(
+                rx.icon("sparkles", size=14),
+                rx.cond(
+                    State.is_generating_coach,
+                    "Generating...",
+                    "Generate Coach Feedback",
+                ),
+                color_scheme="blue",
+                variant="soft",
+                size="2",
+                width="100%",
+                on_click=State.generate_coach_feedback,
+                loading=State.is_generating_coach,
+                disabled=State.is_generating_coach,
+            ),
+            spacing="3",
+            padding="16px",
+            background_color="var(--gray-2)",
+            border_radius="10px",
+            border="1px solid var(--gray-5)",
+            align_items="stretch",
+            width="100%",
+        ),
+    )
+
+
 def _detail_participant_chip(item: DetailParticipantItem) -> rx.Component:
     """Read-only participant chip showing their role badge."""
     return rx.hstack(
@@ -297,12 +460,30 @@ def render_interview_detail() -> rx.Component:
                 size="2",
             ),
             rx.spacer(),
-            rx.badge(
-                "Quality: ",
-                State.interview_detail_quality.to_string(),
-                "/10",
-                color_scheme="blue",
-                size="2",
+            rx.cond(
+                State.interview_detail_coach_score > 0,
+                rx.badge(
+                    "Score: ",
+                    State.interview_detail_coach_score.to_string(),
+                    "/10",
+                    color_scheme=rx.cond(
+                        State.interview_detail_coach_score >= 8,
+                        "green",
+                        rx.cond(State.interview_detail_coach_score >= 5, "amber", "red"),
+                    ),
+                    size="2",
+                ),
+                rx.cond(
+                    State.interview_detail_quality > 0,
+                    rx.badge(
+                        "Quality: ",
+                        State.interview_detail_quality.to_string(),
+                        "/10",
+                        color_scheme="blue",
+                        size="2",
+                    ),
+                    rx.fragment(),
+                ),
             ),
             align="center",
             spacing="2",
@@ -344,8 +525,16 @@ def render_interview_detail() -> rx.Component:
                 align_items="stretch",
                 min_width="0",
             ),
-            # ── Right: Evidence panel ─────────────────────────────────────────
-            evidence_panel(),
+            # ── Right: Evidence + Coach panels ────────────────────────────────
+            rx.vstack(
+                evidence_panel(),
+                _coach_corner(),
+                spacing="4",
+                width="100%",
+                min_width="280px",
+                max_width="360px",
+                align_items="stretch",
+            ),
             spacing="5",
             align_items="start",
             width="100%",

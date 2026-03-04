@@ -249,6 +249,19 @@ class PrepExperimentItem(BaseModel):
     selected: bool = False
 
 
+class CoachScorePoint(BaseModel):
+    """One data point in the coach score trend chart."""
+    date: str           # x-axis label, e.g. "2026-02-15"
+    score: int          # y-axis value, 1–10
+    interview_id: int
+
+
+class CoachFreqItem(BaseModel):
+    """An aggregated coaching item with its frequency across interviews."""
+    text: str
+    count: int
+
+
 class PersonaPrep(SQLModel, table=True):
     """Stores the latest generated prep script for a specific persona."""
 
@@ -283,4 +296,6 @@ __all__ = [
     "RecentInterviewItem",
     "PrepOppItem",
     "PrepExperimentItem",
+    "CoachScorePoint",
+    "CoachFreqItem",
 ]

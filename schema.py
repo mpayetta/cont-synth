@@ -30,3 +30,12 @@ class OpportunityMatch(BaseModel):
 
 class DedupeResult(BaseModel):
     matches: List[OpportunityMatch]
+
+
+# For Gemini Flash (Interview Coach)
+class CoachFeedback(BaseModel):
+    score: int
+    keep_doing: List[str]
+    stop_doing: List[str]
+    start_doing: List[str]
+    trend_analysis: str

@@ -132,6 +132,18 @@ class User(rx.Model, table=True):
     gemini_api_key: Optional[str] = Field(default=None)
 
 
+class InterviewFeedback(rx.Model, table=True):
+    """1-to-1 coaching assessment linked to an Interview."""
+
+    interview_id: int = Field(foreign_key="interview.id", unique=True, index=True)
+    score: int  # 1–10
+    keep_doing: str = ""  # JSON list of strings
+    stop_doing: str = ""  # JSON list of strings
+    start_doing: str = ""  # JSON list of strings
+    trend_analysis: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class LlmUsageLog(rx.Model, table=True):
     """One row per LLM API call, capturing token usage for cost tracking."""
 

@@ -12,6 +12,7 @@ from sqlmodel import select
 from ..models import (
     Persona,
     Interview,
+    InterviewFeedback,
     Opportunity,
     InterviewOpportunityLink,
     LlmUsageLog,
@@ -65,6 +66,31 @@ class InterviewStateMixin(rx.State, mixin=True):
     def _persona_color(self, name: str) -> str:
         idx = sum(ord(c) for c in name) % len(self._PERSONA_COLORS)
         return self._PERSONA_COLORS[idx]
+
+    def _get_coach_history_context(self, product_id: int) -> str:
+        """Fetch the last 3 InterviewFeedback records for coaching history context."""
+        with rx.session() as session:
+            past_interviews = session.exec(
+                select(Interview)
+                .where(Interview.product_id == product_id)
+                .order_by(Interview.date_logged.desc())
+                .limit(3)
+            ).all()
+            history = []
+            for inv in reversed(past_interviews):  # chronological order
+                fb = session.exec(
+                    select(InterviewFeedback).where(InterviewFeedback.interview_id == inv.id)
+                ).first()
+                if fb:
+                    history.append({
+                        "date": inv.date_logged.strftime("%Y-%m-%d"),
+                        "score": fb.score,
+                        "keep_doing": json.loads(fb.keep_doing) if fb.keep_doing else [],
+                        "stop_doing": json.loads(fb.stop_doing) if fb.stop_doing else [],
+                    })
+        if not history:
+            return "No previous coaching history available."
+        return json.dumps(history, indent=2)
 
     def load_history(self):
         """Loads all past interviews for the management tab."""
@@ -296,6 +322,40 @@ class InterviewStateMixin(rx.State, mixin=True):
                     )
                 )
 
+            # --- Coach feedback (flash model, gracefully degrades on failure) ---
+            try:
+                history_ctx = self._get_coach_history_context(int(self.active_product_id))
+                coach_prompt = load_prompt("coach.txt").format(
+                    history_context=history_ctx,
+                    transcript=self.transcript_text,
+                )
+                coach_resp = flash_model.generate_content(
+                    coach_prompt,
+                    generation_config=genai.GenerationConfig(
+                        response_mime_type="application/json",
+                    ),
+                )
+                coach = json.loads(coach_resp.text)
+                pending_usages.append(PendingLlmUsage(
+                    model_name="gemini-2.5-flash",
+                    operation="coach",
+                    prompt_tokens=coach_resp.usage_metadata.prompt_token_count,
+                    output_tokens=coach_resp.usage_metadata.candidates_token_count,
+                    total_tokens=coach_resp.usage_metadata.total_token_count,
+                ))
+                self.pending_coach_score = coach.get("score", 0)
+                self.pending_coach_keep = coach.get("keep_doing", [])
+                self.pending_coach_stop = coach.get("stop_doing", [])
+                self.pending_coach_start = coach.get("start_doing", [])
+                self.pending_coach_trend = coach.get("trend_analysis", "")
+            except Exception as coach_err:
+                print(f"Coach feedback generation failed (non-fatal): {coach_err}")
+                self.pending_coach_score = 0
+                self.pending_coach_keep = []
+                self.pending_coach_stop = []
+                self.pending_coach_start = []
+                self.pending_coach_trend = ""
+
             # Store pending synthesis state
             self.pending_synthesis_transcript = self.transcript_text
             self.pending_synthesis_persona = self.persona_input
@@ -454,6 +514,11 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.pending_synthesis_interview_date = ""
         self.pending_synthesis_participants = []
         self.pending_synthesis_participant_roles = []
+        self.pending_coach_score = 0
+        self.pending_coach_keep = []
+        self.pending_coach_stop = []
+        self.pending_coach_start = []
+        self.pending_coach_trend = ""
         return rx.redirect("/synthesize")
 
     def confirm_synthesis(self):
@@ -499,7 +564,19 @@ class InterviewStateMixin(rx.State, mixin=True):
                 ))
             session.commit()
 
-            # 3.5 Auto-create/link Participant records from LLM-extracted names
+            # 3.5 Save coach feedback
+            if self.pending_coach_score > 0:
+                session.add(InterviewFeedback(
+                    interview_id=interview.id,
+                    score=self.pending_coach_score,
+                    keep_doing=json.dumps(self.pending_coach_keep),
+                    stop_doing=json.dumps(self.pending_coach_stop),
+                    start_doing=json.dumps(self.pending_coach_start),
+                    trend_analysis=self.pending_coach_trend,
+                ))
+                session.commit()
+
+            # 4. Auto-create/link Participant records from LLM-extracted names
             roles = self.pending_synthesis_participant_roles
             for i, raw_name in enumerate(self.pending_synthesis_participants):
                 name = raw_name.strip()
@@ -887,6 +964,92 @@ class InterviewStateMixin(rx.State, mixin=True):
         self.interview_detail_participants = participants_str
         self.interview_detail_participant_items = participant_items
         self.interview_detail_quality = interview.quality_score
+
+        # Load coach feedback
+        with rx.session() as fb_session:
+            fb = fb_session.exec(
+                select(InterviewFeedback).where(InterviewFeedback.interview_id == interview_id)
+            ).first()
+        if fb:
+            self.interview_detail_coach_score = fb.score
+            self.interview_detail_coach_keep = json.loads(fb.keep_doing) if fb.keep_doing else []
+            self.interview_detail_coach_stop = json.loads(fb.stop_doing) if fb.stop_doing else []
+            self.interview_detail_coach_start = json.loads(fb.start_doing) if fb.start_doing else []
+            self.interview_detail_coach_trend = fb.trend_analysis or ""
+        else:
+            self.interview_detail_coach_score = 0
+            self.interview_detail_coach_keep = []
+            self.interview_detail_coach_stop = []
+            self.interview_detail_coach_start = []
+            self.interview_detail_coach_trend = ""
+
+    async def generate_coach_feedback(self):
+        """Generate (or regenerate) coach feedback for the currently viewed interview."""
+        interview_id = self.selected_interview_id
+        transcript = self.interview_detail_transcript
+        if not transcript or not interview_id:
+            return
+
+        self.is_generating_coach = True
+        yield
+
+        try:
+            history_ctx = self._get_coach_history_context(int(self.active_product_id))
+            coach_prompt = load_prompt("coach.txt").format(
+                history_context=history_ctx,
+                transcript=transcript,
+            )
+            coach_resp = flash_model.generate_content(
+                coach_prompt,
+                generation_config=genai.GenerationConfig(
+                    response_mime_type="application/json",
+                ),
+            )
+            coach = json.loads(coach_resp.text)
+
+            with rx.session() as session:
+                # Upsert: update existing record if it exists
+                existing = session.exec(
+                    select(InterviewFeedback).where(InterviewFeedback.interview_id == interview_id)
+                ).first()
+                if existing:
+                    existing.score = coach.get("score", 0)
+                    existing.keep_doing = json.dumps(coach.get("keep_doing", []))
+                    existing.stop_doing = json.dumps(coach.get("stop_doing", []))
+                    existing.start_doing = json.dumps(coach.get("start_doing", []))
+                    existing.trend_analysis = coach.get("trend_analysis", "")
+                    session.add(existing)
+                else:
+                    session.add(InterviewFeedback(
+                        interview_id=interview_id,
+                        score=coach.get("score", 0),
+                        keep_doing=json.dumps(coach.get("keep_doing", [])),
+                        stop_doing=json.dumps(coach.get("stop_doing", [])),
+                        start_doing=json.dumps(coach.get("start_doing", [])),
+                        trend_analysis=coach.get("trend_analysis", ""),
+                    ))
+                session.add(LlmUsageLog(
+                    model_name="gemini-2.5-flash",
+                    operation="coach",
+                    interview_id=interview_id,
+                    prompt_tokens=coach_resp.usage_metadata.prompt_token_count,
+                    output_tokens=coach_resp.usage_metadata.candidates_token_count,
+                    total_tokens=coach_resp.usage_metadata.total_token_count,
+                ))
+                session.commit()
+
+            # Reload coach fields into detail state
+            self.interview_detail_coach_score = coach.get("score", 0)
+            self.interview_detail_coach_keep = coach.get("keep_doing", [])
+            self.interview_detail_coach_stop = coach.get("stop_doing", [])
+            self.interview_detail_coach_start = coach.get("start_doing", [])
+            self.interview_detail_coach_trend = coach.get("trend_analysis", "")
+
+        except Exception as e:
+            print(f"generate_coach_feedback failed: {e}")
+            yield rx.window_alert(f"Coach feedback generation failed: {e}")
+        finally:
+            self.is_generating_coach = False
 
     async def next_quote(self):
         if self.active_quote_index < len(self.interview_detail_quotes) - 1:

@@ -14,6 +14,7 @@ from .pages.llm_usage import render_llm_usage
 from .pages.participants import render_participants
 from .pages.login import login_page
 from .pages.account import render_account
+from .pages.coach import render_coach
 
 
 # --- SIDEBAR COMPONENT ---
@@ -25,6 +26,8 @@ def sidebar_item(text: str, icon: str, view_name: str) -> rx.Component:
         is_active = (State.current_view == "synthesize") | (State.current_view == "synthesis_review")
     elif view_name == "logs":
         is_active = (State.current_view == "logs") | (State.current_view == "interview_detail")
+    elif view_name == "coach":
+        is_active = State.current_view == "coach"
     else:
         is_active = State.current_view == view_name
     return rx.hstack(
@@ -302,6 +305,7 @@ def sidebar() -> rx.Component:
         sidebar_item("Opportunities", "table", "ledger"),
         sidebar_item("Pre-Meeting Prep", "target", "prep"),
         sidebar_item("Interviews", "archive", "logs"),
+        sidebar_item("Interview Coach", "graduation-cap", "coach"),
         sidebar_item("Participants", "users", "participants"),
         # Push workspace section to the bottom
         rx.spacer(),
@@ -386,6 +390,10 @@ def account_page() -> rx.Component:
     return _page_layout(render_account(), State.load_account_page)
 
 
+def coach_page() -> rx.Component:
+    return _page_layout(render_coach(), State.load_coach_page)
+
+
 def login_route() -> rx.Component:
     return rx.box(login_page(), on_mount=State.load_app)
 
@@ -403,4 +411,5 @@ app.add_page(prep_page, route="/prep")
 app.add_page(participants_page, route="/participants")
 app.add_page(llm_usage_page, route="/llm-usage")
 app.add_page(account_page, route="/account")
+app.add_page(coach_page, route="/coach")
 app.add_page(login_route, route="/login")

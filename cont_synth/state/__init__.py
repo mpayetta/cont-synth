@@ -27,6 +27,7 @@ from .core import (
     RecentInterviewItem,
     PrepOppItem,
     PrepExperimentItem,
+    CoachFreqItem,
     configure_genai,
 )
 from .auth import _hash_password, _verify_password
@@ -38,6 +39,7 @@ from ..models import (
     OutcomeOpportunityLink,
     LlmUsageLog,
     Interview,
+    InterviewFeedback,
     Solution,
     Opportunity,
     Outcome,
@@ -280,6 +282,13 @@ class State(
     interview_detail_participants: str = ""  # comma-joined display string
     interview_detail_participant_items: list[DetailParticipantItem] = []
     interview_detail_quality: int = 0
+    # Coach feedback (loaded from DB on interview detail page)
+    interview_detail_coach_score: int = 0
+    interview_detail_coach_keep: list[str] = []
+    interview_detail_coach_stop: list[str] = []
+    interview_detail_coach_start: list[str] = []
+    interview_detail_coach_trend: str = ""
+    is_generating_coach: bool = False
 
     # --- Pending synthesis (confirmation step) ---
     pending_synthesis_transcript: str = ""
@@ -295,6 +304,13 @@ class State(
     pending_synthesis_participants: list[str] = []
     # Parallel list of roles for each participant ("interviewee" or "interviewer")
     pending_synthesis_participant_roles: list[str] = []
+
+    # --- Pending coach feedback (held until confirm_synthesis writes to DB) ---
+    pending_coach_score: int = 0
+    pending_coach_keep: list[str] = []
+    pending_coach_stop: list[str] = []
+    pending_coach_start: list[str] = []
+    pending_coach_trend: str = ""
 
     # --- Shared highlight state (synthesis review + interview detail) ---
     highlighted_quote_text: str = ""
@@ -358,6 +374,11 @@ class State(
     dashboard_solutions_testing: int = 0
     dashboard_total_opps: int = 0
     dashboard_recent_interviews: list[RecentInterviewItem] = []
+
+    # --- Coach dashboard ---
+    coach_score_history: list[dict] = []
+    coach_top_stop_doing: list[CoachFreqItem] = []
+    coach_top_keep_doing: list[CoachFreqItem] = []
 
     @rx.var
     def active_product_name(self) -> str:
@@ -491,6 +512,11 @@ class State(
         self.account_section = "settings"
         return self._ensure_auth_and_load()
 
+    def load_coach_page(self):
+        """On-mount handler for the /coach page."""
+        self.current_view = "coach"
+        return self._ensure_auth_and_load()
+
     def _prefill_account_settings(self):
         """Pre-fill account settings form fields from the current user record."""
         with rx.session() as session:
@@ -567,6 +593,8 @@ class State(
             for row in session.exec(select(OutcomeOpportunityLink)).all():
                 session.delete(row)
             for row in session.exec(select(LlmUsageLog)).all():
+                session.delete(row)
+            for row in session.exec(select(InterviewFeedback)).all():
                 session.delete(row)
             for row in session.exec(select(PersonaPrep)).all():  # PersonaPrep is from .core
                 session.delete(row)
