@@ -85,7 +85,6 @@ def render_prep() -> rx.Component:
         rx.vstack(
             rx.hstack(
                 rx.text("Opportunities to explore", weight="medium", size="3"),
-                rx.badge("Required for OST guide", color_scheme="blue", variant="soft", size="1"),
                 spacing="2",
                 align="center",
             ),
