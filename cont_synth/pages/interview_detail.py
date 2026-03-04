@@ -29,12 +29,12 @@ def _coach_corner() -> rx.Component:
     """Coach feedback card shown below the evidence panel in the interview detail view."""
     # Shared title row — sits outside the card like the Evidence header
     title = rx.hstack(
-        rx.icon("graduation-cap", size=16, color="#8338EC"),
+        rx.icon("graduation-cap", size=16, color="var(--gray-12)",),
         rx.text(
             "Coach's Corner",
             size="2",
             weight="bold",
-            color="#8338EC",
+            color="var(--gray-12)",
             text_transform="uppercase",
             letter_spacing="0.05em",
         ),
@@ -53,12 +53,12 @@ def _coach_corner() -> rx.Component:
                     State.interview_detail_coach_keep.length() > 0,
                     rx.vstack(
                         rx.hstack(
-                            rx.icon("check-circle", size=13, color="#06D6A0"),
+                            rx.icon("check-circle", size=13, color="#30A46C"),
                             rx.text(
                                 "Keep Doing",
                                 size="1",
                                 weight="bold",
-                                color="#06D6A0",
+                                color="#30A46C",
                                 text_transform="uppercase",
                                 letter_spacing="0.05em",
                             ),
@@ -81,12 +81,12 @@ def _coach_corner() -> rx.Component:
                     State.interview_detail_coach_stop.length() > 0,
                     rx.vstack(
                         rx.hstack(
-                            rx.icon("x-circle", size=13, color="#EF476F"),
+                            rx.icon("x-circle", size=13, color="#E5484D"),
                             rx.text(
                                 "Stop Doing",
                                 size="1",
                                 weight="bold",
-                                color="#EF476F",
+                                color="#E5484D",
                                 text_transform="uppercase",
                                 letter_spacing="0.05em",
                             ),
@@ -134,11 +134,11 @@ def _coach_corner() -> rx.Component:
                 ),
                 spacing="3",
                 padding="16px",
-                background_color="rgba(131, 56, 236, 0.04)",
                 border_radius="10px",
-                border="1px solid rgba(131, 56, 236, 0.2)",
                 align_items="stretch",
                 width="100%",
+                background_color="var(--gray-2)",
+
             ),
             spacing="3",
             align_items="stretch",
@@ -189,7 +189,7 @@ def _detail_participant_chip(item: DetailParticipantItem) -> rx.Component:
         rx.text(item.name, size="2", weight="medium", color="var(--gray-12)"),
         rx.cond(
             item.is_team_member,
-            rx.badge("Team", color_scheme="orange", variant="soft", size="1"),
+            rx.badge("Team", color_scheme="amber", variant="soft", size="1"),
             rx.badge("Customer", color_scheme="blue", variant="soft", size="1"),
         ),
         spacing="2",
@@ -446,7 +446,6 @@ def evidence_panel() -> rx.Component:
             padding="20px",
             background_color="var(--gray-2)",
             border_radius="10px",
-            border="1px solid var(--gray-5)",
             align_items="stretch",
         ),
         spacing="3",

@@ -31,13 +31,13 @@ def sidebar_item(text: str, icon: str, view_name: str) -> rx.Component:
         rx.icon(
             icon,
             size=17,
-            color=rx.cond(is_active, "#118AB2", "var(--gray-9)"),
+            color=rx.cond(is_active, "var(--blue-9)", "var(--gray-9)"),
         ),
         rx.text(
             text,
             size="3",
             weight=rx.cond(is_active, "medium", "regular"),
-            color=rx.cond(is_active, "#118AB2", "var(--gray-11)"),
+            color=rx.cond(is_active, "var(--blue-9)", "var(--gray-11)"),
         ),
         spacing="3",
         align="center",
@@ -295,11 +295,11 @@ def sidebar() -> rx.Component:
             rx.hstack(
                 rx.icon("triangle", size=28, color="#ffffff"),
                 rx.hstack(
-                    rx.text("P", color="#EF476F", weight="bold", size="6"),
-                    rx.text("R", color="#F78C6B", weight="bold", size="6"),
-                    rx.text("I", color="#06D6A0", weight="bold", size="6"),
-                    rx.text("S", color="#118AB2", weight="bold", size="6"),
-                    rx.text("M", color="#8338EC", weight="bold", size="6"),
+                    rx.text("P", color="#E5484D", weight="bold", size="6"),
+                    rx.text("R", color="#FFC53D", weight="bold", size="6"),
+                    rx.text("I", color="#30A46C", weight="bold", size="6"),
+                    rx.text("S", color="#0090FF", weight="bold", size="6"),
+                    rx.text("M", color="#6E56CF", weight="bold", size="6"),
                     spacing="1",
                 ),
                 spacing="2",

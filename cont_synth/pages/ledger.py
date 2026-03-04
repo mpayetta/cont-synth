@@ -218,21 +218,25 @@ def show_ledger_row(item: LedgerItem):
             rx.cond(item.status_color == "yellow", "4px solid var(--amber-6)", "4px solid var(--red-6)"),
         ),
         border_radius="8px",
-        background_color=rx.cond(
+        # background_color=rx.cond(
+        #     item.priority_score >= 11,
+        #     "var(--amber-1)",
+        #     rx.cond(
+        #         item.priority_score >= 6,
+        #         "var(--blue-1)",
+        #         rx.cond(item.indent_level > 0, "var(--gray-2)", "var(--gray-1)"),
+        #     ),
+        # ),
+        border=rx.cond(
             item.priority_score >= 11,
-            "var(--amber-1)",
+            "1px solid var(--amber-7)",
             rx.cond(
                 item.priority_score >= 6,
-                "var(--blue-1)",
-                rx.cond(item.indent_level > 0, "var(--gray-2)", "var(--gray-1)"),
+                "1px solid var(--blue-7)",
+                rx.cond(item.indent_level > 0, "1px solid var(--gray-7)", "1px solid var(--gray-5)"),
             ),
         ),
-        border="1px solid var(--gray-4)",
         width="100%",
-        _hover={
-            "background_color": "var(--blue-1)",
-            "border_color": "var(--blue-5)",
-        },
         transition="background-color 0.1s ease, border-color 0.1s ease",
     ),
     padding_left=f"calc({item.indent_level} * 28px)",
@@ -627,7 +631,7 @@ def _merge_dialog() -> rx.Component:
                         "SOURCE (will be deleted)",
                         size="1",
                         weight="bold",
-                        color="#EF476F",
+                        color="#E5484D",
                         letter_spacing="0.05em",
                     ),
                     rx.box(

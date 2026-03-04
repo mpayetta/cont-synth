@@ -12,13 +12,13 @@ def _nav_item(label: str, icon: str, section: str) -> rx.Component:
         rx.icon(
             icon,
             size=15,
-            color=rx.cond(is_active, "#118AB2", "var(--gray-12)"),
+            color=rx.cond(is_active, "var(--blue-9)", "var(--gray-12)"),
         ),
         rx.text(
             label,
             size="2",
             weight=rx.cond(is_active, "medium", "regular"),
-            color=rx.cond(is_active, "#118AB2", "var(--gray-12)"),
+            color=rx.cond(is_active, "var(--blue-9)", "var(--gray-12)"),
         ),
         spacing="3",
         align="center",
@@ -364,7 +364,7 @@ def _llm_usage_view() -> rx.Component:
 
 def _danger_zone_view() -> rx.Component:
     return rx.vstack(
-        rx.text("Danger Zone", size="5", weight="bold", color="#EF476F"),
+        rx.text("Danger Zone", size="5", weight="bold", color="#E5484D"),
         rx.box(
             rx.vstack(
                 rx.hstack(

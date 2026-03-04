@@ -121,7 +121,7 @@ def _coach_tab() -> rx.Component:
                 rx.recharts.line_chart(
                     rx.recharts.line(
                         data_key="score",
-                        stroke="#06D6A0",
+                        stroke="#30A46C",
                         dot=True,
                         type_="monotone",
                         stroke_width=2,
@@ -147,7 +147,7 @@ def _coach_tab() -> rx.Component:
         rx.hstack(
             rx.vstack(
                 rx.hstack(
-                    rx.icon("check-circle", size=16, color="#06D6A0"),
+                    rx.icon("check-circle", size=16, color="#30A46C"),
                     rx.text("Top Keep Doing", size="3", weight="bold", color="var(--gray-12)"),
                     rx.text(
                         "· most frequent strengths",
@@ -182,7 +182,7 @@ def _coach_tab() -> rx.Component:
             ),
             rx.vstack(
                 rx.hstack(
-                    rx.icon("x-circle", size=16, color="#EF476F"),
+                    rx.icon("x-circle", size=16, color="#E5484D"),
                     rx.text("Top Stop Doing", size="3", weight="bold", color="var(--gray-12)"),
                     rx.text(
                         "· most frequent bad habits",

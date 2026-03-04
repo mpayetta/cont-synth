@@ -13,12 +13,12 @@ def _render_coach_panel() -> rx.Component:
         rx.vstack(
             # Header row
             rx.hstack(
-                rx.icon("graduation-cap", size=16, color="#8338EC"),
+                rx.icon("graduation-cap", size=16, color="#6E56CF"),
                 rx.text(
                     "Coach's Corner",
                     size="2",
                     weight="bold",
-                    color="#8338EC",
+                    color="#6E56CF",
                     text_transform="uppercase",
                     letter_spacing="0.05em",
                 ),
@@ -31,12 +31,12 @@ def _render_coach_panel() -> rx.Component:
                 State.pending_coach_keep.length() > 0,
                 rx.vstack(
                     rx.hstack(
-                        rx.icon("check-circle", size=13, color="#06D6A0"),
+                        rx.icon("check-circle", size=13, color="#30A46C"),
                         rx.text(
                             "Keep Doing",
                             size="1",
                             weight="bold",
-                            color="#06D6A0",
+                            color="#30A46C",
                             text_transform="uppercase",
                             letter_spacing="0.05em",
                         ),
@@ -59,12 +59,12 @@ def _render_coach_panel() -> rx.Component:
                 State.pending_coach_stop.length() > 0,
                 rx.vstack(
                     rx.hstack(
-                        rx.icon("x-circle", size=13, color="#EF476F"),
+                        rx.icon("x-circle", size=13, color="#E5484D"),
                         rx.text(
                             "Stop Doing",
                             size="1",
                             weight="bold",
-                            color="#EF476F",
+                            color="#E5484D",
                             text_transform="uppercase",
                             letter_spacing="0.05em",
                         ),

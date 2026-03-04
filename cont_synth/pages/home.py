@@ -27,7 +27,7 @@ def _render_bar(item: DashboardBarItem) -> rx.Component:
                 rx.box(
                     width="100%",
                     height=item.height_css,
-                    background_color="#118AB2",
+                    background_color="var(--blue-9)",
                     border_radius="3px 3px 0 0",
                 ),
                 rx.box(
@@ -92,7 +92,7 @@ def _cadence_widget() -> rx.Component:
         rx.vstack(
             # Header
             rx.hstack(
-                rx.icon("calendar-check", size=16, color="#118AB2"),
+                rx.icon("calendar-check", size=16, color="var(--blue-9)"),
                 rx.text("Interview Cadence", weight="bold", size="4"),
                 spacing="2",
                 align="center",
@@ -113,7 +113,7 @@ def _cadence_widget() -> rx.Component:
                                 rx.cond(
                                     State.dashboard_days_since_last <= 14,
                                     "var(--amber-11)",
-                                    "#EF476F",
+                                    "#E5484D",
                                 ),
                             ),
                         ),
@@ -193,9 +193,9 @@ def _experiment_widget() -> rx.Component:
                 rx.text(State.dashboard_exp_draft.to_string(), weight="bold", size="3"),
             ),
             _stat_row(
-                "circle-play", "#118AB2",
+                "circle-play", "var(--blue-9)",
                 "Running",
-                rx.text(State.dashboard_exp_running.to_string(), weight="bold", size="3", color="#118AB2"),
+                rx.text(State.dashboard_exp_running.to_string(), weight="bold", size="3", color="var(--blue-9)"),
             ),
             _stat_row(
                 "circle-check", "var(--gray-12)",
@@ -219,12 +219,12 @@ def _experiment_widget() -> rx.Component:
                             align="center",
                         ),
                         rx.hstack(
-                            rx.icon("x", size=12, color="#EF476F"),
+                            rx.icon("x", size=12, color="#E5484D"),
                             rx.text(
                                 State.dashboard_exp_invalidated.to_string(),
                                 " Invalidated",
                                 size="2",
-                                color="#EF476F",
+                                color="#E5484D",
                             ),
                             spacing="1",
                             align="center",

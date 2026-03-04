@@ -50,8 +50,8 @@ def render_synthesize() -> rx.Component:
         rx.cond(
             State.synthesis_error != "",
             rx.hstack(
-                rx.icon("circle-alert", size=15, color="#EF476F"),
-                rx.text(State.synthesis_error, size="2", color="#EF476F"),
+                rx.icon("circle-alert", size=15, color="#E5484D"),
+                rx.text(State.synthesis_error, size="2", color="#E5484D"),
                 padding="10px 14px",
                 background_color="var(--red-2)",
                 border="1px solid var(--red-6)",
@@ -63,7 +63,7 @@ def render_synthesize() -> rx.Component:
         ),
         rx.button(
             rx.icon("sparkles", size=16),
-            "Run Dual-Engine Synthesis",
+            "Run Synthesis",
             on_click=State.run_synthesis,
             loading=State.is_processing,
             size="4",

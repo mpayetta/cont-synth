@@ -74,12 +74,12 @@ def _render_coach_pregame_brief() -> rx.Component:
         rx.box(
             rx.vstack(
                 rx.hstack(
-                    rx.icon("graduation-cap", size=16, color="#8338EC"),
+                    rx.icon("graduation-cap", size=16, color="#6E56CF"),
                     rx.text(
                         "Coach's Pre-Game Brief",
                         weight="bold",
                         size="3",
-                        color="#8338EC",
+                        color="#6E56CF",
                     ),
                     rx.spacer(),
                     rx.badge(
@@ -103,7 +103,7 @@ def _render_coach_pregame_brief() -> rx.Component:
                         rx.foreach(
                             State.last_stop_doing,
                             lambda item: rx.hstack(
-                                rx.text("•", size="2", color="#8338EC", flex_shrink="0"),
+                                rx.text("•", size="2", color="#6E56CF", flex_shrink="0"),
                                 rx.text(item, size="2", color="var(--gray-12)"),
                                 spacing="2",
                                 align="start",
@@ -312,7 +312,7 @@ def _guide_drawer() -> rx.Component:
                                     rx.box(
                                         rx.vstack(
                                             rx.hstack(
-                                                rx.icon("graduation-cap", size=13, color="#8338EC"),
+                                                rx.icon("graduation-cap", size=13, color="#6E56CF"),
                                                 rx.text(
                                                     f"Last score: {g.input_coach_score}/10",
                                                     size="2",
@@ -329,7 +329,7 @@ def _guide_drawer() -> rx.Component:
                                                     rx.foreach(
                                                         g.input_stop_doing,
                                                         lambda item: rx.hstack(
-                                                            rx.text("•", size="2", color="#8338EC", flex_shrink="0"),
+                                                            rx.text("•", size="2", color="#6E56CF", flex_shrink="0"),
                                                             rx.text(item, size="2", color="var(--gray-12)"),
                                                             spacing="2",
                                                             align="start",
