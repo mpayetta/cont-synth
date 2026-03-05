@@ -607,16 +607,32 @@ class LedgerStateMixin(rx.State, mixin=True):
             self.manual_opp_theme = "Uncategorized"
             self.manual_opp_statement = ""
             self.manual_opp_parent_id = "None"
+            self.manual_opp_outcome_name = "None"
 
     def open_opp_dialog(self):
         self.editing_opp_id = -1
         self.manual_opp_theme = "Uncategorized"
         self.manual_opp_statement = ""
         self.manual_opp_parent_id = "None"
+        self.manual_opp_outcome_name = "None"
         self.is_opp_dialog_open = True
 
     def close_opp_dialog(self):
         self.is_opp_dialog_open = False
+
+    def open_delete_confirm(self, opp_id: int):
+        self.pending_delete_opp_id = opp_id
+        self.is_delete_confirm_open = True
+
+    def close_delete_confirm(self, _open: bool = False):
+        self.is_delete_confirm_open = False
+        self.pending_delete_opp_id = -1
+
+    def confirm_delete_opportunity(self):
+        if self.pending_delete_opp_id != -1:
+            self.delete_opportunity(self.pending_delete_opp_id)
+        self.is_delete_confirm_open = False
+        self.pending_delete_opp_id = -1
 
     def start_edit_opportunity(
         self, opp_id: int, theme: str, statement: str, parent_id: int
@@ -632,6 +648,13 @@ class LedgerStateMixin(rx.State, mixin=True):
                 if choice.startswith(f"{parent_id} -"):
                     self.manual_opp_parent_id = choice
                     break
+
+        # Prefill linked outcome (first one if any)
+        self.manual_opp_outcome_name = "None"
+        for item in self.ledger_data:
+            if item.opportunity_id == opp_id and item.linked_outcomes:
+                self.manual_opp_outcome_name = item.linked_outcomes[0].name
+                break
 
         self.is_opp_dialog_open = True
 
@@ -661,6 +684,10 @@ class LedgerStateMixin(rx.State, mixin=True):
                 ).all()
                 parent_outcome_ids = [link.outcome_id for link in parent_links]
 
+            chosen_outcome = next(
+                (o for o in self.outcomes if o.name == self.manual_opp_outcome_name), None
+            )
+
             if self.editing_opp_id != -1:
                 opp = session.get(Opportunity, self.editing_opp_id)
                 if opp:
@@ -669,13 +696,22 @@ class LedgerStateMixin(rx.State, mixin=True):
                     opp.parent_id = parent_id_val
                     session.add(opp)
 
-                    # Inherit outcomes if we just assigned a parent and it currently has none
+                    # Apply dialog outcome selection (clears and re-sets)
                     existing_outcomes = session.exec(
                         select(OutcomeOpportunityLink).where(
                             OutcomeOpportunityLink.opportunity_id == opp.id
                         )
                     ).all()
-                    if len(existing_outcomes) == 0 and parent_outcome_ids:
+                    for link in existing_outcomes:
+                        session.delete(link)
+                    if chosen_outcome:
+                        session.add(
+                            OutcomeOpportunityLink(
+                                opportunity_id=opp.id, outcome_id=chosen_outcome.id
+                            )
+                        )
+                    elif not chosen_outcome and not existing_outcomes and parent_outcome_ids:
+                        # Fall back to parent inheritance only if no explicit selection and none existed
                         for out_id in parent_outcome_ids:
                             session.add(
                                 OutcomeOpportunityLink(
@@ -692,13 +728,20 @@ class LedgerStateMixin(rx.State, mixin=True):
                 session.commit()
                 session.refresh(new_opp)
 
-                # Automatically inherit outcomes from parent on creation
-                for out_id in parent_outcome_ids:
+                if chosen_outcome:
                     session.add(
                         OutcomeOpportunityLink(
-                            opportunity_id=new_opp.id, outcome_id=out_id
+                            opportunity_id=new_opp.id, outcome_id=chosen_outcome.id
                         )
                     )
+                else:
+                    # Inherit from parent if no explicit selection
+                    for out_id in parent_outcome_ids:
+                        session.add(
+                            OutcomeOpportunityLink(
+                                opportunity_id=new_opp.id, outcome_id=out_id
+                            )
+                        )
 
             session.commit()
 

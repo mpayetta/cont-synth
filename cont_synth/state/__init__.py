@@ -236,7 +236,7 @@ class State(
     ledger_data: list[LedgerItem] = []
     available_personas: list[str] = []
     target_persona: str = ""
-    ledger_view_mode: str = "list"   # "list" | "board" | "matrix"
+    ledger_view_mode: str = "list"   # "table" | "list" | "board" | "matrix"
     collapsed_themes: list[str] = []
 
     # --- Solutions workspace ---
@@ -260,8 +260,11 @@ class State(
     manual_opp_theme: str = "Uncategorized"
     manual_opp_statement: str = ""
     manual_opp_parent_id: str = "None"
+    manual_opp_outcome_name: str = "None"
     is_opp_dialog_open: bool = False
     is_editing_opp_detail: bool = False
+    is_delete_confirm_open: bool = False
+    pending_delete_opp_id: int = -1
     parent_opp_choices: list[str] = []
 
     # --- Merge opportunity state ---
@@ -390,6 +393,10 @@ class State(
     coach_top_keep_doing: list[CoachFreqItem] = []
 
     @rx.var
+    def outcome_choices_for_dialog(self) -> list[str]:
+        return ["None"] + [o.name for o in self.outcomes]
+
+    @rx.var
     def active_product_name(self) -> str:
         """Display name for the currently selected workspace."""
         active = next((p for p in self.products if str(p.id) == self.active_product_id), None)
@@ -510,6 +517,7 @@ class State(
     def set_manual_opp_theme(self, val: str): self.manual_opp_theme = val
     def set_manual_opp_statement(self, val: str): self.manual_opp_statement = val
     def set_manual_opp_parent_id(self, val: str): self.manual_opp_parent_id = val
+    def set_manual_opp_outcome_name(self, val: str): self.manual_opp_outcome_name = val
     def set_selected_interview_choice(self, val: str): self.selected_interview_choice = val
     def set_participant_form_name(self, val: str): self.participant_form_name = val
     def set_participant_form_persona(self, val: str): self.participant_form_persona = val

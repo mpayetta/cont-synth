@@ -15,7 +15,6 @@ def render_persona_badge(badge: PersonaBadge):
     return rx.badge(badge.name, color_scheme=badge.color, variant="soft")
 
 
-
 def _info_label(text, explanation: str) -> rx.Component:
     """A label + clickable ? icon that opens a popover with an explanation."""
     return rx.flex(
@@ -76,171 +75,422 @@ def show_ledger_row(item: LedgerItem):
 
     return rx.box(
         rx.box(
-        rx.vstack(
-            # ── Row 1: badges + right-side status chips ──────────────────
-            rx.flex(
-                # Left: indent arrow + theme + tags
+            rx.vstack(
+                # ── Row 1: badges + right-side status chips ──────────────────
                 rx.flex(
+                    # Left: indent arrow + theme + tags
+                    rx.flex(
+                        rx.cond(
+                            item.indent_level > 0,
+                            rx.icon(
+                                "corner-down-right", size=13, color="var(--gray-12)"
+                            ),
+                            rx.fragment(),
+                        ),
+                        # Priority score badge
+                        rx.badge(
+                            f"P: {item.priority_score}",
+                            color_scheme=priority_color,
+                            variant=rx.cond(item.priority_score > 0, "soft", "outline"),
+                            size="1",
+                            title="Priority = Impact + Satisfaction Gap + Frequency (evidence count)",
+                            height="20px",
+                        ),
+                        rx.cond(
+                            item.is_cross_functional,
+                            rx.badge(
+                                "Cross-Persona",
+                                color_scheme="amber",
+                                variant="soft",
+                                size="1",
+                            ),
+                            rx.fragment(),
+                        ),
+                        spacing="2",
+                        align="center",
+                        flex="1",
+                    ),
+                    # Right: running experiments + priority score + actions
+                    rx.flex(
+                        # Running experiments pill (only shown when > 0)
+                        rx.cond(
+                            item.running_experiments > 0,
+                            rx.badge(
+                                rx.icon("flask-conical", size=10),
+                                f"{item.running_experiments} running",
+                                color_scheme="orange",
+                                variant="soft",
+                                size="1",
+                            ),
+                            rx.fragment(),
+                        ),
+                        rx.separator(orientation="vertical", size="1"),
+                        # Merge button
+                        rx.button(
+                            rx.icon("git-merge", size=12),
+                            "Merge",
+                            size="1",
+                            variant="ghost",
+                            color_scheme="gray",
+                            on_click=lambda: State.open_merge_dialog(
+                                item.opportunity_id
+                            ),
+                            height="20px",
+                        ),
+                        spacing="2",
+                        align="center",
+                        flex_shrink="0",
+                    ),
+                    justify="between",
+                    width="100%",
+                    align="center",
+                ),
+                # ── Row 2: Opportunity statement (hero text, 2-line clamp) ───
+                rx.text(
+                    item.opportunity,
+                    weight="bold",
+                    size="4",
+                    line_height="1.4",
+                    cursor="pointer",
+                    on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
+                    _hover={"color": "var(--blue-11)"},
+                    transition="color 0.1s ease",
+                    style={
+                        "overflow": "hidden",
+                        "display": "-webkit-box",
+                        "-webkit-line-clamp": "2",
+                        "-webkit-box-orient": "vertical",
+                    },
+                ),
+                # ── Row 3: Personas + quick metrics ──────────────────────────
+                rx.flex(
+                    rx.flex(
+                        rx.foreach(
+                            item.personas_affected,
+                            lambda b: rx.badge(
+                                b.name, color_scheme=b.color, variant="soft", size="1"
+                            ),
+                        ),
+                        spacing="1",
+                        wrap="wrap",
+                    ),
+                    rx.flex(
+                        rx.flex(
+                            rx.icon("quote", size=11, color="var(--gray-12)"),
+                            rx.text(
+                                f"{item.evidence.length()} quotes",
+                                size="1",
+                                color="var(--gray-12)",
+                            ),
+                            spacing="1",
+                            align="center",
+                        ),
+                        rx.text("·", size="1", color="var(--gray-6)"),
+                        rx.flex(
+                            rx.icon("lightbulb", size=11, color="var(--gray-12)"),
+                            rx.text(
+                                f"{item.solutions.length()} solutions",
+                                size="1",
+                                color="var(--gray-12)",
+                            ),
+                            spacing="1",
+                            align="center",
+                        ),
+                        rx.text("·", size="1", color="var(--gray-6)"),
+                        rx.text(
+                            f"{item.days_old}d",
+                            size="1",
+                            weight="medium",
+                            color=rx.cond(
+                                item.status_color == "green",
+                                "var(--green-9)",
+                                rx.cond(
+                                    item.status_color == "yellow",
+                                    "var(--amber-9)",
+                                    "var(--red-9)",
+                                ),
+                            ),
+                            title=item.status,
+                        ),
+                        spacing="2",
+                        align="center",
+                    ),
+                    justify="between",
+                    width="100%",
+                    align="center",
+                ),
+                # ── Row 4: Compact Torres scoring (single row) ───────────────
+                rx.flex(
+                    _info_label(
+                        "Impact",
+                        "Impact (1–5): How much does solving this opportunity move your target business outcome? 5 = critical driver, 1 = marginal effect.",
+                    ),
+                    rx.flex(
+                        _score_dot(item, "impact", 1),
+                        _score_dot(item, "impact", 2),
+                        _score_dot(item, "impact", 3),
+                        _score_dot(item, "impact", 4),
+                        _score_dot(item, "impact", 5),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.box(
+                        width="1px",
+                        height="12px",
+                        background_color="var(--gray-6)",
+                        flex_shrink="0",
+                        margin_x="2",
+                    ),
+                    _info_label(
+                        "Gap",
+                        "Satisfaction Gap (1–5): How unhappy are users with the current situation? 5 = severe pain / no workaround, 1 = mild annoyance. High gap means users urgently want a better solution.",
+                    ),
+                    rx.flex(
+                        _score_dot(item, "sat_gap", 1),
+                        _score_dot(item, "sat_gap", 2),
+                        _score_dot(item, "sat_gap", 3),
+                        _score_dot(item, "sat_gap", 4),
+                        _score_dot(item, "sat_gap", 5),
+                        spacing="1",
+                        align="center",
+                    ),
+                    rx.box(
+                        width="1px",
+                        height="12px",
+                        background_color="var(--gray-6)",
+                        flex_shrink="0",
+                        margin_x="2",
+                    ),
+                    _info_label(
+                        f"Freq {item.evidence.length()}/5",
+                        "Frequency: How many interviews mentioned this opportunity (auto-counted from linked quotes, capped at 5). Combined with Impact and Gap to form the Priority score: Impact + Gap + Freq (max 15).",
+                    ),
+                    spacing="2",
+                    align="center",
+                    flex_wrap="wrap",
+                ),
+                spacing="3",
+                width="100%",
+                align_items="start",
+            ),
+            padding="16px 16px 14px 20px",
+            border_left=rx.cond(
+                item.status_color == "green",
+                "4px solid var(--green-6)",
+                rx.cond(
+                    item.status_color == "yellow",
+                    "4px solid var(--amber-6)",
+                    "4px solid var(--red-6)",
+                ),
+            ),
+            border_radius="8px",
+            # background_color=rx.cond(
+            #     item.priority_score >= 11,
+            #     "var(--amber-1)",
+            #     rx.cond(
+            #         item.priority_score >= 6,
+            #         "var(--blue-1)",
+            #         rx.cond(item.indent_level > 0, "var(--gray-2)", "var(--gray-1)"),
+            #     ),
+            # ),
+            border=rx.cond(
+                item.priority_score >= 11,
+                "1px solid var(--amber-7)",
+                rx.cond(
+                    item.priority_score >= 6,
+                    "1px solid var(--blue-7)",
                     rx.cond(
                         item.indent_level > 0,
-                        rx.icon("corner-down-right", size=13, color="var(--gray-12)"),
-                        rx.fragment(),
+                        "1px solid var(--gray-7)",
+                        "1px solid var(--gray-5)",
                     ),
-                    rx.badge(item.theme, color_scheme="gray", variant="solid", size="1"),
-                    rx.cond(
-                        item.is_cross_functional,
-                        rx.badge("Cross-Persona", color_scheme="amber", variant="soft", size="1"),
-                        rx.fragment(),
-                    ),
-                    spacing="2", align="center", flex="1",
                 ),
-                # Right: running experiments + priority score + actions
-                rx.flex(
-                    # Running experiments pill (only shown when > 0)
-                    rx.cond(
-                        item.running_experiments > 0,
-                        rx.badge(
-                            rx.icon("flask-conical", size=10),
-                            f"{item.running_experiments} running",
-                            color_scheme="orange", variant="soft", size="1",
-                        ),
-                        rx.fragment(),
-                    ),
-                    # Priority score badge
-                    rx.badge(
-                        f"P: {item.priority_score}",
-                        color_scheme=priority_color,
-                        variant=rx.cond(item.priority_score > 0, "soft", "outline"),
-                        size="1",
-                        title="Priority = Impact + Satisfaction Gap + Frequency (evidence count)",
-                        height="20px",
-                    ),
-                    rx.separator(orientation="vertical", size="1"),
-                    # Merge button
-                    rx.button(
-                        rx.icon("git-merge", size=12),
-                        "Merge",
-                        size="1",
-                        variant="ghost",
-                        color_scheme="gray",
-                        on_click=lambda: State.open_merge_dialog(item.opportunity_id),
-                        height="20px",
-                    ),
-                    spacing="2", align="center", flex_shrink="0",
-                ),
-                justify="between", width="100%", align="center",
             ),
-            # ── Row 2: Opportunity statement (hero text, 2-line clamp) ───
+            width="100%",
+            transition="background-color 0.1s ease, border-color 0.1s ease",
+        ),
+        padding_left=f"calc({item.indent_level} * 28px)",
+        width="100%",
+    )
+
+
+# ── HIGH-DENSITY TABLE VIEW ───────────────────────────────────────────────────
+
+def show_opportunity_table_row(item: LedgerItem) -> rx.Component:
+    """Renders a single opportunity as a high-density table row."""
+    return rx.table.row(
+        # ID
+        rx.table.cell(
+            rx.text(item.opportunity_id, size="1", color="gray"),
+            vertical_align="middle",
+            padding_y="6px",
+        ),
+        # Theme
+        rx.table.cell(
+            rx.badge(item.theme, size="1", variant="solid", color_scheme="gray"),
+            vertical_align="middle",
+            padding_y="6px",
+        ),
+        # Opportunity statement
+        rx.table.cell(
             rx.text(
                 item.opportunity,
-                weight="bold",
-                size="4",
-                line_height="1.4",
+                size="2",
                 cursor="pointer",
-                on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
                 _hover={"color": "var(--blue-11)"},
-                transition="color 0.1s ease",
-                style={
-                    "overflow": "hidden",
-                    "display": "-webkit-box",
-                    "-webkit-line-clamp": "2",
-                    "-webkit-box-orient": "vertical",
-                },
+                on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
             ),
-            # ── Row 3: Personas + quick metrics ──────────────────────────
+            vertical_align="middle",
+            padding_y="6px",
+        ),
+        # Personas
+        rx.table.cell(
             rx.flex(
-                rx.flex(
-                    rx.foreach(
-                        item.personas_affected,
-                        lambda b: rx.badge(b.name, color_scheme=b.color, variant="soft", size="1"),
+                rx.foreach(
+                    item.personas_affected,
+                    lambda b: rx.badge(
+                        b.name, color_scheme=b.color, variant="soft", size="1"
                     ),
-                    spacing="1", wrap="wrap",
                 ),
-                rx.flex(
-                    rx.flex(
-                        rx.icon("quote", size=11, color="var(--gray-12)"),
-                        rx.text(f"{item.evidence.length()} quotes", size="1", color="var(--gray-12)"),
-                        spacing="1", align="center",
+                spacing="1",
+                wrap="wrap",
+                max_width="180px",
+            ),
+            vertical_align="middle",
+            padding_y="6px",
+        ),
+        # Metrics (I / G / F)
+        rx.table.cell(
+            rx.text(
+                rx.cond(
+                    item.impact_score > 0,
+                    rx.cond(
+                        item.sat_gap_score > 0,
+                        f"I:{item.impact_score} | G:{item.sat_gap_score} | F:{item.evidence.length()}",
+                        f"I:{item.impact_score} | G:— | F:{item.evidence.length()}",
                     ),
-                    rx.text("·", size="1", color="var(--gray-6)"),
-                    rx.flex(
-                        rx.icon("lightbulb", size=11, color="var(--gray-12)"),
-                        rx.text(f"{item.solutions.length()} solutions", size="1", color="var(--gray-12)"),
-                        spacing="1", align="center",
+                    rx.cond(
+                        item.sat_gap_score > 0,
+                        f"I:— | G:{item.sat_gap_score} | F:{item.evidence.length()}",
+                        f"I:— | G:— | F:{item.evidence.length()}",
                     ),
-                    rx.text("·", size="1", color="var(--gray-6)"),
-                    rx.text(
-                        f"{item.days_old}d",
-                        size="1",
-                        weight="medium",
-                        color=rx.cond(
-                            item.status_color == "green", "var(--green-9)",
-                            rx.cond(item.status_color == "yellow", "var(--amber-9)", "var(--red-9)"),
+                ),
+                size="1",
+                color="var(--gray-12)",
+                white_space="nowrap",
+            ),
+            vertical_align="middle",
+            padding_y="6px",
+        ),
+        # Priority score
+        rx.table.cell(
+            rx.text(
+                f"P:{item.priority_score}",
+                size="2",
+                weight="bold",
+                color=rx.cond(
+                    item.priority_score >= 11,
+                    "var(--green-11)",
+                    rx.cond(
+                        item.priority_score >= 6,
+                        "var(--amber-11)",
+                        rx.cond(
+                            item.priority_score >= 1, "var(--blue-11)", "var(--gray-9)"
                         ),
-                        title=item.status,
                     ),
-                    spacing="2", align="center",
                 ),
-                justify="between", width="100%", align="center",
+                white_space="nowrap",
             ),
-            # ── Row 4: Compact Torres scoring (single row) ───────────────
+            vertical_align="middle",
+            padding_y="6px",
+        ),
+        # Metadata (quotes + solutions)
+        rx.table.cell(
             rx.flex(
-                _info_label("Impact", "Impact (1–5): How much does solving this opportunity move your target business outcome? 5 = critical driver, 1 = marginal effect."),
-                rx.flex(
-                    _score_dot(item, "impact", 1),
-                    _score_dot(item, "impact", 2),
-                    _score_dot(item, "impact", 3),
-                    _score_dot(item, "impact", 4),
-                    _score_dot(item, "impact", 5),
-                    spacing="1", align="center",
-                ),
-                rx.box(width="1px", height="12px", background_color="var(--gray-6)", flex_shrink="0", margin_x="2"),
-                _info_label("Gap", "Satisfaction Gap (1–5): How unhappy are users with the current situation? 5 = severe pain / no workaround, 1 = mild annoyance. High gap means users urgently want a better solution."),
-                rx.flex(
-                    _score_dot(item, "sat_gap", 1),
-                    _score_dot(item, "sat_gap", 2),
-                    _score_dot(item, "sat_gap", 3),
-                    _score_dot(item, "sat_gap", 4),
-                    _score_dot(item, "sat_gap", 5),
-                    spacing="1", align="center",
-                ),
-                rx.box(width="1px", height="12px", background_color="var(--gray-6)", flex_shrink="0", margin_x="2"),
-                _info_label(f"Freq {item.evidence.length()}/5", "Frequency: How many interviews mentioned this opportunity (auto-counted from linked quotes, capped at 5). Combined with Impact and Gap to form the Priority score: Impact + Gap + Freq (max 15)."),
-                spacing="2", align="center", flex_wrap="wrap",
+                rx.text("Quotes", size="1"),
+                rx.text(item.evidence.length(), size="1", color="gray"),
+                rx.text(" | ", size="1", color="gray"),
+                rx.text("Solutions", size="1"),
+                rx.text(item.solutions.length(), size="1", color="gray"),
+                spacing="1",
+                align="center",
             ),
-            spacing="3",
-            width="100%",
-            align_items="start",
+            vertical_align="middle",
+            padding_y="6px",
         ),
-        padding="16px 16px 14px 20px",
-        border_left=rx.cond(
-            item.status_color == "green", "4px solid var(--green-6)",
-            rx.cond(item.status_color == "yellow", "4px solid var(--amber-6)", "4px solid var(--red-6)"),
+        # Actions dropdown
+        rx.table.cell(
+            rx.dropdown_menu.root(
+                rx.dropdown_menu.trigger(
+                    rx.icon_button(
+                        rx.icon("ellipsis-vertical", size=14),
+                        variant="ghost",
+                        color_scheme="gray",
+                        size="1",
+                    ),
+                ),
+                rx.dropdown_menu.content(
+                    rx.dropdown_menu.item(
+                        rx.icon("eye", size=14),
+                        "View",
+                        on_click=lambda: State.navigate_to_opportunity(
+                            item.opportunity_id
+                        ),
+                    ),
+                    rx.dropdown_menu.item(
+                        rx.icon("pencil", size=14),
+                        "Edit",
+                        on_click=lambda: State.start_edit_opportunity(
+                            item.opportunity_id,
+                            item.theme,
+                            item.opportunity,
+                            item.parent_id,
+                        ),
+                    ),
+                    rx.dropdown_menu.item(
+                        rx.icon("git-merge", size=14),
+                        "Merge",
+                        on_click=lambda: State.open_merge_dialog(item.opportunity_id),
+                    ),
+                    rx.dropdown_menu.separator(),
+                    rx.dropdown_menu.item(
+                        rx.icon("trash-2", size=14),
+                        "Delete",
+                        color="red",
+                        on_click=lambda: State.open_delete_confirm(item.opportunity_id),
+                    ),
+                    size="1",
+                ),
+            ),
+            vertical_align="middle",
+            padding_y="6px",
         ),
-        border_radius="8px",
-        # background_color=rx.cond(
-        #     item.priority_score >= 11,
-        #     "var(--amber-1)",
-        #     rx.cond(
-        #         item.priority_score >= 6,
-        #         "var(--blue-1)",
-        #         rx.cond(item.indent_level > 0, "var(--gray-2)", "var(--gray-1)"),
-        #     ),
-        # ),
-        border=rx.cond(
-            item.priority_score >= 11,
-            "1px solid var(--amber-7)",
-            rx.cond(
-                item.priority_score >= 6,
-                "1px solid var(--blue-7)",
-                rx.cond(item.indent_level > 0, "1px solid var(--gray-7)", "1px solid var(--gray-5)"),
+        _hover={"background_color": "var(--gray-2)"},
+        style={"transition": "background-color 0.1s ease"},
+    )
+
+
+def show_table_view() -> rx.Component:
+    """High-density table of all opportunities."""
+    return rx.table.root(
+        rx.table.header(
+            rx.table.row(
+                rx.table.column_header_cell(rx.text("#", size="1", weight="medium", color="gray")),
+                rx.table.column_header_cell(rx.text("Theme", size="1", weight="medium", color="gray")),
+                rx.table.column_header_cell(rx.text("Opportunity", size="1", weight="medium", color="gray")),
+                rx.table.column_header_cell(rx.text("Personas", size="1", weight="medium", color="gray")),
+                rx.table.column_header_cell(rx.text("Metrics", size="1", weight="medium", color="gray")),
+                rx.table.column_header_cell(rx.text("Priority", size="1", weight="medium", color="gray")),
+                rx.table.column_header_cell(rx.text("Evidence", size="1", weight="medium", color="gray")),
+                rx.table.column_header_cell(""),
             ),
         ),
+        rx.table.body(
+            rx.foreach(State.ledger_data, show_opportunity_table_row),
+        ),
+        variant="surface",
+        size="2",
         width="100%",
-        transition="background-color 0.1s ease, border-color 0.1s ease",
-    ),
-    padding_left=f"calc({item.indent_level} * 28px)",
-    width="100%",
     )
 
 
@@ -610,6 +860,41 @@ def show_matrix_view() -> rx.Component:
         spacing="3",
     )
 
+def _delete_confirm_dialog() -> rx.Component:
+    """Confirmation dialog for deleting an opportunity from the table view."""
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.vstack(
+                rx.dialog.title("Delete Opportunity"),
+                rx.text(
+                    "This will permanently delete the opportunity and all associated evidence, solutions, and experiments. This action cannot be undone.",
+                    size="2",
+                    color="var(--gray-11)",
+                ),
+                rx.flex(
+                    rx.dialog.close(
+                        rx.button("Cancel", variant="soft", color_scheme="gray"),
+                    ),
+                    rx.button(
+                        rx.icon("trash-2", size=14),
+                        "Delete",
+                        color_scheme="red",
+                        on_click=State.confirm_delete_opportunity,
+                    ),
+                    spacing="3",
+                    justify="end",
+                    width="100%",
+                ),
+                spacing="4",
+                width="100%",
+            ),
+            max_width="420px",
+        ),
+        open=State.is_delete_confirm_open,
+        on_open_change=State.close_delete_confirm,
+    )
+
+
 def _merge_dialog() -> rx.Component:
     """State-controlled dialog for merging two opportunities."""
     return rx.dialog.root(
@@ -863,6 +1148,13 @@ def render_ledger() -> rx.Component:
                         "Manually add or update an opportunity.", margin_bottom="8px"
                     ),
                     rx.vstack(
+                        rx.text("Business Outcome", size="2", weight="bold"),
+                        rx.select(
+                            State.outcome_choices_for_dialog,
+                            value=State.manual_opp_outcome_name,
+                            on_change=State.set_manual_opp_outcome_name,
+                            width="100%",
+                        ),
                         rx.text("Parent Opportunity", size="2", weight="bold"),
                         rx.select(
                             State.parent_opp_choices,
@@ -916,8 +1208,16 @@ def render_ledger() -> rx.Component:
             # View mode toggle buttons
             rx.flex(
                 rx.button(
+                    rx.icon("table", size=14),
+                    "Table",
+                    variant=rx.cond(State.ledger_view_mode == "table", "solid", "outline"),
+                    color_scheme="blue",
+                    size="2",
+                    on_click=State.set_ledger_view_mode("table"),
+                ),
+                rx.button(
                     rx.icon("list", size=14),
-                    "List",
+                    "Cards",
                     variant=rx.cond(State.ledger_view_mode == "list", "solid", "outline"),
                     color_scheme="blue",
                     size="2",
@@ -964,21 +1264,26 @@ def render_ledger() -> rx.Component:
                 width="100%",
             ),
             rx.cond(
-                State.ledger_view_mode == "board",
-                show_board_view(),
+                State.ledger_view_mode == "table",
+                show_table_view(),
                 rx.cond(
-                    State.ledger_view_mode == "matrix",
-                    show_matrix_view(),
-                    # Default: grouped list view
-                    rx.vstack(
-                        rx.foreach(State.ledger_data_by_theme, show_theme_group),
-                        spacing="3",
-                        width="100%",
+                    State.ledger_view_mode == "board",
+                    show_board_view(),
+                    rx.cond(
+                        State.ledger_view_mode == "matrix",
+                        show_matrix_view(),
+                        # Default: grouped cards view
+                        rx.vstack(
+                            rx.foreach(State.ledger_data_by_theme, show_theme_group),
+                            spacing="3",
+                            width="100%",
+                        ),
                     ),
                 ),
             ),
         ),
         _merge_dialog(),
+        _delete_confirm_dialog(),
         width="100%",
         max_width="1400px",
         spacing="4",
