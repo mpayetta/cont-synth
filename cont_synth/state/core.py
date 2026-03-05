@@ -50,6 +50,13 @@ class PersonaBadge(BaseModel):
     color: str
 
 
+class WorkspaceDocumentItem(BaseModel):
+    id: int
+    filename: str
+    upload_date: str   # formatted "YYYY-MM-DD HH:MM"
+    chunk_count: int
+
+
 class QuoteItem(BaseModel):
     interview_id: int
     persona_name: str
@@ -237,6 +244,7 @@ class PrepOppItem(BaseModel):
     theme: str
     statement: str
     selected: bool = False
+    personas: list[str] = []
 
 
 class PrepExperimentItem(BaseModel):

@@ -1,0 +1,3 @@
+Summarise the core product areas, features, and workflows discussed in this interview transcript in 2-3 sentences. Be specific about product concepts, feature names, and user workflows mentioned.
+
+{transcript}

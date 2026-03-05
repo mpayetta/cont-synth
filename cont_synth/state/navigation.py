@@ -53,6 +53,7 @@ _URL_MAP: dict[str, str] = {
     "llm_usage": "/llm-usage",
     "participants": "/participants",
     "account": "/account",
+    "knowledge_base": "/knowledge-base",
 }
 
 
@@ -148,6 +149,8 @@ class NavigationStateMixin(rx.State, mixin=True):
             self.selected_solution_for_experiment = ""
             self.is_editing_opp_detail = False
             self.editing_solution_id = -1
+        elif self.current_view == "knowledge_base":
+            self.load_kb_documents()
 
     def load_coach_data(self):
         """Loads all InterviewFeedback records for the coaching dashboard."""

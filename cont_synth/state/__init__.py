@@ -30,6 +30,7 @@ from .core import (
     PrepGuideItem,
     CoachFreqItem,
     CoachDetailItem,
+    WorkspaceDocumentItem,
     configure_genai,
 )
 from .auth import _hash_password, _verify_password
@@ -54,6 +55,7 @@ from .navigation import NavigationStateMixin
 from .interviews import InterviewStateMixin
 from .ledger import LedgerStateMixin
 from .participants import ParticipantStateMixin
+from .knowledge_base import KnowledgeBaseStateMixin
 
 _MARK_OPEN = '<mark style="background:rgba(250,204,21,0.5);border-radius:2px;padding:1px 2px">'
 _MARK_CLOSE = "</mark>"
@@ -177,6 +179,7 @@ class State(
     InterviewStateMixin,
     LedgerStateMixin,
     ParticipantStateMixin,
+    KnowledgeBaseStateMixin,
     rx.State,
 ):
     """Main application state composed from feature-specific mixins."""
@@ -391,6 +394,16 @@ class State(
     coach_score_history: list[dict] = []
     coach_top_stop_doing: list[CoachFreqItem] = []
     coach_top_keep_doing: list[CoachFreqItem] = []
+
+    # --- Knowledge Base ---
+    kb_documents: list[WorkspaceDocumentItem] = []
+    kb_is_uploading: bool = False
+    kb_is_reprocessing: bool = False
+    kb_upload_error: str = ""
+
+    @rx.var
+    def kb_document_count(self) -> int:
+        return len(self.kb_documents)
 
     @rx.var
     def outcome_choices_for_dialog(self) -> list[str]:
@@ -757,6 +770,10 @@ class State(
 
     def load_llm_usage_page(self):
         self.current_view = "llm_usage"
+        return self._ensure_auth_and_load()
+
+    def load_knowledge_base_page(self):
+        self.current_view = "knowledge_base"
         return self._ensure_auth_and_load()
 
     def load_app(self):

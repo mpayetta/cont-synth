@@ -3,27 +3,45 @@ from cont_synth.state import State
 from cont_synth.state.core import PrepOppItem, PrepExperimentItem, PrepGuideItem
 
 
-def _render_prep_opp_row(opp: PrepOppItem) -> rx.Component:
-    """One opportunity row with a checkbox, theme badge, and statement."""
-    return rx.box(
-        rx.hstack(
+def _render_prep_opp_table_row(opp: PrepOppItem) -> rx.Component:
+    """One compact table row for an opportunity: checkbox | theme | statement | personas."""
+    return rx.table.row(
+        rx.table.cell(
             rx.checkbox(
                 checked=opp.selected,
                 on_change=lambda _: State.toggle_prep_opportunity(opp.id),
                 color_scheme="blue",
                 size="2",
             ),
-            rx.badge(opp.theme, color_scheme="gray", variant="soft", size="1"),
-            rx.text(opp.statement, size="2", color="var(--gray-12)"),
-            spacing="3",
-            align="center",
-            flex_wrap="wrap",
+            padding="0 8px",
+            vertical_align="middle",
         ),
-        padding="10px 12px",
-        border_radius="6px",
-        border="1px solid var(--gray-4)",
-        background_color=rx.cond(opp.selected, "var(--blue-2)", "var(--gray-1)"),
-        width="100%",
+        rx.table.cell(
+            rx.badge(opp.theme, color_scheme="gray", variant="soft", size="1"),
+            vertical_align="middle",
+            white_space="nowrap",
+        ),
+        rx.table.cell(
+            rx.text(opp.statement, size="2", color="var(--gray-12)"),
+            vertical_align="middle",
+        ),
+        rx.table.cell(
+            rx.cond(
+                opp.personas.length() > 0,
+                rx.flex(
+                    rx.foreach(
+                        opp.personas,
+                        lambda p: rx.badge(p, color_scheme="blue", variant="soft", size="1"),
+                    ),
+                    gap="4px",
+                    flex_wrap="wrap",
+                ),
+                rx.text("—", size="2", color="var(--gray-9)"),
+            ),
+            vertical_align="middle",
+        ),
+        _hover={"background_color": rx.cond(opp.selected, "var(--blue-3)", "var(--gray-2)")},
+        background_color=rx.cond(opp.selected, "var(--blue-2)", "transparent"),
     )
 
 
@@ -141,13 +159,6 @@ def _render_guide_table_row(guide: PrepGuideItem) -> rx.Component:
         ),
         rx.table.cell(
             rx.cond(
-                guide.guide_type == "interview_guide",
-                rx.badge("Interview Guide", color_scheme="blue", variant="soft", size="1"),
-                rx.badge("Battle Plan", color_scheme="red", variant="soft", size="1"),
-            ),
-        ),
-        rx.table.cell(
-            rx.cond(
                 guide.target_persona != "",
                 rx.badge(guide.target_persona, color_scheme="gray", variant="soft", size="1"),
                 rx.text("—", size="2", color="var(--gray-9)"),
@@ -198,11 +209,7 @@ def _guide_drawer() -> rx.Component:
                         rx.flex(
                             rx.vstack(
                                 rx.hstack(
-                                    rx.cond(
-                                        g.guide_type == "interview_guide",
-                                        rx.badge("Interview Guide", color_scheme="blue", variant="solid", size="1"),
-                                        rx.badge("Battle Plan", color_scheme="red", variant="solid", size="1"),
-                                    ),
+                                    rx.badge("Interview Guide", color_scheme="blue", variant="solid", size="1"),
                                     rx.cond(
                                         g.used_coach_feedback,
                                         rx.badge(
@@ -428,7 +435,32 @@ def render_prep() -> rx.Component:
                 # Coach Pre-Game Brief
                 _render_coach_pregame_brief(),
 
-                # Opportunity Selector
+                # Persona Selector (moved here, right after the brief)
+                rx.vstack(
+                    rx.hstack(
+                        rx.text("Customer persona", weight="medium", size="3"),
+                        rx.badge("Optional context", color_scheme="gray", variant="soft", size="1"),
+                        spacing="2",
+                        align="center",
+                    ),
+                    rx.text(
+                        "Optionally select a persona to give the LLM context about who you're interviewing. Required if generating the legacy battle plan (no opportunities selected).",
+                        size="2",
+                        color="var(--gray-12)",
+                    ),
+                    rx.select(
+                        State.prep_persona_options,
+                        value=rx.cond(State.target_persona != "", State.target_persona, "— None —"),
+                        on_change=State.load_prep_for_persona,
+                        size="3",
+                        width="100%",
+                    ),
+                    spacing="2",
+                    align_items="start",
+                    width="100%",
+                ),
+
+                # Opportunity Selector (compact table)
                 rx.vstack(
                     rx.hstack(
                         rx.text("Opportunities to explore", weight="medium", size="3"),
@@ -442,9 +474,20 @@ def render_prep() -> rx.Component:
                     ),
                     rx.cond(
                         State.prep_opportunities.length() > 0,
-                        rx.vstack(
-                            rx.foreach(State.prep_opportunities, _render_prep_opp_row),
-                            spacing="2",
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("", width="40px"),
+                                    rx.table.column_header_cell("Theme"),
+                                    rx.table.column_header_cell("Opportunity"),
+                                    rx.table.column_header_cell("Personas"),
+                                ),
+                            ),
+                            rx.table.body(
+                                rx.foreach(State.prep_opportunities, _render_prep_opp_table_row),
+                            ),
+                            variant="surface",
+                            size="1",
                             width="100%",
                         ),
                         rx.box(
@@ -490,32 +533,6 @@ def render_prep() -> rx.Component:
                         width="100%",
                         padding_top="4px",
                     ),
-                ),
-
-                # Persona Selector
-                rx.vstack(
-                    rx.hstack(
-                        rx.text("Customer persona", weight="medium", size="3"),
-                        rx.badge("Optional context", color_scheme="gray", variant="soft", size="1"),
-                        spacing="2",
-                        align="center",
-                    ),
-                    rx.text(
-                        "Optionally select a persona to give the LLM context about who you're interviewing. Required if generating the legacy battle plan (no opportunities selected).",
-                        size="2",
-                        color="var(--gray-12)",
-                    ),
-                    rx.select(
-                        State.prep_persona_options,
-                        value=rx.cond(State.target_persona != "", State.target_persona, "— None —"),
-                        on_change=State.load_prep_for_persona,
-                        size="3",
-                        width="100%",
-                    ),
-                    spacing="2",
-                    align_items="start",
-                    width="100%",
-                    padding_top="4px",
                 ),
 
                 # Extra Context
@@ -568,26 +585,14 @@ def render_prep() -> rx.Component:
                     rx.button(
                         rx.cond(
                             State.prep_questions != "",
-                            rx.cond(
-                                State.selected_opportunity_ids.length() > 0,
-                                "Regenerate Interview Guide",
-                                "Regenerate Battle Plan",
-                            ),
-                            rx.cond(
-                                State.selected_opportunity_ids.length() > 0,
-                                "Generate Interview Guide",
-                                "Generate Battle Plan",
-                            ),
+                            "Regenerate Interview Guide",
+                            "Generate Interview Guide",
                         ),
                         on_click=State.generate_hostile_questions,
                         loading=State.is_prepping,
                         size="4",
                         width="100%",
-                        color_scheme=rx.cond(
-                            State.selected_opportunity_ids.length() > 0,
-                            "blue",
-                            "red",
-                        ),
+                        color_scheme="blue",
                         variant=rx.cond(State.prep_questions != "", "outline", "solid"),
                     ),
                     spacing="3",
@@ -601,11 +606,7 @@ def render_prep() -> rx.Component:
                     rx.box(
                         rx.flex(
                             rx.hstack(
-                                rx.cond(
-                                    State.selected_opportunity_ids.length() > 0,
-                                    rx.badge("Interview Guide", color_scheme="blue", variant="solid"),
-                                    rx.badge("Battle Plan", color_scheme="red", variant="solid"),
-                                ),
+                                rx.badge("Interview Guide", color_scheme="blue", variant="solid"),
                                 rx.text(
                                     f"Generated: {State.prep_last_updated}",
                                     color="gray",
@@ -667,7 +668,6 @@ def render_prep() -> rx.Component:
                         rx.table.header(
                             rx.table.row(
                                 rx.table.column_header_cell("Date"),
-                                rx.table.column_header_cell("Type"),
                                 rx.table.column_header_cell("Persona"),
                                 rx.table.column_header_cell("Coach"),
                                 rx.table.column_header_cell(""),

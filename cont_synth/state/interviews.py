@@ -167,11 +167,32 @@ class InterviewStateMixin(rx.State, mixin=True):
             ).all()
             opportunity_ids = {link.opportunity_id for link in links}
 
+            # Phase 1: delete all rows that FK-reference this interview.
+            # Committed before touching the interview row so the DB never sees
+            # a state where the parent is gone but children still reference it.
             for link in links:
                 session.delete(link)
-            session.delete(interview)
+            for fb in session.exec(
+                select(InterviewFeedback).where(InterviewFeedback.interview_id == interview_id)
+            ).all():
+                session.delete(fb)
+            for log in session.exec(
+                select(LlmUsageLog).where(LlmUsageLog.interview_id == interview_id)
+            ).all():
+                session.delete(log)
+            for ipl in session.exec(
+                select(InterviewParticipantLink).where(InterviewParticipantLink.interview_id == interview_id)
+            ).all():
+                session.delete(ipl)
             session.commit()
 
+            # Phase 2: delete the interview row itself.
+            interview = session.get(Interview, interview_id)
+            if interview:
+                session.delete(interview)
+            session.commit()
+
+            # Phase 3: clean up opportunities that are now evidence-less.
             for opp_id in opportunity_ids:
                 remaining_links = session.exec(
                     select(IOL).where(IOL.opportunity_id == opp_id)
@@ -239,7 +260,20 @@ class InterviewStateMixin(rx.State, mixin=True):
             existing_themes = sorted(set(existing_opps_themes.values())) if existing_opps_themes else []
             existing_themes_str = ", ".join(existing_themes) if existing_themes else "None yet — create new themes as needed."
 
+            # --- RAG: retrieve workspace context (gracefully degrades if no docs or error) ---
+            workspace_context = ""
+            try:
+                from ..kb_ingest import get_rag_context
+                workspace_context = get_rag_context(self.transcript_text, int(self.active_product_id))
+            except Exception as rag_err:
+                print(f"RAG context retrieval failed (non-fatal): {rag_err}")
+
             synthesis_prompt = load_prompt("synthesis.txt").format(existing_themes=existing_themes_str)
+            if workspace_context:
+                synthesis_prompt += "\n\n" + load_prompt("rag_context_block.txt").format(
+                    workspace_context=workspace_context
+                )
+
             response = pro_model.generate_content(
                 f"{synthesis_prompt}\n\nTranscript:\n{self.transcript_text}",
                 generation_config=genai.GenerationConfig(
@@ -724,8 +758,34 @@ class InterviewStateMixin(rx.State, mixin=True):
                 )
             ).all()
 
+            # Build opp_id → persona names mapping via InterviewOpportunityLink → Interview → Persona
+            opp_ids = [o.id for o in opps]
+            opp_personas: dict[int, list[str]] = {o.id: [] for o in opps}
+            if opp_ids:
+                links = session.exec(
+                    select(InterviewOpportunityLink).where(
+                        InterviewOpportunityLink.opportunity_id.in_(opp_ids)
+                    )
+                ).all()
+                interview_ids = list({lnk.interview_id for lnk in links})
+                if interview_ids:
+                    interviews = session.exec(
+                        select(Interview).where(Interview.id.in_(interview_ids))
+                    ).all()
+                    persona_ids = list({iv.persona_id for iv in interviews})
+                    personas = session.exec(
+                        select(Persona).where(Persona.id.in_(persona_ids))
+                    ).all()
+                    persona_map = {p.id: p.name for p in personas}
+                    interview_map = {iv.id: iv.persona_id for iv in interviews}
+                    for lnk in links:
+                        p_id = interview_map.get(lnk.interview_id)
+                        p_name = persona_map.get(p_id, "") if p_id else ""
+                        if p_name and p_name not in opp_personas[lnk.opportunity_id]:
+                            opp_personas[lnk.opportunity_id].append(p_name)
+
             self.prep_opportunities = [
-                PrepOppItem(id=o.id, theme=o.theme, statement=o.statement)
+                PrepOppItem(id=o.id, theme=o.theme, statement=o.statement, personas=opp_personas[o.id])
                 for o in opps
             ]
 
@@ -806,7 +866,7 @@ class InterviewStateMixin(rx.State, mixin=True):
             if o.id == opp_id:
                 was_selected = o.selected
                 new_list.append(
-                    PrepOppItem(id=o.id, theme=o.theme, statement=o.statement, selected=not o.selected)
+                    PrepOppItem(id=o.id, theme=o.theme, statement=o.statement, selected=not o.selected, personas=o.personas)
                 )
             else:
                 new_list.append(o)
@@ -852,6 +912,20 @@ class InterviewStateMixin(rx.State, mixin=True):
         yield
 
         try:
+            # --- RAG: retrieve workspace context keyed on persona + selected opportunities ---
+            workspace_context_block = ""
+            try:
+                from ..kb_ingest import get_prep_rag_context
+                opp_texts = [o.statement for o in selected_opps]
+                rag_query = " ".join(filter(None, [self.target_persona] + opp_texts))
+                raw_context = get_prep_rag_context(rag_query, int(self.active_product_id))
+                if raw_context:
+                    workspace_context_block = load_prompt("rag_context_block.txt").format(
+                        workspace_context=raw_context
+                    ) + "\n"
+            except Exception as rag_err:
+                print(f"Prep RAG context retrieval failed (non-fatal): {rag_err}")
+
             if selected_opps:
                 # --- OST-based interview guide: only when opportunities are explicitly selected ---
                 selected_exps = [e for e in self.prep_running_experiments if e.selected]
@@ -878,11 +952,13 @@ class InterviewStateMixin(rx.State, mixin=True):
 
                 guide_template = load_prompt("interview_guide.txt")
                 guide_prompt = guide_template.format(
+                    workspace_context=workspace_context_block,
                     persona_context=persona_context,
                     extra_context=extra_context,
                     opportunities_section=opps_section,
                     assumptions_section=exps_section,
                 )
+                print(workspace_context_block)
                 guide_response = flash_model.generate_content(guide_prompt)
                 generated_text = guide_response.text
 
@@ -949,11 +1025,13 @@ class InterviewStateMixin(rx.State, mixin=True):
 
                 prep_template = load_prompt("prep.txt")
                 prep_prompt = prep_template.format(
+                    workspace_context=workspace_context_block,
                     target_persona=self.target_persona,
                     target_opps=target_opps if target_opps else ["(No prior opportunities — use the additional direction below as the focus)"],
                     coaching_guardrails=coaching_guardrails,
                     extra_direction=extra_direction,
                 )
+                print(workspace_context_block)
                 prep_response = flash_model.generate_content(prep_prompt)
                 generated_text = prep_response.text
 

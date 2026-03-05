@@ -14,6 +14,7 @@ from .pages.llm_usage import render_llm_usage
 from .pages.participants import render_participants
 from .pages.login import login_page
 from .pages.account import render_account
+from .pages.knowledge_base import render_knowledge_base
 
 
 # --- SIDEBAR COMPONENT ---
@@ -317,6 +318,7 @@ def sidebar() -> rx.Component:
         sidebar_item("Pre-Meeting Prep", "target", "prep"),
         sidebar_item("Interviews", "archive", "logs"),
         sidebar_item("Participants", "users", "participants"),
+        sidebar_item("Product Context", "book-open", "knowledge_base"),
         # Push workspace section to the bottom
         rx.spacer(),
         _workspace_section(),
@@ -405,6 +407,10 @@ def account_page() -> rx.Component:
     return _page_layout(render_account(), State.load_account_page)
 
 
+def knowledge_base_page() -> rx.Component:
+    return _page_layout(render_knowledge_base(), State.load_knowledge_base_page)
+
+
 def login_route() -> rx.Component:
     return rx.box(login_page(), on_mount=State.load_app)
 
@@ -422,4 +428,5 @@ app.add_page(prep_page, route="/prep")
 app.add_page(participants_page, route="/participants")
 app.add_page(llm_usage_page, route="/llm-usage")
 app.add_page(account_page, route="/account")
+app.add_page(knowledge_base_page, route="/knowledge-base")
 app.add_page(login_route, route="/login")

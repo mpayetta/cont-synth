@@ -1,0 +1,5 @@
+<Workspace_Context>
+The following are the most relevant excerpts from this product's documentation. Use them to better understand the product and correctly classify opportunities into the right themes and feature areas. Do not fabricate information not present in the transcript.
+
+{workspace_context}
+</Workspace_Context>

@@ -171,12 +171,19 @@ class PrepGuideLog(rx.Model, table=True):
     input_stop_doing: str = Field(default="")      # JSON list of strings
 
 
-class KnowledgeChunk(rx.Model, table=True):
-    """A chunk of text from a document, with a vector embedding for RAG."""
+class WorkspaceDocument(rx.Model, table=True):
+    """Tracks a file uploaded to the workspace Knowledge Base."""
 
-    workspace_id: int
-    document_name: str
-    text_content: str
+    product_id: int | None = Field(default=1, foreign_key="product.id")
+    filename: str
+    upload_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class DocumentChunk(rx.Model, table=True):
+    """A chunked slice of a WorkspaceDocument with its vector embedding."""
+
+    document_id: int = Field(foreign_key="workspacedocument.id")
+    chunk_text: str
     # 384-dimensional embedding from all-MiniLM-L6-v2
     embedding: Optional[list] = Field(
         default=None, sa_column=Column(Vector(384))
