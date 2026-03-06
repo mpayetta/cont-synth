@@ -60,19 +60,22 @@ _URL_MAP: dict[str, str] = {
 class NavigationStateMixin(rx.State, mixin=True):
 
     def load_products(self):
-        """Fetches all products and ensures an active product is selected."""
+        """Fetches all products for the current user and ensures an active product is selected."""
         with rx.session() as session:
-            db_products = session.exec(select(Product)).all()
+            db_products = session.exec(
+                select(Product).where(Product.user_id == self.auth_user_id)
+            ).all()
             if not db_products:
-                # Failsafe if the database migration seed was skipped
-                default_prod = Product(id=1, name="Default Product")
+                # Failsafe: create a default workspace for this user
+                default_prod = Product(name="Default Product", user_id=self.auth_user_id)
                 session.add(default_prod)
                 session.commit()
+                session.refresh(default_prod)
                 db_products = [default_prod]
 
             self.products = [ProductItem(id=p.id, name=p.name) for p in db_products]
 
-            # Ensure the active product actually exists
+            # Ensure the active product actually belongs to this user
             if not any(str(p.id) == self.active_product_id for p in self.products):
                 self.active_product_id = str(self.products[0].id)
 
@@ -91,7 +94,9 @@ class NavigationStateMixin(rx.State, mixin=True):
         return rx.redirect(_URL_MAP.get(view_name, "/"))
 
     def load_llm_usage(self):
-        """Fetches all LLM usage log rows for the dashboard."""
+        """Fetches all LLM usage log rows for the dashboard. Admin-only: shows all users."""
+        if self.auth_user_role != "admin":
+            return
         with rx.session() as session:
             rows = session.exec(
                 select(LlmUsageLog).order_by(LlmUsageLog.created_at.desc())
@@ -114,6 +119,7 @@ class NavigationStateMixin(rx.State, mixin=True):
         """The Master Data Router: Loads specific domain data based on the active product."""
         self.load_products()
         if self.current_view == "home":
+            self.load_ledger()
             self.load_dashboard()
         elif self.current_view == "logs":
             self.load_interview_log()
@@ -318,11 +324,11 @@ class NavigationStateMixin(rx.State, mixin=True):
             self.dashboard_recent_interviews = recent
 
     def create_product(self):
-        """Creates a new workspace."""
+        """Creates a new workspace for the current user."""
         if not self.new_product_name.strip():
             return
         with rx.session() as session:
-            new_prod = Product(name=self.new_product_name.strip())
+            new_prod = Product(name=self.new_product_name.strip(), user_id=self.auth_user_id)
             session.add(new_prod)
             session.commit()
             session.refresh(new_prod)
@@ -351,8 +357,10 @@ class NavigationStateMixin(rx.State, mixin=True):
     def delete_current_product(self):
         """Performs a massive cascading delete to wipe the workspace completely."""
         with rx.session() as session:
-            # 1. Prevent deleting the very last workspace
-            all_prods = session.exec(select(Product)).all()
+            # 1. Prevent deleting the very last workspace for this user
+            all_prods = session.exec(
+                select(Product).where(Product.user_id == self.auth_user_id)
+            ).all()
             if len(all_prods) <= 1:
                 return rx.window_alert("Cannot delete the only workspace. Create a new one first.")
 

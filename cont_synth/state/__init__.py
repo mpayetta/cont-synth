@@ -191,6 +191,7 @@ class State(
     auth_user_id: int = 0
     auth_username: str = ""
     auth_fullname: str = ""
+    auth_user_role: str = ""
     login_username: str = ""
     login_password: str = ""
     login_error: str = ""
@@ -431,6 +432,10 @@ class State(
     kb_upload_error: str = ""
 
     @rx.var
+    def is_admin(self) -> bool:
+        return self.auth_user_role == "admin"
+
+    @rx.var
     def kb_document_count(self) -> int:
         return len(self.kb_documents)
 
@@ -482,6 +487,7 @@ class State(
         self.auth_user_id = user.id
         self.auth_username = user.username
         self.auth_fullname = user.fullname
+        self.auth_user_role = user.role
         self.is_authenticated = True
         self.login_error = ""
         self.login_username = ""
@@ -500,6 +506,7 @@ class State(
         self.auth_user_id = 0
         self.auth_username = ""
         self.auth_fullname = ""
+        self.auth_user_role = ""
         yield rx.call_script("localStorage.removeItem('auth_user_id')")
         yield rx.redirect("/login")
 
@@ -517,6 +524,7 @@ class State(
         self.auth_user_id = user.id
         self.auth_username = user.username
         self.auth_fullname = user.fullname
+        self.auth_user_role = user.role
         self.is_authenticated = True
         configure_genai(user.gemini_api_key or "")
         self.load_data_for_current_view()
@@ -703,42 +711,65 @@ class State(
         self.settings_success = "Settings saved successfully."
 
     def wipe_database(self):
-        """Delete all data except the current user. Useful for resetting test state."""
+        """Delete all data for the current user's workspaces. Other users are unaffected."""
         with rx.session() as session:
-            # Delete in FK-safe order (children before parents)
-            for row in session.exec(select(Experiment)).all():
+            # Gather current user's scope
+            user_prod_ids = [
+                p.id for p in session.exec(
+                    select(Product).where(Product.user_id == self.auth_user_id)
+                ).all()
+            ]
+            if not user_prod_ids:
+                return
+
+            inv_ids = [
+                i.id for i in session.exec(
+                    select(Interview).where(Interview.product_id.in_(user_prod_ids))
+                ).all()
+            ]
+            opp_ids = [
+                o.id for o in session.exec(
+                    select(Opportunity).where(Opportunity.product_id.in_(user_prod_ids))
+                ).all()
+            ]
+            sol_ids = (
+                [s.id for s in session.exec(
+                    select(Solution).where(Solution.opportunity_id.in_(opp_ids))
+                ).all()]
+                if opp_ids else []
+            )
+
+            # Delete in FK-safe order (children before parents), scoped to this user
+            if sol_ids:
+                for row in session.exec(select(Experiment).where(Experiment.solution_id.in_(sol_ids))).all():
+                    session.delete(row)
+            if inv_ids:
+                for row in session.exec(select(InterviewParticipantLink).where(InterviewParticipantLink.interview_id.in_(inv_ids))).all():
+                    session.delete(row)
+                for row in session.exec(select(InterviewOpportunityLink).where(InterviewOpportunityLink.interview_id.in_(inv_ids))).all():
+                    session.delete(row)
+                for row in session.exec(select(LlmUsageLog).where(LlmUsageLog.interview_id.in_(inv_ids))).all():
+                    session.delete(row)
+                for row in session.exec(select(InterviewFeedback).where(InterviewFeedback.interview_id.in_(inv_ids))).all():
+                    session.delete(row)
+            if opp_ids:
+                for row in session.exec(select(OutcomeOpportunityLink).where(OutcomeOpportunityLink.opportunity_id.in_(opp_ids))).all():
+                    session.delete(row)
+                # Solutions: children (sub-solutions) first
+                for row in session.exec(select(Solution).where(Solution.opportunity_id.in_(opp_ids), Solution.parent_id != None)).all():
+                    session.delete(row)
+                for row in session.exec(select(Solution).where(Solution.opportunity_id.in_(opp_ids))).all():
+                    session.delete(row)
+                # Opportunities: children first
+                for row in session.exec(select(Opportunity).where(Opportunity.product_id.in_(user_prod_ids), Opportunity.parent_id != None)).all():
+                    session.delete(row)
+                for row in session.exec(select(Opportunity).where(Opportunity.product_id.in_(user_prod_ids))).all():
+                    session.delete(row)
+            for row in session.exec(select(Outcome).where(Outcome.product_id.in_(user_prod_ids))).all():
                 session.delete(row)
-            for row in session.exec(select(InterviewParticipantLink)).all():
+            for row in session.exec(select(Interview).where(Interview.product_id.in_(user_prod_ids))).all():
                 session.delete(row)
-            for row in session.exec(select(InterviewOpportunityLink)).all():
-                session.delete(row)
-            for row in session.exec(select(OutcomeOpportunityLink)).all():
-                session.delete(row)
-            for row in session.exec(select(LlmUsageLog)).all():
-                session.delete(row)
-            for row in session.exec(select(InterviewFeedback)).all():
-                session.delete(row)
-            for row in session.exec(select(PersonaPrep)).all():  # PersonaPrep is from .core
-                session.delete(row)
-            for row in session.exec(select(Interview)).all():
-                session.delete(row)
-            # Solutions have a self-referential parent_id — clear children first
-            for row in session.exec(select(Solution).where(Solution.parent_id != None)).all():
-                session.delete(row)
-            for row in session.exec(select(Solution)).all():
-                session.delete(row)
-            # Opportunities have a self-referential parent_id — clear children first
-            for row in session.exec(select(Opportunity).where(Opportunity.parent_id != None)).all():
-                session.delete(row)
-            for row in session.exec(select(Opportunity)).all():
-                session.delete(row)
-            for row in session.exec(select(Outcome)).all():
-                session.delete(row)
-            for row in session.exec(select(Participant)).all():
-                session.delete(row)
-            for row in session.exec(select(Persona)).all():
-                session.delete(row)
-            for row in session.exec(select(Product)).all():
+            for row in session.exec(select(Product).where(Product.user_id == self.auth_user_id)).all():
                 session.delete(row)
             session.commit()
 

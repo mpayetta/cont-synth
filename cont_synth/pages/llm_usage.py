@@ -50,6 +50,20 @@ def _show_usage_row(item: LlmUsageItem) -> rx.Component:
 
 
 def render_llm_usage() -> rx.Component:
+    return rx.cond(
+        State.is_admin,
+        _render_llm_usage_content(),
+        rx.vstack(
+            rx.icon("lock", size=32, color="var(--gray-6)"),
+            rx.text("This page is only accessible to admin users.", color="var(--gray-11)", size="3"),
+            align="center",
+            padding_y="60px",
+            width="100%",
+        ),
+    )
+
+
+def _render_llm_usage_content() -> rx.Component:
     return rx.vstack(
         # Header
         rx.box(

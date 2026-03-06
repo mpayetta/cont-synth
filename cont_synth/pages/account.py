@@ -35,7 +35,10 @@ def _nav_item(label: str, icon: str, section: str) -> rx.Component:
 def _secondary_nav() -> rx.Component:
     return rx.vstack(
         _nav_item("Settings", "settings", "settings"),
-        _nav_item("LLM Usage", "bar-chart-2", "llm_usage"),
+        rx.cond(
+            State.is_admin,
+            _nav_item("LLM Usage", "bar-chart-2", "llm_usage"),
+        ),
         _nav_item("Danger Zone", "shield-alert", "danger_zone"),
         spacing="1",
         width="180px",
@@ -461,7 +464,7 @@ def render_account() -> rx.Component:
                     State.account_section == "settings",
                     _settings_view(),
                     rx.cond(
-                        State.account_section == "llm_usage",
+                        (State.account_section == "llm_usage") & State.is_admin,
                         _llm_usage_view(),
                         _danger_zone_view(),
                     ),

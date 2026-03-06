@@ -8,6 +8,7 @@ from pgvector.sqlalchemy import Vector
 
 class Product(rx.Model, table=True):
     name: str
+    user_id: int | None = Field(default=None, foreign_key="user.id")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -124,12 +125,13 @@ class InterviewParticipantLink(SQLModel, table=True):
 
 
 class User(rx.Model, table=True):
-    """Single-user authentication table."""
+    """User authentication table. role: 'admin' | 'user'"""
 
     username: str = Field(unique=True, index=True)
     password_hash: str
     fullname: str
     gemini_api_key: Optional[str] = Field(default=None)
+    role: str = Field(default="user")
 
 
 class InterviewFeedback(rx.Model, table=True):
