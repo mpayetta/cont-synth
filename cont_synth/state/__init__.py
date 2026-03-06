@@ -52,7 +52,8 @@ from ..models import (
     Product,
 )
 from .navigation import NavigationStateMixin
-from .interviews import InterviewStateMixin
+from .synthesis import InterviewSynthesisStateMixin, _SCROLL_TO_MARK
+from .interviews import InterviewPrepStateMixin
 from .ledger import LedgerStateMixin
 from .participants import ParticipantStateMixin
 from .knowledge_base import KnowledgeBaseStateMixin
@@ -176,7 +177,8 @@ def _inject_mark(escaped: str, escaped_quote: str) -> str:
 
 class State(
     NavigationStateMixin,
-    InterviewStateMixin,
+    InterviewSynthesisStateMixin,
+    InterviewPrepStateMixin,
     LedgerStateMixin,
     ParticipantStateMixin,
     KnowledgeBaseStateMixin,
@@ -215,6 +217,9 @@ class State(
 
     # --- Interview & prep state ---
     is_processing: bool = False
+    synthesis_status: str = ""
+    synthesis_phase: str = ""
+    synthesis_ready: bool = False
     is_prepping: bool = False
     persona_input: str = ""
     transcript_text: str = ""
@@ -348,6 +353,9 @@ class State(
     # --- LLM Usage dashboard ---
     llm_usage_logs: list[LlmUsageItem] = []
     workspace_menu_open: bool = False
+
+    # --- Combobox UI ---
+    open_combo: str = ""
 
     # --- Participant CRM ---
     participants: list[ParticipantItem] = []
@@ -538,6 +546,21 @@ class State(
     def set_participant_form_segment(self, val: str): self.participant_form_segment = val
     def set_participant_form_recruited_via(self, val: str): self.participant_form_recruited_via = val
     def set_participant_form_notes(self, val: str): self.participant_form_notes = val
+
+    def open_combo_box(self, field_id: str): self.open_combo = field_id
+    def close_combo_box(self): self.open_combo = ""
+    def select_combo_option(self, field_id: str, value: str):
+        self.open_combo = ""
+        if field_id == "synthesize_persona":
+            self.persona_input = value
+        elif field_id == "participant_persona":
+            self.participant_form_persona = value
+        elif field_id == "participant_segment":
+            self.participant_form_segment = value
+        elif field_id == "participant_recruited_via":
+            self.participant_form_recruited_via = value
+        elif field_id == "opp_theme":
+            self.manual_opp_theme = value
     def set_new_experiment_name(self, val: str): self.new_experiment_name = val
     def set_new_experiment_assumption(self, val: str): self.new_experiment_assumption = val
     def set_new_experiment_description(self, val: str): self.new_experiment_description = val
@@ -551,38 +574,12 @@ class State(
         self.account_section = "settings"
         return self._ensure_auth_and_load()
 
-    def scroll_to_timestamp(self, ts: str):
-        """Scroll the transcript to the line containing the given timestamp."""
-        return rx.call_script(
-            f"""
-            (function() {{
-                var ts = {repr(ts)};
-                var container = document.getElementById('interview-transcript');
-                if (!container) return;
-                var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-                var node, found = false;
-                while (!found && (node = walker.nextNode())) {{
-                    var text = node.textContent;
-                    var idx = 0;
-                    while ((idx = text.indexOf(ts, idx)) !== -1) {{
-                        var before = idx > 0 ? text[idx - 1] : ' ';
-                        var after = idx + ts.length < text.length ? text[idx + ts.length] : ' ';
-                        if (!/\d/.test(before) && !/[\d:]/.test(after)) {{
-                            var range = document.createRange();
-                            range.setStart(node, idx);
-                            range.setEnd(node, idx + ts.length);
-                            var rect = range.getBoundingClientRect();
-                            var contRect = container.getBoundingClientRect();
-                            container.scrollTop += rect.top - contRect.top - contRect.height / 2 + rect.height / 2;
-                            found = true;
-                            break;
-                        }}
-                        idx++;
-                    }}
-                }}
-            }})()
-            """
-        )
+    async def scroll_to_timestamp(self, ts: str):
+        """Highlight the timestamp in the transcript and scroll to it."""
+        self.highlighted_quote_text = ts
+        self.scroll_trigger += 1
+        yield
+        yield rx.call_script(_SCROLL_TO_MARK)
 
     def _prefill_account_settings(self):
         """Pre-fill account settings form fields from the current user record."""
@@ -732,7 +729,12 @@ class State(
 
     def load_review_page(self):
         self.current_view = "synthesis_review"
+        self.synthesis_ready = False
         return self._ensure_auth_and_load()
+
+    def go_to_review(self):
+        self.synthesis_ready = False
+        return rx.redirect("/review")
 
     def load_ledger_page(self):
         self.current_view = "ledger"
@@ -845,6 +847,49 @@ class State(
         if self.show_team_members:
             return self.participants
         return [p for p in self.participants if not p.is_team_member]
+
+    @rx.var
+    def available_themes(self) -> list[str]:
+        seen = []
+        for item in self.ledger_data:
+            if item.theme and item.theme not in seen:
+                seen.append(item.theme)
+        return sorted(seen)
+
+    @rx.var
+    def filtered_opp_themes(self) -> list[str]:
+        q = self.manual_opp_theme.lower()
+        if not q or q == "uncategorized":
+            return self.available_themes
+        return [t for t in self.available_themes if q in t.lower()]
+
+    @rx.var
+    def filtered_synthesize_personas(self) -> list[str]:
+        q = self.persona_input.lower()
+        if not q:
+            return self.available_personas
+        return [p for p in self.available_personas if q in p.lower()]
+
+    @rx.var
+    def filtered_participant_personas(self) -> list[str]:
+        q = self.participant_form_persona.lower()
+        if not q:
+            return self.available_personas
+        return [p for p in self.available_personas if q in p.lower()]
+
+    @rx.var
+    def filtered_participant_segments(self) -> list[str]:
+        q = self.participant_form_segment.lower()
+        if not q:
+            return self.participant_segments
+        return [p for p in self.participant_segments if q in p.lower()]
+
+    @rx.var
+    def filtered_participant_recruited_vias(self) -> list[str]:
+        q = self.participant_form_recruited_via.lower()
+        if not q:
+            return self.participant_recruited_vias
+        return [p for p in self.participant_recruited_vias if q in p.lower()]
 
     @rx.var
     def prep_persona_options(self) -> list[str]:

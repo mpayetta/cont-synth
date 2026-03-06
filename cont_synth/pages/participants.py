@@ -1,5 +1,6 @@
 import reflex as rx
 from cont_synth.state import State, ParticipantItem
+from cont_synth.pages.ui import combo_box
 
 _INPUT_STYLE = {
     "width": "100%",
@@ -41,21 +42,6 @@ def _plain_input(placeholder: str, value, on_change) -> rx.Component:
     )
 
 
-def _auto_input(placeholder: str, value, on_change, list_id: str, suggestions) -> rx.Component:
-    return rx.fragment(
-        rx.el.input(
-            placeholder=placeholder,
-            default_value=value,
-            on_blur=on_change,
-            list=list_id,
-            style=_INPUT_STYLE,
-        ),
-        rx.el.datalist(
-            rx.foreach(suggestions, lambda s: rx.el.option(value=s)),
-            id=list_id,
-        ),
-    )
-
 
 def _participant_form_card() -> rx.Component:
     return rx.card(
@@ -77,12 +63,12 @@ def _participant_form_card() -> rx.Component:
                 ),
                 _field(
                     "Persona (role archetype)",
-                    _auto_input(
+                    combo_box(
                         "e.g. VP of Engineering, Managing Director",
                         State.participant_form_persona,
                         State.set_participant_form_persona,
-                        "persona-suggestions",
-                        State.available_personas,
+                        "participant_persona",
+                        State.filtered_participant_personas,
                     ),
                 ),
                 spacing="4",
@@ -114,22 +100,22 @@ def _participant_form_card() -> rx.Component:
             rx.hstack(
                 _field(
                     "Segment",
-                    _auto_input(
+                    combo_box(
                         "e.g. Enterprise, SMB, Mid-Market",
                         State.participant_form_segment,
                         State.set_participant_form_segment,
-                        "segment-suggestions",
-                        State.participant_segments,
+                        "participant_segment",
+                        State.filtered_participant_segments,
                     ),
                 ),
                 _field(
                     "Recruited Via",
-                    _auto_input(
+                    combo_box(
                         "e.g. LinkedIn, Customer Success, Referral",
                         State.participant_form_recruited_via,
                         State.set_participant_form_recruited_via,
-                        "recruited-via-suggestions",
-                        State.participant_recruited_vias,
+                        "participant_recruited_via",
+                        State.filtered_participant_recruited_vias,
                     ),
                 ),
                 spacing="4",
@@ -173,13 +159,18 @@ def _participant_row(item: ParticipantItem) -> rx.Component:
             rx.cond(
                 item.is_team_member,
                 rx.badge("Interviewer", color_scheme="gray", variant="soft", size="1"),
-                rx.badge("Customer", color_scheme="blue", variant="soft", size="1"),
+                rx.badge("User", color_scheme="blue", variant="soft", size="1"),
             )
         ),
         rx.table.cell(
             rx.cond(
                 item.persona_name != "",
-                rx.badge(item.persona_name, color_scheme=item.persona_color, variant="soft", size="1"),
+                rx.badge(
+                    item.persona_name,
+                    color_scheme=item.persona_color,
+                    variant="soft",
+                    size="1",
+                ),
                 rx.text("—", size="2", color="var(--gray-12)"),
             )
         ),
@@ -200,8 +191,18 @@ def _participant_row(item: ParticipantItem) -> rx.Component:
         rx.table.cell(
             rx.cond(
                 item.interview_count > 5,
-                rx.badge(item.interview_count.to_string(), color_scheme="orange", variant="soft", size="1"),
-                rx.badge(item.interview_count.to_string(), color_scheme="blue", variant="soft", size="1"),
+                rx.badge(
+                    item.interview_count.to_string(),
+                    color_scheme="orange",
+                    variant="soft",
+                    size="1",
+                ),
+                rx.badge(
+                    item.interview_count.to_string(),
+                    color_scheme="blue",
+                    variant="soft",
+                    size="1",
+                ),
             )
         ),
         rx.table.cell(

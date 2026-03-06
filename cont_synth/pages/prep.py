@@ -408,30 +408,29 @@ def _guide_drawer() -> rx.Component:
 
 
 def render_prep() -> rx.Component:
-    return rx.tabs.root(
+    return rx.vstack(
+        rx.vstack(
+            rx.text("Pre-Meeting Prep", weight="bold", size="6"),
+            rx.text(
+                "Generate interview guides tailored to the opportunities you want to explore, and review your past guides.",
+                color="gray",
+                size="3",
+            ),
+            spacing="1",
+            margin_bottom="4px",
+        ),
+        rx.divider(),
+        rx.tabs.root(
         # --- Tab List ---
         rx.tabs.list(
             rx.tabs.trigger("Create Guide", value="create"),
             rx.tabs.trigger("Guide History", value="history"),
             size="2",
-            margin_bottom="20px",
         ),
 
         # ── TAB 1: CREATE GUIDE ──────────────────────────────────────────────
         rx.tabs.content(
             rx.vstack(
-                # Header
-                rx.box(
-                    rx.text("Interview Guide Prep", weight="bold", size="6"),
-                    rx.text(
-                        "Select opportunities to explore and experiment assumptions to probe. The guide will help you steer the conversation toward the areas of your tree that matter most right now.",
-                        color="gray",
-                        size="3",
-                    ),
-                    margin_bottom="10px",
-                ),
-                rx.divider(),
-
                 # Coach Pre-Game Brief
                 _render_coach_pregame_brief(),
 
@@ -642,26 +641,15 @@ def render_prep() -> rx.Component:
                 ),
 
                 width="100%",
-                max_width="900px",
                 spacing="5",
-                padding_top="20px",
             ),
             value="create",
+            padding_top="16px",
         ),
 
         # ── TAB 2: GUIDE HISTORY ─────────────────────────────────────────────
         rx.tabs.content(
             rx.vstack(
-                rx.box(
-                    rx.text("Guide History", weight="bold", size="6"),
-                    rx.text(
-                        "Every guide you have generated, newest first. Click Open to see full input context and output.",
-                        color="gray",
-                        size="3",
-                    ),
-                    margin_bottom="10px",
-                ),
-                rx.divider(),
                 rx.cond(
                     State.guide_history.length() > 0,
                     rx.table.root(
@@ -694,9 +682,9 @@ def render_prep() -> rx.Component:
                 ),
                 width="100%",
                 spacing="5",
-                padding_top="20px",
             ),
             value="history",
+            padding_top="16px",
         ),
 
         # Guide detail drawer (rendered at root level so it overlays the whole page)
@@ -704,4 +692,10 @@ def render_prep() -> rx.Component:
 
         default_value="create",
         width="100%",
+        ),
+        width="100%",
+        max_width="900px",
+        spacing="4",
+        padding_top="20px",
+        align_items="stretch",
     )

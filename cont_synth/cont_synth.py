@@ -336,25 +336,75 @@ def sidebar() -> rx.Component:
     )
 
 
+# --- SYNTHESIS TOAST ---
+def _synthesis_toast() -> rx.Component:
+    """Fixed bottom-right toast showing synthesis progress or ready state across all pages."""
+    show_toast = State.is_processing | State.synthesis_ready
+    return rx.cond(
+        show_toast,
+        rx.box(
+            rx.cond(
+                State.synthesis_ready,
+                # Ready state — clickable
+                rx.hstack(
+                    rx.icon("circle-check", size=18, color="#4ade80"),
+                    rx.vstack(
+                        rx.text("Synthesis ready!", weight="bold", size="2", color="white"),
+                        rx.text("Click to review results →", size="1", color="rgba(255,255,255,0.7)"),
+                        spacing="0",
+                    ),
+                    spacing="3",
+                    align="center",
+                    cursor="pointer",
+                    on_click=State.go_to_review,
+                ),
+                # Processing state
+                rx.hstack(
+                    rx.spinner(size="2", color="white"),
+                    rx.vstack(
+                        rx.text("Synthesis running", weight="bold", size="2", color="white"),
+                        rx.text(State.synthesis_status, size="1", color="rgba(255,255,255,0.7)"),
+                        spacing="0",
+                    ),
+                    spacing="3",
+                    align="center",
+                ),
+            ),
+            position="fixed",
+            bottom="24px",
+            right="24px",
+            width="280px",
+            padding="14px 18px",
+            background="var(--gray-7)",
+            border_radius="10px",
+            box_shadow="0 4px 24px rgba(0,0,0,0.3)",
+            z_index="9999",
+        ),
+    )
+
+
 # --- SHARED PAGE LAYOUT ---
 def _page_layout(content: rx.Component, on_mount) -> rx.Component:
     """Authenticated app shell: sidebar + content area, guarded by is_authenticated."""
     return rx.box(
         rx.cond(
             State.is_authenticated,
-            rx.hstack(
-                sidebar(),
-                rx.box(
-                    content,
-                    padding="40px",
-                    flex="1",
-                    min_width="0",
-                    height="100%",
-                    overflow_y="auto",
+            rx.fragment(
+                rx.hstack(
+                    sidebar(),
+                    rx.box(
+                        content,
+                        padding="20px 40px",
+                        flex="1",
+                        min_width="0",
+                        height="100%",
+                        overflow_y="auto",
+                    ),
+                    width="100%",
+                    height="100vh",
+                    spacing="0",
                 ),
-                width="100%",
-                height="100vh",
-                spacing="0",
+                _synthesis_toast(),
             ),
             rx.fragment(),  # blank while auth check redirects to /login
         ),

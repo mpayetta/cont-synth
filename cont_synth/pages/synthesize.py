@@ -1,5 +1,6 @@
 import reflex as rx
 from cont_synth.state import State
+from cont_synth.pages.ui import combo_box
 
 
 def render_synthesize() -> rx.Component:
@@ -14,17 +15,13 @@ def render_synthesize() -> rx.Component:
             margin_bottom="10px",
         ),
         rx.divider(),
-        rx.input(
+        combo_box(
             placeholder="Persona (e.g., Consultant, MD)",
             value=State.persona_input,
             on_change=State.set_persona_input,
-            width="100%",
-            size="3",
-            custom_attrs={"list": "persona-suggestions"},
-        ),
-        rx.el.datalist(
-            rx.foreach(State.available_personas, lambda p: rx.el.option(value=p)),
-            id="persona-suggestions",
+            field_id="synthesize_persona",
+            suggestions=State.filtered_synthesize_personas,
+            input_style={"height": "42px", "font_size": "16px"},
         ),
         rx.upload(
             rx.vstack(
@@ -62,13 +59,36 @@ def render_synthesize() -> rx.Component:
             ),
         ),
         rx.button(
-            rx.icon("sparkles", size=16),
-            "Run Synthesis",
+            rx.cond(
+                State.is_processing,
+                rx.spinner(size="2"),
+                rx.icon("sparkles", size=16),
+            ),
+            rx.cond(
+                State.is_processing,
+                State.synthesis_status,
+                "Run Synthesis",
+            ),
             on_click=State.run_synthesis,
-            loading=State.is_processing,
+            disabled=State.is_processing,
             size="4",
             width="100%",
             color_scheme="violet",
+        ),
+        rx.cond(
+            State.is_processing,
+            rx.hstack(
+                rx.icon("arrow-left-right", size=13, color="var(--gray-9)"),
+                rx.text(
+                    "Feel free to navigate away — we'll notify you when it's ready.",
+                    size="1",
+                    color="var(--gray-9)",
+                ),
+                spacing="2",
+                align="center",
+                justify="center",
+                width="100%",
+            ),
         ),
         width="100%",
         max_width="900px",

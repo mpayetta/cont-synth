@@ -11,110 +11,113 @@ def _render_coach_panel() -> rx.Component:
     return rx.cond(
         State.pending_coach_score > 0,
         rx.vstack(
-            # Header row
+            # Header outside the card — matches Evidence Snippets / Coach's Corner style
             rx.hstack(
-                rx.icon("graduation-cap", size=16, color="#6E56CF"),
+                rx.icon("graduation-cap", size=16, color="var(--gray-12)"),
                 rx.text(
                     "Coach's Corner",
                     size="2",
                     weight="bold",
-                    color="#6E56CF",
+                    color="var(--gray-12)",
                     text_transform="uppercase",
                     letter_spacing="0.05em",
                 ),
                 align="center",
-                width="100%",
                 spacing="2",
+                width="100%",
             ),
-            # Keep Doing
-            rx.cond(
-                State.pending_coach_keep.length() > 0,
-                rx.vstack(
-                    rx.hstack(
-                        rx.icon("check-circle", size=13, color="#30A46C"),
-                        rx.text(
-                            "Keep Doing",
-                            size="1",
-                            weight="bold",
-                            color="#30A46C",
-                            text_transform="uppercase",
-                            letter_spacing="0.05em",
+            # Card
+            rx.vstack(
+                rx.cond(
+                    State.pending_coach_keep.length() > 0,
+                    rx.vstack(
+                        rx.hstack(
+                            rx.icon("check-circle", size=13, color="#30A46C"),
+                            rx.text(
+                                "Keep Doing",
+                                size="1",
+                                weight="bold",
+                                color="#30A46C",
+                                text_transform="uppercase",
+                                letter_spacing="0.05em",
+                            ),
+                            spacing="1",
+                            align="center",
                         ),
+                        rx.foreach(State.pending_coach_keep, _coach_feedback_item),
                         spacing="1",
-                        align="center",
+                        align_items="start",
+                        width="100%",
+                        padding="10px 12px",
+                        background_color="rgba(6, 214, 160, 0.08)",
+                        border_radius="6px",
+                        border="1px solid rgba(6, 214, 160, 0.3)",
                     ),
-                    rx.foreach(State.pending_coach_keep, _coach_feedback_item),
-                    spacing="1",
-                    align_items="start",
-                    width="100%",
-                    padding="10px 12px",
-                    background_color="rgba(6, 214, 160, 0.08)",
-                    border_radius="6px",
-                    border="1px solid rgba(6, 214, 160, 0.3)",
+                    rx.fragment(),
                 ),
-                rx.fragment(),
-            ),
-            # Stop Doing
-            rx.cond(
-                State.pending_coach_stop.length() > 0,
-                rx.vstack(
-                    rx.hstack(
-                        rx.icon("x-circle", size=13, color="#E5484D"),
-                        rx.text(
-                            "Stop Doing",
-                            size="1",
-                            weight="bold",
-                            color="#E5484D",
-                            text_transform="uppercase",
-                            letter_spacing="0.05em",
+                rx.cond(
+                    State.pending_coach_stop.length() > 0,
+                    rx.vstack(
+                        rx.hstack(
+                            rx.icon("x-circle", size=13, color="#E5484D"),
+                            rx.text(
+                                "Stop Doing",
+                                size="1",
+                                weight="bold",
+                                color="#E5484D",
+                                text_transform="uppercase",
+                                letter_spacing="0.05em",
+                            ),
+                            spacing="1",
+                            align="center",
                         ),
+                        rx.foreach(State.pending_coach_stop, _coach_feedback_item),
                         spacing="1",
-                        align="center",
+                        align_items="start",
+                        width="100%",
+                        padding="10px 12px",
+                        background_color="rgba(239, 71, 111, 0.08)",
+                        border_radius="6px",
+                        border="1px solid rgba(239, 71, 111, 0.3)",
                     ),
-                    rx.foreach(State.pending_coach_stop, _coach_feedback_item),
-                    spacing="1",
-                    align_items="start",
-                    width="100%",
-                    padding="10px 12px",
-                    background_color="rgba(239, 71, 111, 0.08)",
-                    border_radius="6px",
-                    border="1px solid rgba(239, 71, 111, 0.3)",
+                    rx.fragment(),
                 ),
-                rx.fragment(),
-            ),
-            # Start Doing
-            rx.cond(
-                State.pending_coach_start.length() > 0,
-                rx.vstack(
-                    rx.hstack(
-                        rx.icon("lightbulb", size=13, color="#F78C6B"),
-                        rx.text(
-                            "Start Doing",
-                            size="1",
-                            weight="bold",
-                            color="#F78C6B",
-                            text_transform="uppercase",
-                            letter_spacing="0.05em",
+                rx.cond(
+                    State.pending_coach_start.length() > 0,
+                    rx.vstack(
+                        rx.hstack(
+                            rx.icon("lightbulb", size=13, color="#F78C6B"),
+                            rx.text(
+                                "Start Doing",
+                                size="1",
+                                weight="bold",
+                                color="#F78C6B",
+                                text_transform="uppercase",
+                                letter_spacing="0.05em",
+                            ),
+                            spacing="1",
+                            align="center",
                         ),
+                        rx.foreach(State.pending_coach_start, _coach_feedback_item),
                         spacing="1",
-                        align="center",
+                        align_items="start",
+                        width="100%",
+                        padding="10px 12px",
+                        background_color="rgba(247, 140, 107, 0.08)",
+                        border_radius="6px",
+                        border="1px solid rgba(247, 140, 107, 0.3)",
                     ),
-                    rx.foreach(State.pending_coach_start, _coach_feedback_item),
-                    spacing="1",
-                    align_items="start",
-                    width="100%",
-                    padding="10px 12px",
-                    background_color="rgba(247, 140, 107, 0.08)",
-                    border_radius="6px",
-                    border="1px solid rgba(247, 140, 107, 0.3)",
+                    rx.fragment(),
                 ),
-                rx.fragment(),
+                spacing="3",
+                padding="16px",
+                border_radius="10px",
+                align_items="stretch",
+                width="100%",
+                background_color="var(--gray-2)",
+                border="1px solid var(--gray-5)",
             ),
             spacing="3",
-            padding="16px",
-            background_color="rgba(131, 56, 236, 0.04)",
-            border_radius="10px",
-            border="1px solid rgba(131, 56, 236, 0.2)",
             align_items="stretch",
             width="100%",
         ),
@@ -127,7 +130,7 @@ def _render_participant_role(item: PendingParticipantItem) -> rx.Component:
     return rx.hstack(
         rx.text(item.name, size="2", weight="medium", color="var(--gray-12)"),
         rx.button(
-            "Customer",
+            "User",
             size="1",
             color_scheme="blue",
             variant=rx.cond(item.role == "interviewee", "soft", "ghost"),
@@ -151,91 +154,119 @@ def _render_participant_role(item: PendingParticipantItem) -> rx.Component:
     )
 
 
-def _transcript_header_meta() -> rx.Component:
-    """Date, duration, and editable participant roles — shown above the transcript."""
+def _interview_info_panel() -> rx.Component:
+    """Date, duration, and participant roles — mirrors interview detail's info panel style."""
     return rx.vstack(
-        # Date + duration row (shown only when available)
-        rx.cond(
-            (State.pending_synthesis_duration > 0)
-            | (State.pending_synthesis_interview_date != ""),
-            rx.hstack(
-                rx.cond(
-                    State.pending_synthesis_interview_date != "",
-                    rx.hstack(
-                        rx.icon("calendar", size=12, color="var(--gray-12)"),
-                        rx.text(
-                            State.pending_synthesis_interview_date,
-                            size="1",
-                            color="var(--gray-12)",
-                        ),
-                        spacing="1",
-                        align="center",
-                    ),
-                    rx.fragment(),
-                ),
-                rx.cond(
-                    State.pending_synthesis_duration > 0,
-                    rx.hstack(
-                        rx.icon("clock", size=12, color="var(--gray-12)"),
-                        rx.text(
-                            State.pending_synthesis_duration.to_string(),
-                            " min",
-                            size="1",
-                            color="var(--gray-12)",
-                        ),
-                        spacing="1",
-                        align="center",
-                    ),
-                    rx.fragment(),
-                ),
-                spacing="4",
-                align="center",
+        rx.hstack(
+            rx.icon("info", size=16, color="var(--gray-12)"),
+            rx.text(
+                "Interview Info",
+                size="2",
+                weight="bold",
+                color="var(--gray-12)",
+                text_transform="uppercase",
+                letter_spacing="0.05em",
             ),
-            rx.fragment(),
+            align="center",
+            spacing="2",
         ),
-        # Participants with role editor (shown only when participants were extracted)
-        rx.cond(
-            State.pending_synthesis_participants.length() > 0,
-            rx.vstack(
+        rx.vstack(
+            rx.cond(
+                (State.pending_synthesis_duration > 0)
+                | (State.pending_synthesis_interview_date != ""),
                 rx.hstack(
-                    rx.icon("users", size=13, color="var(--gray-12)"),
-                    rx.text(
-                        "Participants",
-                        size="1",
-                        weight="bold",
-                        color="var(--gray-12)",
-                        text_transform="uppercase",
-                        letter_spacing="0.05em",
+                    rx.cond(
+                        State.pending_synthesis_interview_date != "",
+                        rx.vstack(
+                            rx.text(
+                                "Interview Date",
+                                size="1",
+                                weight="bold",
+                                color="var(--gray-10)",
+                                text_transform="uppercase",
+                                letter_spacing="0.05em",
+                            ),
+                            rx.hstack(
+                                rx.icon("calendar", size=13, color="var(--gray-12)"),
+                                rx.text(State.pending_synthesis_interview_date, size="2", color="var(--gray-12)"),
+                                spacing="1",
+                                align="center",
+                            ),
+                            spacing="1",
+                            align_items="start",
+                        ),
+                        rx.fragment(),
                     ),
-                    rx.text(
-                        "· set each person's role before confirming",
-                        size="1",
-                        color="var(--gray-12)",
-                        style={"font_style": "italic"},
+                    rx.cond(
+                        State.pending_synthesis_duration > 0,
+                        rx.vstack(
+                            rx.text(
+                                "Duration",
+                                size="1",
+                                weight="bold",
+                                color="var(--gray-10)",
+                                text_transform="uppercase",
+                                letter_spacing="0.05em",
+                            ),
+                            rx.hstack(
+                                rx.icon("clock", size=13, color="var(--gray-12)"),
+                                rx.text(State.pending_synthesis_duration.to_string(), " min", size="2", color="var(--gray-12)"),
+                                spacing="1",
+                                align="center",
+                            ),
+                            spacing="1",
+                            align_items="start",
+                        ),
+                        rx.fragment(),
+                    ),
+                    spacing="6",
+                    align="start",
+                ),
+                rx.fragment(),
+            ),
+            rx.cond(
+                State.pending_synthesis_participants.length() > 0,
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("users", size=13, color="var(--gray-12)"),
+                        rx.text(
+                            "Participants",
+                            size="1",
+                            weight="bold",
+                            color="var(--gray-12)",
+                            text_transform="uppercase",
+                            letter_spacing="0.05em",
+                        ),
+                        rx.text(
+                            "· set each person's role before confirming",
+                            size="1",
+                            color="var(--gray-10)",
+                            style={"font_style": "italic"},
+                        ),
+                        spacing="2",
+                        align="center",
+                    ),
+                    rx.flex(
+                        rx.foreach(State.pending_participants_with_roles, _render_participant_role),
+                        wrap="wrap",
+                        gap="2",
                     ),
                     spacing="2",
-                    align="center",
+                    align_items="start",
+                    width="100%",
                 ),
-                rx.flex(
-                    rx.foreach(
-                        State.pending_participants_with_roles,
-                        _render_participant_role,
-                    ),
-                    wrap="wrap",
-                    gap="2",
-                ),
-                spacing="2",
-                align_items="start",
-                width="100%",
-                padding="10px 14px",
-                background_color="var(--gray-2)",
-                border_radius="8px",
-                border="1px solid var(--gray-5)",
+                rx.fragment(),
             ),
-            rx.fragment(),
+            spacing="3",
+            padding="14px 16px",
+            background_color="var(--gray-2)",
+            border_radius="8px",
+            border="1px solid var(--gray-5)",
+            align_items="start",
+            width="100%",
         ),
-        spacing="2",
-        align_items="start",
+        spacing="3",
+        align_items="stretch",
         width="100%",
     )
 
@@ -251,7 +282,6 @@ def render_pending_opp(opp: PendingOppItem) -> rx.Component:
                 size="2",
             ),
             rx.vstack(
-                # Statement + NEW/EXISTING badge
                 rx.hstack(
                     rx.text(opp.opportunity_statement, size="2", weight="medium"),
                     rx.cond(
@@ -263,7 +293,6 @@ def render_pending_opp(opp: PendingOppItem) -> rx.Component:
                     spacing="2",
                     flex_wrap="wrap",
                 ),
-                # "Matches existing" hint
                 rx.cond(
                     opp.matched_existing_id > 0,
                     rx.text(
@@ -275,7 +304,6 @@ def render_pending_opp(opp: PendingOppItem) -> rx.Component:
                     ),
                     rx.fragment(),
                 ),
-                # Evidence quote — clickable to highlight in transcript
                 rx.box(
                     rx.hstack(
                         rx.icon("quote", size=10, color="var(--blue-9)"),
@@ -309,11 +337,7 @@ def render_pending_opp(opp: PendingOppItem) -> rx.Component:
         ),
         padding="12px",
         background_color=rx.cond(opp.selected, "var(--blue-2)", "var(--gray-2)"),
-        border=rx.cond(
-            opp.selected,
-            "1px solid var(--blue-5)",
-            "1px solid var(--gray-4)",
-        ),
+        border=rx.cond(opp.selected, "1px solid var(--blue-5)", "1px solid var(--gray-4)"),
         border_radius="6px",
         transition="all 0.15s",
         width="100%",
@@ -322,53 +346,54 @@ def render_pending_opp(opp: PendingOppItem) -> rx.Component:
 
 def render_synthesis_review() -> rx.Component:
     return rx.vstack(
-        # Page header
+        # ── Top: cancel button row ────────────────────────────────────────────
         rx.hstack(
-            rx.vstack(
-                rx.text("Review Synthesis Results", weight="bold", size="6"),
-                rx.text(
-                    "Select the opportunities to ingest. Click an evidence quote to verify it in the transcript.",
-                    color="gray",
-                    size="3",
-                ),
-                spacing="1",
-                align_items="start",
-            ),
             rx.spacer(),
-            rx.hstack(
-                rx.cond(
-                    State.pending_coach_score > 0,
-                    rx.badge(
-                        "Coach Score: ",
-                        State.pending_coach_score.to_string(),
-                        "/10",
-                        color_scheme=rx.cond(
-                            State.pending_coach_score >= 8,
-                            "green",
-                            rx.cond(State.pending_coach_score >= 5, "amber", "red"),
-                        ),
-                        size="2",
-                    ),
-                    rx.badge(
-                        "Quality: ",
-                        State.pending_synthesis_quality.to_string(),
-                        "/10",
-                        color_scheme="blue",
-                        size="2",
-                    ),
-                ),
-                rx.badge(State.pending_synthesis_persona, color_scheme="purple", size="2"),
-                spacing="2",
-                align="center",
+            rx.button(
+                rx.icon("x", size=14),
+                "Cancel",
+                variant="outline",
+                color_scheme="red",
+                size="2",
+                on_click=State.cancel_synthesis_review,
             ),
-            align="start",
+            width="100%",
+        ),
+        # ── Header: persona + scores ──────────────────────────────────────────
+        rx.hstack(
+            rx.badge(State.pending_synthesis_persona, color_scheme="purple", variant="soft", size="2"),
+            rx.spacer(),
+            rx.cond(
+                State.pending_coach_score > 0,
+                rx.badge(
+                    "Coach Score: ",
+                    State.pending_coach_score.to_string(),
+                    "/10",
+                    color_scheme=rx.cond(
+                        State.pending_coach_score >= 8,
+                        "green",
+                        rx.cond(State.pending_coach_score >= 5, "amber", "red"),
+                    ),
+                    size="2",
+                ),
+                rx.badge(
+                    "Quality: ",
+                    State.pending_synthesis_quality.to_string(),
+                    "/10",
+                    color_scheme="blue",
+                    size="2",
+                ),
+            ),
+            align="center",
+            spacing="2",
             width="100%",
         ),
         rx.divider(),
-        # Two-column body
+        # ── Two-column body ───────────────────────────────────────────────────
         rx.hstack(
-            # ── Left: Full transcript ─────────────────────────────────────────
+            # ── Left: Interview info + transcript ────────────────────────────
             rx.vstack(
+                _interview_info_panel(),
                 rx.hstack(
                     rx.icon("file-text", size=16, color="var(--gray-12)"),
                     rx.text(
@@ -382,18 +407,18 @@ def render_synthesis_review() -> rx.Component:
                     rx.text(
                         "· click a quote on the right to highlight",
                         size="1",
-                        color="var(--gray-12)",
+                        color="var(--gray-10)",
                         style={"font_style": "italic"},
                     ),
                     align="center",
                     spacing="2",
+                    margin_top="16px",
                 ),
-                # Date, duration, and participant role editor
-                _transcript_header_meta(),
                 rx.box(
                     rx.html(State.synthesis_review_transcript_html),
                     width="100%",
-                    height="calc(100vh - 340px)",
+                    flex="1",
+                    min_height="0",
                     overflow_y="auto",
                     padding="16px",
                     background_color="var(--gray-2)",
@@ -403,13 +428,14 @@ def render_synthesis_review() -> rx.Component:
                 ),
                 spacing="3",
                 flex="1",
+                min_height="0",
                 align_items="stretch",
-                min_width="0",
             ),
-            # ── Right: Opportunity review panel ───────────────────────────────
+            # ── Right: Opportunities + Coach ─────────────────────────────────
             rx.vstack(
-                # Header OUTSIDE the card — aligns with the left panel's title row
+                # Header outside card
                 rx.hstack(
+                    rx.icon("sparkles", size=16, color="var(--gray-12)"),
                     rx.text(
                         "Extracted Opportunities",
                         size="2",
@@ -430,39 +456,23 @@ def render_synthesis_review() -> rx.Component:
                     width="100%",
                     align="center",
                 ),
-                # Card: opportunity list + actions
+                # Card: opportunity list + action buttons
                 rx.vstack(
-                    # Scrollable opportunity list
                     rx.vstack(
                         rx.foreach(State.pending_synthesis_opps, render_pending_opp),
                         spacing="2",
                         width="100%",
-                        overflow_y="auto",
-                        max_height="calc(100vh - 360px)",
                         padding_right="4px",
                     ),
                     rx.divider(),
-                    # Action buttons
-                    rx.vstack(
-                        rx.button(
-                            rx.icon("check", size=14),
-                            "Confirm & Ingest Selected",
-                            color_scheme="blue",
-                            size="3",
-                            width="100%",
-                            on_click=State.confirm_synthesis,
-                            disabled=State.selected_opp_count == 0,
-                        ),
-                        rx.button(
-                            "Cancel",
-                            variant="ghost",
-                            color_scheme="gray",
-                            size="2",
-                            width="100%",
-                            on_click=State.cancel_synthesis_review,
-                        ),
-                        spacing="2",
+                    rx.button(
+                        rx.icon("check", size=14),
+                        "Confirm & Ingest Selected",
+                        color_scheme="blue",
+                        size="3",
                         width="100%",
+                        on_click=State.confirm_synthesis,
+                        disabled=State.selected_opp_count == 0,
                     ),
                     spacing="3",
                     padding="20px",
@@ -472,18 +482,24 @@ def render_synthesis_review() -> rx.Component:
                     align_items="stretch",
                     width="100%",
                 ),
-                # Coach's Corner (shown when coach feedback was generated)
                 _render_coach_panel(),
                 spacing="3",
-                width="400px",
-                min_width="320px",
+                min_width="360px",
                 max_width="440px",
+                flex_shrink="0",
                 align_items="stretch",
+                overflow_y="auto",
+                padding_bottom="20px",
             ),
+            flex="1",
+            min_height="0",
+            overflow="hidden",
+            align_items="stretch",
             spacing="5",
-            align_items="start",
             width="100%",
         ),
+        height="100%",
+        overflow="hidden",
         width="100%",
         max_width="1400px",
         spacing="4",

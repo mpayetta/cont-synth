@@ -1,6 +1,7 @@
 import reflex as rx
 from cont_synth.state import State, OppDetailSolution, ExperimentItem, QuoteItem
 from cont_synth.pages.ledger import _merge_dialog
+from cont_synth.pages.ui import combo_box
 
 
 # --- SCORING HELPERS ---
@@ -738,11 +739,12 @@ def render_opp_edit_header() -> rx.Component:
             # Theme
             rx.vstack(
                 rx.text("Theme / Category", size="2", weight="bold", color="var(--gray-12)"),
-                rx.input(
-                    default_value=State.manual_opp_theme,
-                    on_blur=State.set_manual_opp_theme,
-                    placeholder="e.g., Usability, Pricing...",
-                    width="100%",
+                combo_box(
+                    "e.g., Usability, Pricing...",
+                    State.manual_opp_theme,
+                    State.set_manual_opp_theme,
+                    "opp_theme",
+                    State.filtered_opp_themes,
                 ),
                 spacing="1", width="100%", align_items="start",
             ),

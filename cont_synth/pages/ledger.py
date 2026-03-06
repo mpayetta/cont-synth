@@ -7,6 +7,7 @@ from cont_synth.state import (
     BoardColumn,
     MatrixCell,
 )
+from cont_synth.pages.ui import combo_box
 
 
 # --- HELPER COMPONENTS ---
@@ -1163,11 +1164,12 @@ def render_ledger() -> rx.Component:
                             width="100%",
                         ),
                         rx.text("Theme / Category", size="2", weight="bold"),
-                        rx.input(
-                            placeholder="e.g., Usability, Pricing...",
-                            default_value=State.manual_opp_theme,
-                            on_blur=State.set_manual_opp_theme,
-                            width="100%",
+                        combo_box(
+                            "e.g., Usability, Pricing...",
+                            State.manual_opp_theme,
+                            State.set_manual_opp_theme,
+                            "opp_theme",
+                            State.filtered_opp_themes,
                         ),
                         rx.text(
                             "Opportunity Statement",

@@ -190,7 +190,7 @@ def _detail_participant_chip(item: DetailParticipantItem) -> rx.Component:
         rx.cond(
             item.is_team_member,
             rx.badge("Team", color_scheme="amber", variant="soft", size="1"),
-            rx.badge("Customer", color_scheme="blue", variant="soft", size="1"),
+            rx.badge("User", color_scheme="blue", variant="soft", size="1"),
         ),
         spacing="2",
         align="center",
