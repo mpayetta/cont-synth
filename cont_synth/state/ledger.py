@@ -36,13 +36,60 @@ class LedgerStateMixin(rx.State, mixin=True):
     Reflex / Pydantic happy. This mixin only provides behavior.
     """
 
+    # ── Filter computed vars ──────────────────────────────────────────────────
+
+    @rx.var
+    def available_personas_in_ledger(self) -> list[str]:
+        """Unique persona names across all opportunities (for filter dropdown)."""
+        seen = []
+        for item in self.ledger_data:
+            for badge in item.personas_affected:
+                if badge.name and badge.name not in seen:
+                    seen.append(badge.name)
+        return sorted(seen)
+
+    @rx.var
+    def opp_filters_active(self) -> bool:
+        """True when at least one filter is applied."""
+        return bool(
+            self.opp_filter_themes
+            or self.opp_filter_personas
+            or self.opp_filter_priority
+            or self.opp_filter_search
+        )
+
+    @rx.var
+    def filtered_ledger_data(self) -> list[LedgerItem]:
+        """ledger_data with active filters applied."""
+        items = self.ledger_data
+        if self.opp_filter_themes:
+            items = [i for i in items if i.theme in self.opp_filter_themes]
+        if self.opp_filter_personas:
+            items = [
+                i for i in items
+                if any(b.name in self.opp_filter_personas for b in i.personas_affected)
+            ]
+        if self.opp_filter_priority:
+            if self.opp_filter_priority == "high":
+                items = [i for i in items if i.priority_score >= 11]
+            elif self.opp_filter_priority == "medium":
+                items = [i for i in items if 6 <= i.priority_score <= 10]
+            elif self.opp_filter_priority == "low":
+                items = [i for i in items if 1 <= i.priority_score <= 5]
+            elif self.opp_filter_priority == "unrated":
+                items = [i for i in items if i.priority_score == 0]
+        if self.opp_filter_search:
+            q = self.opp_filter_search.lower()
+            items = [i for i in items if q in i.opportunity.lower()]
+        return items
+
     # ── View-mode computed vars ───────────────────────────────────────────────
 
     @rx.var
     def ledger_data_by_theme(self) -> list[ThemeGroup]:
-        """Groups ledger_data by theme for the collapsible list view."""
+        """Groups filtered_ledger_data by theme for the collapsible list view."""
         groups: dict[str, list[LedgerItem]] = {}
-        for item in self.ledger_data:
+        for item in self.filtered_ledger_data:
             theme = item.theme if item.theme else "Uncategorized"
             groups.setdefault(theme, []).append(item)
 
@@ -62,11 +109,11 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     @rx.var
     def ledger_board_columns(self) -> list[BoardColumn]:
-        """Splits ledger_data into 4 priority tiers for the Kanban board view."""
-        high = [i for i in self.ledger_data if i.priority_score >= 8]
-        medium = [i for i in self.ledger_data if 4 <= i.priority_score < 8]
-        low = [i for i in self.ledger_data if 1 <= i.priority_score < 4]
-        unscored = [i for i in self.ledger_data if i.priority_score == 0]
+        """Splits filtered_ledger_data into 4 priority tiers for the Kanban board view."""
+        high = [i for i in self.filtered_ledger_data if i.priority_score >= 8]
+        medium = [i for i in self.filtered_ledger_data if 4 <= i.priority_score < 8]
+        low = [i for i in self.filtered_ledger_data if 1 <= i.priority_score < 4]
+        unscored = [i for i in self.filtered_ledger_data if i.priority_score == 0]
         return [
             BoardColumn(label="High  P≥8", color="amber", opps=high),
             BoardColumn(label="Medium  P≥4", color="blue", opps=medium),
@@ -81,7 +128,7 @@ class LedgerStateMixin(rx.State, mixin=True):
         for sat in range(5, 0, -1):
             for imp in range(1, 6):
                 cell_items = [
-                    i for i in self.ledger_data
+                    i for i in self.filtered_ledger_data
                     if i.sat_gap_score == sat and i.impact_score == imp
                 ]
                 cells.append(MatrixCell(
@@ -96,7 +143,7 @@ class LedgerStateMixin(rx.State, mixin=True):
     def matrix_unscored(self) -> list[LedgerItem]:
         """Opportunities missing at least one score (cannot appear in matrix)."""
         return [
-            i for i in self.ledger_data
+            i for i in self.filtered_ledger_data
             if i.impact_score == 0 or i.sat_gap_score == 0
         ]
 

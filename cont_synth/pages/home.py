@@ -1,5 +1,5 @@
 import reflex as rx
-from cont_synth.state import State
+from cont_synth.state import State, MatrixCell
 from cont_synth.state.core import DashboardBarItem, RecentInterviewItem
 
 
@@ -363,6 +363,140 @@ def _recent_activity_widget() -> rx.Component:
     )
 
 
+def _dashboard_matrix_cell(cell: MatrixCell) -> rx.Component:
+    """Compact matrix cell for the dashboard view."""
+    return rx.box(
+        rx.vstack(
+            rx.foreach(
+                cell.opps,
+                lambda item: rx.box(
+                    rx.text(
+                        item.theme,
+                        size="1",
+                        weight="bold",
+                        color="var(--blue-11)",
+                        overflow="hidden",
+                        white_space="nowrap",
+                        text_overflow="ellipsis",
+                        max_width="100%",
+                    ),
+                    rx.text(
+                        item.opportunity,
+                        size="1",
+                        color="var(--gray-12)",
+                        style={
+                            "overflow": "hidden",
+                            "display": "-webkit-box",
+                            "-webkit-line-clamp": "2",
+                            "-webkit-box-orient": "vertical",
+                        },
+                    ),
+                    padding="3px 5px",
+                    border_radius="4px",
+                    background_color="var(--blue-3)",
+                    border="1px solid",
+                    border_color="var(--blue-5)",
+                    cursor="pointer",
+                    width="100%",
+                    on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
+                    _hover={"opacity": "0.8"},
+                ),
+            ),
+            spacing="1",
+        ),
+        min_height="52px",
+        padding="5px",
+        background_color=rx.cond(
+            cell.is_sweet_spot, "var(--green-2)", "var(--gray-1)"
+        ),
+        border="1px solid",
+        border_color=rx.cond(
+            cell.is_sweet_spot, "var(--green-4)", "var(--gray-4)"
+        ),
+        border_radius="4px",
+        overflow="hidden",
+        width="100%",
+    )
+
+
+def _priority_matrix_widget() -> rx.Component:
+    """Compact 5×5 priority matrix for the dashboard."""
+    return rx.card(
+        rx.vstack(
+            rx.hstack(
+                rx.icon("grid-2x2", size=16, color="var(--green-9)"),
+                rx.text("Priority Matrix", weight="bold", size="4"),
+                rx.spacer(),
+                rx.flex(
+                    rx.box(
+                        width="10px", height="10px",
+                        background_color="var(--green-3)",
+                        border="1px solid var(--green-5)",
+                        border_radius="2px",
+                        flex_shrink="0",
+                    ),
+                    rx.text("Priority zone", size="1", color="var(--gray-12)"),
+                    spacing="1", align="center",
+                ),
+                rx.button(
+                    "Full Ledger →",
+                    variant="ghost",
+                    size="1",
+                    color_scheme="gray",
+                    on_click=State.handle_navigation("ledger"),
+                ),
+                spacing="2",
+                align="center",
+                width="100%",
+            ),
+            rx.divider(),
+            # Column headers (Impact 1→5)
+            rx.flex(
+                rx.box(width="28px", flex_shrink="0"),
+                rx.grid(
+                    rx.text("I:1", size="1", color="var(--gray-11)", text_align="center"),
+                    rx.text("I:2", size="1", color="var(--gray-11)", text_align="center"),
+                    rx.text("I:3", size="1", color="var(--gray-11)", text_align="center"),
+                    rx.text("I:4", size="1", color="var(--gray-11)", text_align="center"),
+                    rx.text("I:5", size="1", color="var(--gray-11)", text_align="center"),
+                    columns="5",
+                    width="100%",
+                    spacing="1",
+                ),
+                align="center",
+                spacing="1",
+                width="100%",
+            ),
+            # Y-axis labels + 5×5 grid
+            rx.flex(
+                rx.vstack(
+                    rx.text("G:5", size="1", color="var(--gray-11)", width="28px", text_align="center"),
+                    rx.text("G:4", size="1", color="var(--gray-11)", width="28px", text_align="center"),
+                    rx.text("G:3", size="1", color="var(--gray-11)", width="28px", text_align="center"),
+                    rx.text("G:2", size="1", color="var(--gray-11)", width="28px", text_align="center"),
+                    rx.text("G:1", size="1", color="var(--gray-11)", width="28px", text_align="center"),
+                    justify="between",
+                    height="280px",
+                    flex_shrink="0",
+                ),
+                rx.grid(
+                    rx.foreach(State.matrix_cells, _dashboard_matrix_cell),
+                    columns="5",
+                    spacing="1",
+                    width="100%",
+                ),
+                spacing="1",
+                align="start",
+                width="100%",
+            ),
+            width="100%",
+            spacing="3",
+        ),
+        width="100%",
+        height="100%",
+    )
+
+
 def _quick_actions() -> rx.Component:
     """Primary CTA buttons."""
     return rx.hstack(
@@ -429,8 +563,15 @@ def render_home() -> rx.Component:
             gap="16px",
             width="100%",
         ),
-        # Recent activity
-        _recent_activity_widget(),
+        # Matrix + recent interviews side by side
+        rx.grid(
+            _priority_matrix_widget(),
+            _recent_activity_widget(),
+            template_columns="2fr 1fr",
+            gap="16px",
+            width="100%",
+            align_items="start",
+        ),
         width="100%",
         max_width="1200px",
         spacing="5",

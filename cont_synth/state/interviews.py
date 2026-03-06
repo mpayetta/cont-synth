@@ -32,6 +32,7 @@ from .core import (
     flash_model,
 )
 from .synthesis import _SCROLL_TO_MARK, _parse_coach_items
+from .pagination import PAGE_SIZE, apply_pagination, total_pages, clamp_page
 
 
 class InterviewPrepStateMixin(rx.State, mixin=True):
@@ -75,6 +76,180 @@ class InterviewPrepStateMixin(rx.State, mixin=True):
                     )
                 )
             self.interview_history = history[::-1]
+
+    # ── Interview log: filtered + paginated ──────────────────────────────────
+
+    @rx.var
+    def interviews_log_total_pages(self) -> int:
+        return total_pages(self.interviews_log_total, PAGE_SIZE)
+
+    @rx.var
+    def interviews_log_has_prev(self) -> bool:
+        return self.interviews_log_page > 0
+
+    @rx.var
+    def interviews_log_has_next(self) -> bool:
+        return self.interviews_log_page < total_pages(self.interviews_log_total, PAGE_SIZE) - 1
+
+    @rx.var
+    def interviews_log_page_label(self) -> str:
+        tp = total_pages(self.interviews_log_total, PAGE_SIZE)
+        return f"Page {self.interviews_log_page + 1} of {tp}"
+
+    @rx.var
+    def interviews_log_filters_active(self) -> bool:
+        return bool(
+            self.interviews_log_date_from
+            or self.interviews_log_date_to
+            or self.interviews_log_filter_participants
+        )
+
+    def load_interview_log(self):
+        """Server-side filtered + paginated interview history loader."""
+        prod_id = int(self.active_product_id)
+
+        with rx.session() as session:
+            # ── Available participants for the filter dropdown ────────────────
+            all_interview_ids = [
+                row.id for row in session.exec(
+                    select(Interview).where(Interview.product_id == prod_id)
+                ).all()
+            ]
+            if all_interview_ids:
+                p_links = session.exec(
+                    select(InterviewParticipantLink).where(
+                        InterviewParticipantLink.interview_id.in_(all_interview_ids)
+                    )
+                ).all()
+                p_ids = list({lnk.participant_id for lnk in p_links})
+                if p_ids:
+                    participants = session.exec(
+                        select(Participant).where(
+                            Participant.id.in_(p_ids),
+                            Participant.is_team_member == False,
+                        )
+                    ).all()
+                    self.available_log_participants = sorted({p.name for p in participants})
+                else:
+                    self.available_log_participants = []
+            else:
+                self.available_log_participants = []
+
+            # ── Build filter conditions ───────────────────────────────────────
+            conditions = [Interview.product_id == prod_id]
+
+            if self.interviews_log_date_from:
+                try:
+                    from_dt = datetime.fromisoformat(self.interviews_log_date_from)
+                    conditions.append(Interview.date_logged >= from_dt)
+                except ValueError:
+                    pass
+
+            if self.interviews_log_date_to:
+                try:
+                    to_dt = datetime.fromisoformat(self.interviews_log_date_to + "T23:59:59")
+                    conditions.append(Interview.date_logged <= to_dt)
+                except ValueError:
+                    pass
+
+            if self.interviews_log_filter_participants:
+                links = session.exec(
+                    select(InterviewParticipantLink).where(
+                        InterviewParticipantLink.participant_id.in_(
+                            [
+                                p.id for p in session.exec(
+                                    select(Participant).where(
+                                        Participant.name.in_(self.interviews_log_filter_participants)
+                                    )
+                                ).all()
+                            ]
+                        )
+                    )
+                ).all()
+                matching_ids = list({lnk.interview_id for lnk in links})
+                conditions.append(Interview.id.in_(matching_ids))
+
+            # ── Count + clamp page ────────────────────────────────────────────
+            total = session.exec(
+                select(func.count(Interview.id)).where(*conditions)
+            ).one()
+            self.interviews_log_total = total
+            self.interviews_log_page = clamp_page(self.interviews_log_page, total, PAGE_SIZE)
+
+            # ── Fetch page ────────────────────────────────────────────────────
+            interviews = session.exec(
+                apply_pagination(
+                    select(Interview).where(*conditions).order_by(Interview.date_logged.desc()),
+                    self.interviews_log_page,
+                )
+            ).all()
+
+            history: list[InterviewHistoryItem] = []
+            for inv in interviews:
+                persona = session.get(Persona, inv.persona_id)
+                date_str = (
+                    inv.date_logged.strftime("%Y-%m-%d %H:%M")
+                    if inv.date_logged
+                    else "Unknown"
+                )
+                participants_str = ""
+                if inv.participants:
+                    try:
+                        participants_str = ", ".join(json.loads(inv.participants))
+                    except Exception:
+                        participants_str = inv.participants
+                history.append(
+                    InterviewHistoryItem(
+                        interview_id=inv.id,
+                        persona=persona.name if persona else "Unknown",
+                        persona_color=self._persona_color(persona.name if persona else ""),
+                        date_logged=date_str,
+                        snippet=inv.transcript[:80] + "..." if inv.transcript else "No transcript.",
+                        interview_date=inv.interview_date or "",
+                        duration_minutes=inv.duration_minutes or 0,
+                        participants=participants_str,
+                    )
+                )
+            self.interview_history = history
+
+    def interviews_log_next_page(self):
+        if self.interviews_log_has_next:
+            self.interviews_log_page += 1
+            self.load_interview_log()
+
+    def interviews_log_prev_page(self):
+        if self.interviews_log_has_prev:
+            self.interviews_log_page -= 1
+            self.load_interview_log()
+
+    def toggle_log_filter_participant(self, name: str):
+        if name in self.interviews_log_filter_participants:
+            self.interviews_log_filter_participants = [
+                p for p in self.interviews_log_filter_participants if p != name
+            ]
+        else:
+            self.interviews_log_filter_participants = (
+                self.interviews_log_filter_participants + [name]
+            )
+        self.interviews_log_page = 0
+        self.load_interview_log()
+
+    def set_interviews_log_date_from(self, val: str):
+        self.interviews_log_date_from = val
+        self.interviews_log_page = 0
+        self.load_interview_log()
+
+    def set_interviews_log_date_to(self, val: str):
+        self.interviews_log_date_to = val
+        self.interviews_log_page = 0
+        self.load_interview_log()
+
+    def clear_log_filters(self):
+        self.interviews_log_date_from = ""
+        self.interviews_log_date_to = ""
+        self.interviews_log_filter_participants = []
+        self.interviews_log_page = 0
+        self.load_interview_log()
 
     def delete_interview(self, interview_id: int):
         """Cascading delete for interviews and orphaned opportunities."""
@@ -126,7 +301,8 @@ class InterviewPrepStateMixin(rx.State, mixin=True):
                         session.delete(opp)
             session.commit()
 
-        self.load_history()
+        self.interviews_log_page = 0
+        self.load_interview_log()
         # Ledger depends on interviews, so refresh it too.
         self.load_ledger()
 

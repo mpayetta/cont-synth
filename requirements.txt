@@ -7,6 +7,7 @@ passlib[bcrypt]
 python-dotenv
 PyPDF2
 python-docx
+python-pptx
 psycopg2-binary==2.9.11
 pgvector==0.4.2
 sentence-transformers>=2.7.0

@@ -276,72 +276,239 @@ def _participant_row(item: ParticipantItem) -> rx.Component:
     )
 
 
-def render_participants() -> rx.Component:
-    return rx.vstack(
+def _participants_filter_bar() -> rx.Component:
+    """Filter bar matching the Opportunities listing style."""
+    return rx.flex(
+        # Name search
+        rx.input(
+            placeholder="Search name...",
+            value=State.participants_filter_name,
+            on_change=State.set_participants_filter_name,
+            size="2",
+            width="200px",
+        ),
+        # Persona multi-select
+        rx.popover.root(
+            rx.popover.trigger(
+                rx.button(
+                    rx.icon("user-circle", size=14),
+                    rx.cond(
+                        State.participants_filter_personas.length() == 0,
+                        rx.text("Persona"),
+                        rx.text(State.participants_filter_personas.length().to_string(), " selected"),
+                    ),
+                    rx.icon("chevron-down", size=12),
+                    variant=rx.cond(State.participants_filter_personas.length() > 0, "soft", "outline"),
+                    color_scheme=rx.cond(State.participants_filter_personas.length() > 0, "blue", "gray"),
+                    size="2",
+                    gap="4px",
+                ),
+            ),
+            rx.popover.content(
+                rx.cond(
+                    State.available_personas.length() == 0,
+                    rx.text("No personas yet.", size="2", color="var(--gray-9)"),
+                    rx.vstack(
+                        rx.foreach(
+                            State.available_personas,
+                            lambda p: rx.flex(
+                                rx.checkbox(
+                                    checked=State.participants_filter_personas.contains(p),
+                                    on_change=lambda _: State.toggle_participants_filter_persona(p),
+                                ),
+                                rx.text(p, size="2"),
+                                spacing="2",
+                                align="center",
+                                cursor="pointer",
+                                on_click=State.toggle_participants_filter_persona(p),
+                                width="100%",
+                                padding="4px 0",
+                            ),
+                        ),
+                        spacing="1",
+                        min_width="180px",
+                    ),
+                ),
+                padding="10px",
+            ),
+        ),
+        # Segment multi-select
+        rx.popover.root(
+            rx.popover.trigger(
+                rx.button(
+                    rx.icon("tag", size=14),
+                    rx.cond(
+                        State.participants_filter_segments.length() == 0,
+                        rx.text("Segment"),
+                        rx.text(State.participants_filter_segments.length().to_string(), " selected"),
+                    ),
+                    rx.icon("chevron-down", size=12),
+                    variant=rx.cond(State.participants_filter_segments.length() > 0, "soft", "outline"),
+                    color_scheme=rx.cond(State.participants_filter_segments.length() > 0, "blue", "gray"),
+                    size="2",
+                    gap="4px",
+                ),
+            ),
+            rx.popover.content(
+                rx.cond(
+                    State.participant_segments.length() == 0,
+                    rx.text("No segments yet.", size="2", color="var(--gray-9)"),
+                    rx.vstack(
+                        rx.foreach(
+                            State.participant_segments,
+                            lambda s: rx.flex(
+                                rx.checkbox(
+                                    checked=State.participants_filter_segments.contains(s),
+                                    on_change=lambda _: State.toggle_participants_filter_segment(s),
+                                ),
+                                rx.text(s, size="2"),
+                                spacing="2",
+                                align="center",
+                                cursor="pointer",
+                                on_click=State.toggle_participants_filter_segment(s),
+                                width="100%",
+                                padding="4px 0",
+                            ),
+                        ),
+                        spacing="1",
+                        min_width="160px",
+                    ),
+                ),
+                padding="10px",
+            ),
+        ),
+        # Date range (last interviewed)
         rx.vstack(
-            rx.text("Participants", weight="bold", size="6"),
-            rx.text(
-                "Track who you've talked to. Customers only by default — use the toggle to include interviewers. Orange badge = 6+ interviews (over-indexed voice).",
-                color="var(--gray-12)",
-                size="3",
+            rx.text("Last interviewed from", size="1", color="var(--gray-10)"),
+            rx.input(
+                type="date",
+                value=State.participants_filter_date_from,
+                on_change=State.set_participants_filter_date_from,
+                size="2",
             ),
             spacing="1",
-            align_items="start",
-            width="100%",
-            margin_bottom="4px",
         ),
-        rx.divider(),
-        rx.hstack(
-            rx.spacer(),
+        rx.vstack(
+            rx.text("to", size="1", color="var(--gray-10)"),
+            rx.input(
+                type="date",
+                value=State.participants_filter_date_to,
+                on_change=State.set_participants_filter_date_to,
+                size="2",
+            ),
+            spacing="1",
+        ),
+        # Show interviewers toggle (as a filter button)
+        rx.button(
+            rx.icon("users", size=14),
+            rx.cond(State.show_team_members, "Showing interviewers", "Interviewers hidden"),
+            variant=rx.cond(State.show_team_members, "soft", "outline"),
+            color_scheme=rx.cond(State.show_team_members, "blue", "gray"),
+            size="2",
+            on_click=State.toggle_show_team_members,
+            gap="4px",
+        ),
+        # Clear button
+        rx.cond(
+            State.participants_filters_active,
             rx.button(
-                rx.cond(
-                    State.show_team_members,
-                    rx.hstack(rx.icon("eye-off", size=14), rx.text("Hide interviewers"), spacing="2", align="center"),
-                    rx.hstack(rx.icon("eye", size=14), rx.text("Show interviewers"), spacing="2", align="center"),
-                ),
+                rx.icon("x", size=12),
+                "Clear",
                 variant="ghost",
                 color_scheme="gray",
                 size="2",
-                on_click=State.toggle_show_team_members,
+                on_click=State.clear_participants_filters,
+            ),
+            rx.fragment(),
+        ),
+        gap="8px",
+        align="end",
+        wrap="wrap",
+    )
+
+
+def render_participants() -> rx.Component:
+    return rx.vstack(
+        rx.flex(
+            rx.box(
+                rx.text("Participants", weight="bold", size="6"),
+                rx.text(
+                    "Track who you've talked to. Orange badge = 6+ interviews (over-indexed voice).",
+                    color="var(--gray-12)",
+                    size="3",
+                ),
             ),
             rx.button(
                 rx.icon("user-plus", size=14),
                 "Add Participant",
                 color_scheme="blue",
                 variant="soft",
-                size="2",
+                size="3",
                 on_click=State.open_add_participant,
             ),
-            width="100%",
-            padding_y="4px",
-            spacing="3",
+            justify="between",
             align="center",
+            width="100%",
         ),
+        rx.divider(),
+        _participants_filter_bar(),
         rx.cond(
             State.is_participant_form_open,
             _participant_form_card(),
             rx.fragment(),
         ),
-        rx.table.root(
-            rx.table.header(
-                rx.table.row(
-                    rx.table.column_header_cell("Name"),
-                    rx.table.column_header_cell("Type"),
-                    rx.table.column_header_cell("Persona"),
-                    rx.table.column_header_cell("Segment"),
-                    rx.table.column_header_cell("Recruited Via"),
-                    rx.table.column_header_cell("Interviews"),
-                    rx.table.column_header_cell("Last Interviewed"),
-                    rx.table.column_header_cell("Notes"),
-                    rx.table.column_header_cell(""),
-                )
+        rx.cond(
+            State.filtered_participants.length() == 0,
+            rx.center(
+                rx.vstack(
+                    rx.icon("inbox", size=32, color="var(--gray-9)"),
+                    rx.text(
+                        rx.cond(
+                            State.participants_filters_active,
+                            "No participants match your filters.",
+                            "No participants yet.",
+                        ),
+                        weight="medium",
+                        color="var(--gray-9)",
+                    ),
+                    rx.cond(
+                        State.participants_filters_active,
+                        rx.button(
+                            "Clear filters",
+                            variant="soft",
+                            color_scheme="gray",
+                            size="2",
+                            on_click=State.clear_participants_filters,
+                        ),
+                        rx.fragment(),
+                    ),
+                    spacing="3",
+                    align="center",
+                ),
+                padding_y="60px",
+                width="100%",
             ),
-            rx.table.body(rx.foreach(State.filtered_participants, _participant_row)),
-            width="100%",
-            variant="surface",
+            rx.table.root(
+                rx.table.header(
+                    rx.table.row(
+                        rx.table.column_header_cell("Name"),
+                        rx.table.column_header_cell("Type"),
+                        rx.table.column_header_cell("Persona"),
+                        rx.table.column_header_cell("Segment"),
+                        rx.table.column_header_cell("Recruited Via"),
+                        rx.table.column_header_cell("Interviews"),
+                        rx.table.column_header_cell("Last Interviewed"),
+                        rx.table.column_header_cell("Notes"),
+                        rx.table.column_header_cell(""),
+                    )
+                ),
+                rx.table.body(rx.foreach(State.filtered_participants, _participant_row)),
+                width="100%",
+                variant="surface",
+            ),
         ),
         width="100%",
-        max_width="1200px",
+        max_width="1400px",
         spacing="4",
         padding_top="20px",
     )

@@ -80,22 +80,213 @@ def _empty_chart_state() -> rx.Component:
     )
 
 
-def _log_tab() -> rx.Component:
-    return rx.table.root(
-        rx.table.header(
-            rx.table.row(
-                rx.table.column_header_cell("ID"),
-                rx.table.column_header_cell("Persona"),
-                rx.table.column_header_cell("Date Logged"),
-                rx.table.column_header_cell("Interview Date"),
-                rx.table.column_header_cell("Duration"),
-                rx.table.column_header_cell("Participants"),
-                rx.table.column_header_cell(""),
-            )
+def _log_filter_bar() -> rx.Component:
+    """Filter bar: date range + participant multi-select + clear."""
+    return rx.flex(
+        # Date from
+        rx.vstack(
+            rx.text("From", size="1", color="var(--gray-10)"),
+            rx.input(
+                type="date",
+                value=State.interviews_log_date_from,
+                on_change=State.set_interviews_log_date_from,
+                size="2",
+            ),
+            spacing="1",
         ),
-        rx.table.body(rx.foreach(State.interview_history, show_history_row)),
+        # Date to
+        rx.vstack(
+            rx.text("To", size="1", color="var(--gray-10)"),
+            rx.input(
+                type="date",
+                value=State.interviews_log_date_to,
+                on_change=State.set_interviews_log_date_to,
+                size="2",
+            ),
+            spacing="1",
+        ),
+        # Participant multi-select
+        rx.vstack(
+            rx.text("Participant", size="1", color="var(--gray-10)"),
+            rx.popover.root(
+                rx.popover.trigger(
+                    rx.button(
+                        rx.icon("users", size=14),
+                        rx.cond(
+                            State.interviews_log_filter_participants.length() == 0,
+                            rx.text("All"),
+                            rx.text(
+                                State.interviews_log_filter_participants.length().to_string(),
+                                " selected",
+                            ),
+                        ),
+                        rx.icon("chevron-down", size=12),
+                        variant=rx.cond(
+                            State.interviews_log_filter_participants.length() > 0,
+                            "soft",
+                            "outline",
+                        ),
+                        color_scheme=rx.cond(
+                            State.interviews_log_filter_participants.length() > 0,
+                            "blue",
+                            "gray",
+                        ),
+                        size="2",
+                        gap="4px",
+                    ),
+                ),
+                rx.popover.content(
+                    rx.cond(
+                        State.available_log_participants.length() == 0,
+                        rx.text("No participants yet.", size="2", color="var(--gray-9)"),
+                        rx.vstack(
+                            rx.foreach(
+                                State.available_log_participants,
+                                lambda p: rx.flex(
+                                    rx.checkbox(
+                                        checked=State.interviews_log_filter_participants.contains(p),
+                                        on_change=lambda _: State.toggle_log_filter_participant(p),
+                                    ),
+                                    rx.text(p, size="2"),
+                                    spacing="2",
+                                    align="center",
+                                    cursor="pointer",
+                                    on_click=State.toggle_log_filter_participant(p),
+                                    width="100%",
+                                    padding="4px 0",
+                                ),
+                            ),
+                            spacing="1",
+                            min_width="180px",
+                        ),
+                    ),
+                    padding="10px",
+                ),
+            ),
+            spacing="1",
+        ),
+        # Clear button
+        rx.cond(
+            State.interviews_log_filters_active,
+            rx.vstack(
+                rx.text(" ", size="1"),  # spacer to align with inputs
+                rx.button(
+                    rx.icon("x", size=12),
+                    "Clear",
+                    variant="ghost",
+                    color_scheme="gray",
+                    size="2",
+                    on_click=State.clear_log_filters,
+                ),
+                spacing="1",
+            ),
+            rx.fragment(),
+        ),
+        gap="16px",
+        align="end",
+        wrap="wrap",
+        padding_bottom="4px",
+    )
+
+
+def _log_pagination() -> rx.Component:
+    """Prev / page label / Next controls."""
+    return rx.flex(
+        rx.button(
+            rx.icon("chevron-left", size=14),
+            "Prev",
+            variant="outline",
+            color_scheme="gray",
+            size="2",
+            on_click=State.interviews_log_prev_page,
+            disabled=~State.interviews_log_has_prev,
+        ),
+        rx.flex(
+            rx.text(State.interviews_log_page_label, size="2", color="var(--gray-11)"),
+            rx.text(
+                " · ",
+                State.interviews_log_total.to_string(),
+                " total",
+                size="2",
+                color="var(--gray-9)",
+            ),
+            align="center",
+            gap="2px",
+        ),
+        rx.button(
+            "Next",
+            rx.icon("chevron-right", size=14),
+            variant="outline",
+            color_scheme="gray",
+            size="2",
+            on_click=State.interviews_log_next_page,
+            disabled=~State.interviews_log_has_next,
+        ),
+        justify="between",
+        align="center",
         width="100%",
-        variant="surface",
+        padding_top="8px",
+    )
+
+
+def _log_tab() -> rx.Component:
+    return rx.vstack(
+        _log_filter_bar(),
+        rx.cond(
+            State.interview_history.length() == 0,
+            rx.center(
+                rx.vstack(
+                    rx.icon("inbox", size=32, color="var(--gray-9)"),
+                    rx.text(
+                        rx.cond(
+                            State.interviews_log_filters_active,
+                            "No interviews match your filters.",
+                            "No interviews yet.",
+                        ),
+                        weight="medium",
+                        color="var(--gray-9)",
+                    ),
+                    rx.cond(
+                        State.interviews_log_filters_active,
+                        rx.button(
+                            "Clear filters",
+                            variant="soft",
+                            color_scheme="gray",
+                            size="2",
+                            on_click=State.clear_log_filters,
+                        ),
+                        rx.fragment(),
+                    ),
+                    spacing="3",
+                    align="center",
+                ),
+                padding_y="60px",
+                width="100%",
+            ),
+            rx.vstack(
+                rx.table.root(
+                    rx.table.header(
+                        rx.table.row(
+                            rx.table.column_header_cell("ID"),
+                            rx.table.column_header_cell("Persona"),
+                            rx.table.column_header_cell("Date Logged"),
+                            rx.table.column_header_cell("Interview Date"),
+                            rx.table.column_header_cell("Duration"),
+                            rx.table.column_header_cell("Participants"),
+                            rx.table.column_header_cell(""),
+                        )
+                    ),
+                    rx.table.body(rx.foreach(State.interview_history, show_history_row)),
+                    width="100%",
+                    variant="surface",
+                ),
+                _log_pagination(),
+                spacing="0",
+                width="100%",
+            ),
+        ),
+        spacing="3",
+        width="100%",
     )
 
 

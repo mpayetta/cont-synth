@@ -240,12 +240,26 @@ class State(
 
     interview_history: list[InterviewHistoryItem] = []
 
+    # --- Interview log filters + pagination ---
+    interviews_log_page: int = 0
+    interviews_log_total: int = 0
+    interviews_log_date_from: str = ""
+    interviews_log_date_to: str = ""
+    interviews_log_filter_participants: list[str] = []
+    available_log_participants: list[str] = []
+
     # --- Ledger & personas ---
     ledger_data: list[LedgerItem] = []
     available_personas: list[str] = []
     target_persona: str = ""
-    ledger_view_mode: str = "list"   # "table" | "list" | "board" | "matrix"
+    ledger_view_mode: str = "table"  # "table" | "list" | "board" | "matrix"
     collapsed_themes: list[str] = []
+
+    # --- Opportunity list filters ---
+    opp_filter_themes: list[str] = []
+    opp_filter_personas: list[str] = []
+    opp_filter_priority: str = ""   # "" | "high" | "medium" | "low" | "unrated"
+    opp_filter_search: str = ""
 
     # --- Solutions workspace ---
     is_generating_solutions: bool = False
@@ -362,6 +376,13 @@ class State(
     participant_segments: list[str] = []
     participant_recruited_vias: list[str] = []
     show_team_members: bool = False
+
+    # --- Participant filters ---
+    participants_filter_name: str = ""
+    participants_filter_personas: list[str] = []
+    participants_filter_segments: list[str] = []
+    participants_filter_date_from: str = ""
+    participants_filter_date_to: str = ""
     is_participant_form_open: bool = False
     editing_participant_id: int = -1
     participant_form_name: str = ""
@@ -531,6 +552,23 @@ class State(
     def close_guide_drawer(self):
         self.guide_drawer_open = False
     def set_ledger_view_mode(self, val: str): self.ledger_view_mode = val
+    def toggle_opp_filter_theme(self, name: str):
+        if name in self.opp_filter_themes:
+            self.opp_filter_themes = [t for t in self.opp_filter_themes if t != name]
+        else:
+            self.opp_filter_themes = self.opp_filter_themes + [name]
+    def toggle_opp_filter_persona(self, name: str):
+        if name in self.opp_filter_personas:
+            self.opp_filter_personas = [p for p in self.opp_filter_personas if p != name]
+        else:
+            self.opp_filter_personas = self.opp_filter_personas + [name]
+    def set_opp_filter_priority(self, val: str): self.opp_filter_priority = "" if val == "__all__" else val
+    def set_opp_filter_search(self, val: str): self.opp_filter_search = val
+    def clear_opp_filters(self):
+        self.opp_filter_themes = []
+        self.opp_filter_personas = []
+        self.opp_filter_priority = ""
+        self.opp_filter_search = ""
     def set_new_solution_name(self, val: str): self.new_solution_name = val
     def set_new_solution_desc(self, val: str): self.new_solution_desc = val
     def set_new_solution_status(self, val: str): self.new_solution_status = val
@@ -540,6 +578,26 @@ class State(
     def set_manual_opp_parent_id(self, val: str): self.manual_opp_parent_id = val
     def set_manual_opp_outcome_name(self, val: str): self.manual_opp_outcome_name = val
     def set_selected_interview_choice(self, val: str): self.selected_interview_choice = val
+    def set_participants_filter_name(self, val: str): self.participants_filter_name = val
+    def toggle_participants_filter_persona(self, name: str):
+        if name in self.participants_filter_personas:
+            self.participants_filter_personas = [p for p in self.participants_filter_personas if p != name]
+        else:
+            self.participants_filter_personas = self.participants_filter_personas + [name]
+    def toggle_participants_filter_segment(self, name: str):
+        if name in self.participants_filter_segments:
+            self.participants_filter_segments = [s for s in self.participants_filter_segments if s != name]
+        else:
+            self.participants_filter_segments = self.participants_filter_segments + [name]
+    def set_participants_filter_date_from(self, val: str): self.participants_filter_date_from = val
+    def set_participants_filter_date_to(self, val: str): self.participants_filter_date_to = val
+    def clear_participants_filters(self):
+        self.participants_filter_name = ""
+        self.participants_filter_personas = []
+        self.participants_filter_segments = []
+        self.participants_filter_date_from = ""
+        self.participants_filter_date_to = ""
+        self.show_team_members = False
     def set_participant_form_name(self, val: str): self.participant_form_name = val
     def set_participant_form_persona(self, val: str): self.participant_form_persona = val
     def set_participant_form_is_team_member(self, val: bool): self.participant_form_is_team_member = val
@@ -842,11 +900,40 @@ class State(
         ]
 
     @rx.var
+    def participants_filters_active(self) -> bool:
+        return bool(
+            self.participants_filter_name
+            or self.participants_filter_personas
+            or self.participants_filter_segments
+            or self.participants_filter_date_from
+            or self.participants_filter_date_to
+            or self.show_team_members
+        )
+
+    @rx.var
     def filtered_participants(self) -> list[ParticipantItem]:
-        """Participants list filtered by the show_team_members toggle."""
-        if self.show_team_members:
-            return self.participants
-        return [p for p in self.participants if not p.is_team_member]
+        """Participants list with all active filters applied."""
+        items = self.participants
+        # Team member visibility
+        if not self.show_team_members:
+            items = [p for p in items if not p.is_team_member]
+        # Name search
+        if self.participants_filter_name:
+            q = self.participants_filter_name.lower()
+            items = [p for p in items if q in p.name.lower()]
+        # Persona multi-select
+        if self.participants_filter_personas:
+            items = [p for p in items if p.persona_name in self.participants_filter_personas]
+        # Segment multi-select
+        if self.participants_filter_segments:
+            items = [p for p in items if p.segment in self.participants_filter_segments]
+        # Date from (last_interviewed >= date_from)
+        if self.participants_filter_date_from:
+            items = [p for p in items if p.last_interviewed >= self.participants_filter_date_from]
+        # Date to (last_interviewed <= date_to)
+        if self.participants_filter_date_to:
+            items = [p for p in items if p.last_interviewed and p.last_interviewed <= self.participants_filter_date_to]
+        return items
 
     @rx.var
     def available_themes(self) -> list[str]:

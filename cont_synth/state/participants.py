@@ -21,13 +21,37 @@ def _persona_color(name: str) -> str:
 class ParticipantStateMixin(rx.State, mixin=True):
 
     def load_participants(self):
-        """Loads all participants with computed interview counts, sorted by name."""
+        """Loads participants scoped to the active product workspace."""
+        prod_id = int(self.active_product_id)
         with rx.session() as session:
+            # All interview IDs for this product
+            product_interview_ids = {
+                row.id for row in session.exec(
+                    select(Interview).where(Interview.product_id == prod_id)
+                ).all()
+            }
+
+            # Participant IDs that have at least one interview in this product
+            product_participant_ids: set[int] = set()
+            if product_interview_ids:
+                links_in_product = session.exec(
+                    select(InterviewParticipantLink).where(
+                        InterviewParticipantLink.interview_id.in_(product_interview_ids)
+                    )
+                ).all()
+                product_participant_ids = {lnk.participant_id for lnk in links_in_product}
+
+            # Load all participants: those linked to this product OR team members
             all_participants = session.exec(
                 select(Participant).order_by(Participant.name)
             ).all()
+            relevant = [
+                p for p in all_participants
+                if p.id in product_participant_ids or p.is_team_member
+            ]
+
             items: list[ParticipantItem] = []
-            for p in all_participants:
+            for p in relevant:
                 # Resolve persona name and colour
                 persona_name = ""
                 persona_color = "gray"
@@ -37,15 +61,18 @@ class ParticipantStateMixin(rx.State, mixin=True):
                         persona_name = persona.name
                         persona_color = _persona_color(persona.name)
 
-                links = session.exec(
+                # Scope interview count and last date to the active product
+                p_links = session.exec(
                     select(InterviewParticipantLink).where(
-                        InterviewParticipantLink.participant_id == p.id
+                        InterviewParticipantLink.participant_id == p.id,
+                        InterviewParticipantLink.interview_id.in_(product_interview_ids)
+                        if product_interview_ids else False,
                     )
-                ).all()
-                interview_count = len(links)
+                ).all() if product_interview_ids else []
+                interview_count = len(p_links)
                 last_date = ""
-                if links:
-                    interview_ids = [lnk.interview_id for lnk in links]
+                if p_links:
+                    interview_ids = [lnk.interview_id for lnk in p_links]
                     interviews = session.exec(
                         select(Interview).where(Interview.id.in_(interview_ids))
                     ).all()
@@ -69,14 +96,14 @@ class ParticipantStateMixin(rx.State, mixin=True):
                 ))
             self.participants = items
 
-            # Populate autocomplete suggestion lists
+            # Populate autocomplete suggestion lists (scoped to relevant participants)
             personas = session.exec(select(Persona).order_by(Persona.name)).all()
             self.available_personas = [p.name for p in personas]
             self.participant_segments = sorted(
-                {p.segment for p in all_participants if p.segment}
+                {p.segment for p in relevant if p.segment}
             )
             self.participant_recruited_vias = sorted(
-                {p.recruited_via for p in all_participants if p.recruited_via}
+                {p.recruited_via for p in relevant if p.recruited_via}
             )
 
     def save_participant(self):

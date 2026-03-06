@@ -68,11 +68,39 @@ def _get_st_model():
 # ---------------------------------------------------------------------------
 
 def extract_text(file_data: bytes, filename: str) -> str:
-    """Extract raw text from a PDF or plain-text file."""
-    if filename.lower().endswith('.pdf'):
+    """Extract raw text from a PDF, TXT, DOCX, or PPTX file."""
+    lower = filename.lower()
+
+    if lower.endswith('.pdf'):
         reader = PyPDF2.PdfReader(io.BytesIO(file_data))
         pages = [page.extract_text() for page in reader.pages if page.extract_text()]
         return "\n".join(pages)
+
+    if lower.endswith('.docx'):
+        from docx import Document
+        doc = Document(io.BytesIO(file_data))
+        return "\n".join(para.text for para in doc.paragraphs if para.text)
+
+    if lower.endswith('.pptx'):
+        from pptx import Presentation
+        prs = Presentation(io.BytesIO(file_data))
+        texts = []
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    texts.append(shape.text.strip())
+        return "\n".join(texts)
+
+    if lower.endswith('.doc'):
+        raise ValueError(
+            "Old .doc format is not supported. Please open the file in Word and save it as .docx, then re-upload."
+        )
+
+    if lower.endswith('.ppt'):
+        raise ValueError(
+            "Old .ppt format is not supported. Please open the file in PowerPoint and save it as .pptx, then re-upload."
+        )
+
     # Fallback: treat as UTF-8 text
     return file_data.decode('utf-8', errors='replace')
 
@@ -137,7 +165,7 @@ def ingest_document(file_data: bytes, filename: str, product_id: int) -> Workspa
     embeddings = embed_chunks(chunks)
 
     with rx.session() as session:
-        doc = WorkspaceDocument(product_id=product_id, filename=filename)
+        doc = WorkspaceDocument(product_id=product_id, filename=filename, file_data=file_data)
         session.add(doc)
         session.commit()
         session.refresh(doc)

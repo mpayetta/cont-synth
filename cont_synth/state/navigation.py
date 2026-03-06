@@ -116,7 +116,7 @@ class NavigationStateMixin(rx.State, mixin=True):
         if self.current_view == "home":
             self.load_dashboard()
         elif self.current_view == "logs":
-            self.load_history()
+            self.load_interview_log()
             self.load_coach_data()
         elif self.current_view == "ledger":
             self.load_ledger()  # Ledger loads outcomes, opportunities, and personas

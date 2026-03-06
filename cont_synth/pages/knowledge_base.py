@@ -9,6 +9,20 @@ def _document_row(doc) -> rx.Component:
             rx.hstack(
                 rx.icon("file-text", size=14, color="var(--gray-9)"),
                 rx.text(doc.filename, size="2", weight="medium"),
+                rx.cond(
+                    doc.has_file,
+                    rx.tooltip(
+                        rx.icon_button(
+                            rx.icon("download", size=13),
+                            variant="ghost",
+                            color_scheme="gray",
+                            size="1",
+                            on_click=State.download_kb_document(doc.id),
+                        ),
+                        content="Download original file",
+                    ),
+                    rx.fragment(),
+                ),
                 align="center",
                 spacing="2",
             )
@@ -85,13 +99,13 @@ def _upload_zone() -> rx.Component:
                 rx.vstack(
                     rx.icon("upload-cloud", size=36, color="var(--gray-8)"),
                     rx.text(
-                        "Drop a PDF or TXT file here, or click to browse",
+                        "Drop a file here, or click to browse",
                         size="3",
                         color="var(--gray-11)",
                         weight="medium",
                     ),
                     rx.text(
-                        "Files are chunked and indexed with all-MiniLM-L6-v2 (384 dims)",
+                        "PDF, TXT, DOCX, PPTX · max 10 MB",
                         size="1",
                         color="var(--gray-9)",
                     ),
@@ -106,7 +120,14 @@ def _upload_zone() -> rx.Component:
         ),
         id="kb_upload",
         multiple=False,
-        accept={".pdf": ["application/pdf"], ".txt": ["text/plain"]},
+        accept={
+            ".pdf": ["application/pdf"],
+            ".txt": ["text/plain"],
+            ".docx": ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+            ".doc": ["application/msword"],
+            ".pptx": ["application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+            ".ppt": ["application/vnd.ms-powerpoint"],
+        },
         on_drop=State.handle_kb_upload(rx.upload_files(upload_id="kb_upload")),
         border="2px dashed var(--gray-6)",
         border_radius="10px",

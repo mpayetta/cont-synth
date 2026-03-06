@@ -55,6 +55,7 @@ class WorkspaceDocumentItem(BaseModel):
     filename: str
     upload_date: str   # formatted "YYYY-MM-DD HH:MM"
     chunk_count: int
+    has_file: bool = False  # True if original bytes are stored (newer uploads)
 
 
 class QuoteItem(BaseModel):

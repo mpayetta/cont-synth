@@ -35,9 +35,12 @@ class KnowledgeBaseStateMixin(rx.State, mixin=True):
                         filename=doc.filename,
                         upload_date=doc.upload_date.strftime("%Y-%m-%d %H:%M"),
                         chunk_count=chunk_count,
+                        has_file=doc.file_data is not None,
                     )
                 )
         self.kb_documents = items
+
+    _MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
     async def handle_kb_upload(self, files: list[rx.UploadFile]):
         """Ingest an uploaded file into the Knowledge Base."""
@@ -47,8 +50,8 @@ class KnowledgeBaseStateMixin(rx.State, mixin=True):
         filename = file.filename or "unknown"
         lower = filename.lower()
 
-        if not (lower.endswith('.pdf') or lower.endswith('.txt')):
-            self.kb_upload_error = "Only PDF and TXT files are supported."
+        if not any(lower.endswith(ext) for ext in ('.pdf', '.txt', '.docx', '.doc', '.pptx', '.ppt')):
+            self.kb_upload_error = "Unsupported file type. Allowed: PDF, TXT, DOCX, PPTX."
             return
 
         self.kb_is_uploading = True
@@ -57,6 +60,9 @@ class KnowledgeBaseStateMixin(rx.State, mixin=True):
 
         try:
             file_data = await file.read()
+            if len(file_data) > self._MAX_UPLOAD_BYTES:
+                self.kb_upload_error = f"File too large ({len(file_data) // (1024*1024)} MB). Maximum allowed size is 10 MB."
+                return
             from ..kb_ingest import ingest_document
             ingest_document(file_data, filename, int(self.active_product_id))
             self.load_kb_documents()
@@ -64,6 +70,13 @@ class KnowledgeBaseStateMixin(rx.State, mixin=True):
             self.kb_upload_error = f"Upload failed: {str(e)}"
         finally:
             self.kb_is_uploading = False
+
+    def download_kb_document(self, doc_id: int):
+        """Fetch stored file bytes and trigger a browser download."""
+        with rx.session() as session:
+            doc = session.get(WorkspaceDocument, doc_id)
+            if doc and doc.file_data:
+                return rx.download(data=doc.file_data, filename=doc.filename)
 
     def delete_kb_document(self, doc_id: int):
         """Cascading delete: removes DocumentChunks then the WorkspaceDocument."""

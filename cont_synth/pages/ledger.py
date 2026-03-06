@@ -487,7 +487,7 @@ def show_table_view() -> rx.Component:
             ),
         ),
         rx.table.body(
-            rx.foreach(State.ledger_data, show_opportunity_table_row),
+            rx.foreach(State.filtered_ledger_data, show_opportunity_table_row),
         ),
         variant="surface",
         size="2",
@@ -1249,6 +1249,138 @@ def render_ledger() -> rx.Component:
             align="center",
             margin_bottom="4",
         ),
+        # --- Filter Bar ---
+        rx.flex(
+            rx.input(
+                placeholder="Search opportunities...",
+                value=State.opp_filter_search,
+                on_change=State.set_opp_filter_search,
+                size="2",
+                width="220px",
+            ),
+            rx.popover.root(
+                rx.popover.trigger(
+                    rx.button(
+                        rx.icon("tag", size=14),
+                        rx.cond(
+                            State.opp_filter_themes.length() == 0,
+                            rx.text("Theme"),
+                            rx.text(
+                                State.opp_filter_themes.length().to_string(),
+                                " selected",
+                            ),
+                        ),
+                        rx.icon("chevron-down", size=12),
+                        variant=rx.cond(
+                            State.opp_filter_themes.length() > 0, "soft", "outline"
+                        ),
+                        color_scheme=rx.cond(
+                            State.opp_filter_themes.length() > 0, "blue", "gray"
+                        ),
+                        size="2",
+                        gap="4px",
+                    ),
+                ),
+                rx.popover.content(
+                    rx.vstack(
+                        rx.foreach(
+                            State.available_themes,
+                            lambda t: rx.flex(
+                                rx.checkbox(
+                                    checked=State.opp_filter_themes.contains(t),
+                                    on_change=lambda _: State.toggle_opp_filter_theme(t),
+                                ),
+                                rx.text(t, size="2"),
+                                spacing="2",
+                                align="center",
+                                cursor="pointer",
+                                on_click=State.toggle_opp_filter_theme(t),
+                                width="100%",
+                                padding="4px 0",
+                            ),
+                        ),
+                        spacing="1",
+                        min_width="160px",
+                    ),
+                    padding="10px",
+                ),
+            ),
+            rx.popover.root(
+                rx.popover.trigger(
+                    rx.button(
+                        rx.icon("users", size=14),
+                        rx.cond(
+                            State.opp_filter_personas.length() == 0,
+                            rx.text("Persona"),
+                            rx.text(
+                                State.opp_filter_personas.length().to_string(),
+                                " selected",
+                            ),
+                        ),
+                        rx.icon("chevron-down", size=12),
+                        variant=rx.cond(
+                            State.opp_filter_personas.length() > 0, "soft", "outline"
+                        ),
+                        color_scheme=rx.cond(
+                            State.opp_filter_personas.length() > 0, "blue", "gray"
+                        ),
+                        size="2",
+                        gap="4px",
+                    ),
+                ),
+                rx.popover.content(
+                    rx.vstack(
+                        rx.foreach(
+                            State.available_personas_in_ledger,
+                            lambda p: rx.flex(
+                                rx.checkbox(
+                                    checked=State.opp_filter_personas.contains(p),
+                                    on_change=lambda _: State.toggle_opp_filter_persona(p),
+                                ),
+                                rx.text(p, size="2"),
+                                spacing="2",
+                                align="center",
+                                cursor="pointer",
+                                on_click=State.toggle_opp_filter_persona(p),
+                                width="100%",
+                                padding="4px 0",
+                            ),
+                        ),
+                        spacing="1",
+                        min_width="160px",
+                    ),
+                    padding="10px",
+                ),
+            ),
+            rx.select.root(
+                rx.select.trigger(placeholder="Priority", width="160px"),
+                rx.select.content(
+                    rx.select.item("All Priorities", value="__all__"),
+                    rx.select.item("High (≥11)", value="high"),
+                    rx.select.item("Medium (6–10)", value="medium"),
+                    rx.select.item("Low (1–5)", value="low"),
+                    rx.select.item("Unrated", value="unrated"),
+                ),
+                value=rx.cond(State.opp_filter_priority == "", "__all__", State.opp_filter_priority),
+                on_change=State.set_opp_filter_priority,
+                size="2",
+            ),
+            rx.cond(
+                State.opp_filters_active,
+                rx.button(
+                    rx.icon("x", size=12),
+                    "Clear",
+                    variant="ghost",
+                    color_scheme="gray",
+                    size="2",
+                    on_click=State.clear_opp_filters,
+                ),
+                rx.fragment(),
+            ),
+            gap="8px",
+            align="center",
+            wrap="wrap",
+        ),
         # --- Main Content (view-mode conditional) ---
         rx.cond(
             State.ledger_data.length() == 0,
@@ -1266,19 +1398,38 @@ def render_ledger() -> rx.Component:
                 width="100%",
             ),
             rx.cond(
-                State.ledger_view_mode == "table",
-                show_table_view(),
+                State.filtered_ledger_data.length() == 0,
+                rx.center(
+                    rx.vstack(
+                        rx.icon("search-x", size=36, color="var(--gray-12)"),
+                        rx.text("No results match your filters.", weight="medium", color="gray"),
+                        rx.button(
+                            "Clear filters",
+                            variant="soft",
+                            color_scheme="gray",
+                            size="2",
+                            on_click=State.clear_opp_filters,
+                        ),
+                        spacing="3", align="center",
+                    ),
+                    padding_y="80px",
+                    width="100%",
+                ),
                 rx.cond(
-                    State.ledger_view_mode == "board",
-                    show_board_view(),
+                    State.ledger_view_mode == "table",
+                    show_table_view(),
                     rx.cond(
-                        State.ledger_view_mode == "matrix",
-                        show_matrix_view(),
-                        # Default: grouped cards view
-                        rx.vstack(
-                            rx.foreach(State.ledger_data_by_theme, show_theme_group),
-                            spacing="3",
-                            width="100%",
+                        State.ledger_view_mode == "board",
+                        show_board_view(),
+                        rx.cond(
+                            State.ledger_view_mode == "matrix",
+                            show_matrix_view(),
+                            # Default: grouped cards view
+                            rx.vstack(
+                                rx.foreach(State.ledger_data_by_theme, show_theme_group),
+                                spacing="3",
+                                width="100%",
+                            ),
                         ),
                     ),
                 ),

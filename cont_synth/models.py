@@ -2,7 +2,7 @@ import reflex as rx
 from sqlmodel import Field, SQLModel
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import Column
+from sqlalchemy import Column, LargeBinary
 from pgvector.sqlalchemy import Vector
 
 
@@ -177,6 +177,7 @@ class WorkspaceDocument(rx.Model, table=True):
     product_id: int | None = Field(default=1, foreign_key="product.id")
     filename: str
     upload_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    file_data: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
 
 
 class DocumentChunk(rx.Model, table=True):
