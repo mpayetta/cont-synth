@@ -12,6 +12,7 @@ import pytest
 from cont_synth.state import (
     _MARK_CLOSE,
     _MARK_OPEN,
+    _find_span,
     _first_sentence,
     _inject_mark,
     _mark_fragment,
@@ -224,3 +225,87 @@ class TestInjectMark:
         quote = _html.escape(raw_quote)
         result = _inject_mark(transcript, quote)
         assert OPEN in result
+
+    def test_pass3_sentence_boundary_no_ellipsis(self):
+        """Pass 3: quote has a period (no ellipsis) — only its first sentence is tried."""
+        # Only the first sentence of the quote appears in the transcript
+        transcript = "The dashboard is hard to navigate."
+        # Full quote NOT in transcript; no ellipsis → Pass 2 segment = full quote = fails too
+        quote = "The dashboard is hard to navigate. But the export feature is even worse."
+        result = _inject_mark(transcript, quote)
+        assert OPEN in result
+        assert "dashboard" in result
+
+    def test_pass4_prefix_suffix_span_over_gap(self):
+        """Pass 4: quote spans speaker-attribution gap — anchored by first+last words."""
+        # Transcript has facilitator text between two user turns
+        transcript = (
+            "It crashes when I open it. Can you show me? Every single time it does."
+        )
+        # LLM stitched both turns WITHOUT ellipsis and WITHOUT a sentence boundary in quote
+        quote = "crashes when I open it Every single time it does"
+        result = _inject_mark(transcript, quote)
+        assert OPEN in result
+
+    def test_pass4_marks_span_including_gap(self):
+        """Pass 4 marks text from the start anchor to the end anchor, covering the gap."""
+        # Transcript has facilitator text between two user utterances
+        transcript = (
+            "It crashes when I open it. Team note here. crashes every single time it happens."
+        )
+        # Quote stitches both utterances — first+last words anchor the full span
+        quote = "crashes when I open it crashes every single time it happens"
+        result = _inject_mark(transcript, quote)
+        assert OPEN in result
+        assert CLOSE in result
+
+
+# ---------------------------------------------------------------------------
+# _find_span
+# ---------------------------------------------------------------------------
+
+class TestFindSpan:
+    def test_exact_substring_found(self):
+        span = _find_span("Hello world", "world")
+        assert span == (6, 11)
+
+    def test_exact_substring_at_start(self):
+        span = _find_span("Hello world", "Hello")
+        assert span == (0, 5)
+
+    def test_case_insensitive_exact(self):
+        span = _find_span("Hello World", "hello world")
+        assert span is not None
+        assert span == (0, 11)
+
+    def test_not_found_returns_none(self):
+        assert _find_span("Hello world", "missing") is None
+
+    def test_empty_fragment_returns_none(self):
+        assert _find_span("Hello world", "") is None
+        assert _find_span("Hello world", "   ") is None
+
+    def test_after_offset_shifts_search(self):
+        text = "cat and cat and cat"
+        # First "cat" is at 0; searching after=4 should skip it
+        span = _find_span(text, "cat", after=4)
+        assert span is not None
+        assert span[0] >= 4
+
+    def test_flexible_whitespace_matches_across_newline(self):
+        text = "users\nstruggle with onboarding"
+        span = _find_span(text, "users struggle")
+        assert span is not None
+
+    def test_flexible_whitespace_matches_across_tab(self):
+        text = "quick\tbrown fox"
+        span = _find_span(text, "quick brown")
+        assert span is not None
+
+    def test_single_word_no_flexible_path(self):
+        # Single word uses exact only — not found → None
+        assert _find_span("Hello world", "missing") is None
+
+    def test_returns_tuple_with_correct_bounds(self):
+        span = _find_span("aaa bbb ccc", "bbb")
+        assert span == (4, 7)

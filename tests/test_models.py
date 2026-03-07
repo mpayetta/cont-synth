@@ -7,12 +7,16 @@ from sqlmodel import Session, select
 from cont_synth.models import (
     Experiment,
     Interview,
+    InterviewFeedback,
     InterviewOpportunityLink,
+    InterviewParticipantLink,
     LlmUsageLog,
     Opportunity,
     Outcome,
     OutcomeOpportunityLink,
+    Participant,
     Persona,
+    PrepGuideLog,
     Product,
     Solution,
     User,
@@ -581,3 +585,265 @@ class TestLlmUsageLog:
         logs = db_session.exec(select(LlmUsageLog)).all()
         ops = {log.operation for log in logs}
         assert {"synthesis", "dedupe", "prep"}.issubset(ops)
+
+
+# ---------------------------------------------------------------------------
+# Participant
+# ---------------------------------------------------------------------------
+
+class TestParticipant:
+    def test_create_customer(self, db_session: Session):
+        participant = Participant(
+            name="Alice Chen",
+            segment="Enterprise",
+            recruited_via="LinkedIn",
+            notes="Key decision maker",
+        )
+        db_session.add(participant)
+        db_session.commit()
+        db_session.refresh(participant)
+
+        assert participant.id is not None
+        assert participant.name == "Alice Chen"
+        assert participant.is_team_member is False
+        assert participant.segment == "Enterprise"
+
+    def test_create_team_member(self, db_session: Session):
+        interviewer = Participant(
+            name="Bob Smith",
+            is_team_member=True,
+            segment="",
+            recruited_via="",
+            notes="",
+        )
+        db_session.add(interviewer)
+        db_session.commit()
+        db_session.refresh(interviewer)
+
+        assert interviewer.is_team_member is True
+
+    def test_defaults(self, db_session: Session):
+        p = Participant(name="Charlie")
+        db_session.add(p)
+        db_session.commit()
+        db_session.refresh(p)
+
+        assert p.is_team_member is False
+        assert p.segment == ""
+        assert p.recruited_via == ""
+        assert p.notes == ""
+        assert p.created_at is not None
+
+    def test_filter_customers_excludes_team_members(self, db_session: Session):
+        db_session.add(Participant(name="Customer A"))
+        db_session.add(Participant(name="Interviewer B", is_team_member=True))
+        db_session.add(Participant(name="Customer C"))
+        db_session.commit()
+
+        customers = db_session.exec(
+            select(Participant).where(Participant.is_team_member == False)
+        ).all()
+        names = {p.name for p in customers}
+        assert "Customer A" in names
+        assert "Customer C" in names
+        assert "Interviewer B" not in names
+
+    def test_persona_link(self, db_session: Session):
+        persona = Persona(name="VP of Engineering")
+        db_session.add(persona)
+        db_session.commit()
+        db_session.refresh(persona)
+
+        participant = Participant(name="Dana", persona_id=persona.id)
+        db_session.add(participant)
+        db_session.commit()
+        db_session.refresh(participant)
+
+        assert participant.persona_id == persona.id
+
+
+# ---------------------------------------------------------------------------
+# InterviewParticipantLink
+# ---------------------------------------------------------------------------
+
+class TestInterviewParticipantLink:
+    def test_create_link(self, db_session: Session):
+        product = _make_product(db_session)
+        persona = _make_persona(db_session, "IPL Persona")
+        inv = _make_interview(db_session, product, persona)
+
+        p = Participant(name="Eve")
+        db_session.add(p)
+        db_session.commit()
+        db_session.refresh(p)
+
+        link = InterviewParticipantLink(interview_id=inv.id, participant_id=p.id)
+        db_session.add(link)
+        db_session.commit()
+
+        fetched = db_session.exec(
+            select(InterviewParticipantLink).where(
+                InterviewParticipantLink.interview_id == inv.id
+            )
+        ).first()
+        assert fetched is not None
+        assert fetched.participant_id == p.id
+
+    def test_one_participant_multiple_interviews(self, db_session: Session):
+        product = _make_product(db_session)
+        participant = Participant(name="Frank")
+        db_session.add(participant)
+        db_session.commit()
+        db_session.refresh(participant)
+
+        for i in range(3):
+            persona = _make_persona(db_session, f"Persona-IPL-{i}")
+            inv = _make_interview(db_session, product, persona)
+            db_session.add(InterviewParticipantLink(interview_id=inv.id, participant_id=participant.id))
+        db_session.commit()
+
+        links = db_session.exec(
+            select(InterviewParticipantLink).where(
+                InterviewParticipantLink.participant_id == participant.id
+            )
+        ).all()
+        assert len(links) == 3
+
+
+# ---------------------------------------------------------------------------
+# InterviewFeedback
+# ---------------------------------------------------------------------------
+
+class TestInterviewFeedback:
+    def test_create(self, db_session: Session):
+        product = _make_product(db_session)
+        persona = _make_persona(db_session, "Coach Test Persona")
+        inv = _make_interview(db_session, product, persona)
+
+        feedback = InterviewFeedback(
+            interview_id=inv.id,
+            score=8,
+            keep_doing='["Good silence", "Follow-up questions"]',
+            stop_doing='["Leading questions"]',
+            start_doing='["Ask about workarounds"]',
+            trend_analysis="Improving over time.",
+        )
+        db_session.add(feedback)
+        db_session.commit()
+        db_session.refresh(feedback)
+
+        assert feedback.id is not None
+        assert feedback.interview_id == inv.id
+        assert feedback.score == 8
+
+    def test_defaults(self, db_session: Session):
+        product = _make_product(db_session)
+        persona = _make_persona(db_session, "Coach Default Persona")
+        inv = _make_interview(db_session, product, persona)
+
+        feedback = InterviewFeedback(interview_id=inv.id, score=5)
+        db_session.add(feedback)
+        db_session.commit()
+        db_session.refresh(feedback)
+
+        assert feedback.keep_doing == ""
+        assert feedback.stop_doing == ""
+        assert feedback.start_doing == ""
+        assert feedback.trend_analysis == ""
+        assert feedback.created_at is not None
+
+    def test_score_range(self, db_session: Session):
+        product = _make_product(db_session)
+        for i, score in enumerate([1, 5, 10]):
+            persona = _make_persona(db_session, f"Coach Score Persona {i}")
+            inv = _make_interview(db_session, product, persona)
+            feedback = InterviewFeedback(interview_id=inv.id, score=score)
+            db_session.add(feedback)
+        db_session.commit()
+
+        all_feedback = db_session.exec(select(InterviewFeedback)).all()
+        scores = {f.score for f in all_feedback}
+        assert {1, 5, 10}.issubset(scores)
+
+    def test_json_fields_round_trip(self, db_session: Session):
+        product = _make_product(db_session)
+        persona = _make_persona(db_session, "Coach JSON Persona")
+        inv = _make_interview(db_session, product, persona)
+
+        keep_doing_data = json.dumps(["Item 1", "Item 2", "Item 3"])
+        feedback = InterviewFeedback(
+            interview_id=inv.id,
+            score=7,
+            keep_doing=keep_doing_data,
+        )
+        db_session.add(feedback)
+        db_session.commit()
+        feedback_id = feedback.id
+
+        reloaded = db_session.get(InterviewFeedback, feedback_id)
+        items = json.loads(reloaded.keep_doing)
+        assert items == ["Item 1", "Item 2", "Item 3"]
+
+
+# ---------------------------------------------------------------------------
+# PrepGuideLog
+# ---------------------------------------------------------------------------
+
+class TestPrepGuideLog:
+    def test_create_battle_plan(self, db_session: Session):
+        log = PrepGuideLog(
+            guide_type="battle_plan",
+            target_persona="VP of Engineering",
+            content="## Battle Plan\n1. Open warmly...",
+            used_coach_feedback=True,
+            input_extra_context="Focus on billing pain points",
+            input_coach_score=7,
+        )
+        db_session.add(log)
+        db_session.commit()
+        db_session.refresh(log)
+
+        assert log.id is not None
+        assert log.guide_type == "battle_plan"
+        assert log.target_persona == "VP of Engineering"
+        assert log.used_coach_feedback is True
+        assert log.created_at is not None
+
+    def test_create_interview_guide(self, db_session: Session):
+        opps_json = json.dumps([{"theme": "Workflow", "statement": "Can't batch export"}])
+        log = PrepGuideLog(
+            guide_type="interview_guide",
+            target_persona="SMB Owner",
+            content="## Interview Guide\n...",
+            used_coach_feedback=False,
+            input_opportunities=opps_json,
+        )
+        db_session.add(log)
+        db_session.commit()
+        db_session.refresh(log)
+
+        assert log.guide_type == "interview_guide"
+        opps = json.loads(log.input_opportunities)
+        assert len(opps) == 1
+        assert opps[0]["theme"] == "Workflow"
+
+    def test_defaults(self, db_session: Session):
+        log = PrepGuideLog(content="Minimal guide content.")
+        db_session.add(log)
+        db_session.commit()
+        db_session.refresh(log)
+
+        assert log.guide_type == "battle_plan"
+        assert log.target_persona == ""
+        assert log.used_coach_feedback is False
+        assert log.input_opportunities == ""
+        assert log.input_extra_context == ""
+        assert log.input_coach_score == 0
+
+    def test_multiple_logs_ordered_by_creation(self, db_session: Session):
+        for i in range(3):
+            db_session.add(PrepGuideLog(content=f"Guide {i}"))
+        db_session.commit()
+
+        all_logs = db_session.exec(select(PrepGuideLog)).all()
+        assert len(all_logs) >= 3

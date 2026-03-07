@@ -34,6 +34,22 @@ if "docx" not in sys.modules:
     sys.modules["docx"] = MagicMock()
 
 # ---------------------------------------------------------------------------
+# Mock pgvector before any project imports — Vector column won't work in SQLite.
+# We substitute Vector with a lambda that returns a real SQLAlchemy Text type so
+# that create_all() on an in-memory SQLite DB succeeds.
+# ---------------------------------------------------------------------------
+from sqlalchemy import Text as _SAText
+
+_pgvector_sqlalchemy_mock = MagicMock()
+_pgvector_sqlalchemy_mock.Vector = lambda size: _SAText()
+
+_pgvector_mock = MagicMock()
+_pgvector_mock.sqlalchemy = _pgvector_sqlalchemy_mock
+
+sys.modules["pgvector"] = _pgvector_mock
+sys.modules["pgvector.sqlalchemy"] = _pgvector_sqlalchemy_mock
+
+# ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 import pytest
@@ -58,8 +74,12 @@ def db_session():
         OutcomeOpportunityLink,
         Solution,
         Experiment,
+        Participant,
+        InterviewParticipantLink,
         User,
+        InterviewFeedback,
         LlmUsageLog,
+        PrepGuideLog,
     )
     from cont_synth.state.core import PersonaPrep  # noqa: F401
 

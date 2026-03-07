@@ -604,19 +604,29 @@ class TestInterviewGuidePromptTemplate:
     def test_mentions_assumption_probes(self, interview_guide_prompt):
         assert "Assumption" in interview_guide_prompt
 
+    def test_has_workspace_context_placeholder(self, interview_guide_prompt):
+        assert "{workspace_context}" in interview_guide_prompt
+
+    def test_has_extra_context_placeholder(self, interview_guide_prompt):
+        assert "{extra_context}" in interview_guide_prompt
+
     def test_placeholders_are_formattable(self, interview_guide_prompt):
-        """str.format() with all three placeholders must not raise."""
+        """str.format() with all known placeholders must not raise."""
         result = interview_guide_prompt.format(
+            workspace_context="",
             persona_context="The interviewee is a VP of Engineering.",
+            extra_context="",
             opportunities_section="- [Workflow] Can't batch-export",
             assumptions_section="- Solution 'X' | Experiment 'Y' | Assumption: Z",
         )
         assert "VP of Engineering" in result
 
     def test_no_extra_unresolved_placeholders(self, interview_guide_prompt):
-        """After formatting the three known placeholders, no {…} remain."""
+        """After formatting all known placeholders, no {…} remain."""
         result = interview_guide_prompt.format(
+            workspace_context="ctx",
             persona_context="ctx",
+            extra_context="ctx",
             opportunities_section="opps",
             assumptions_section="exps",
         )

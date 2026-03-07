@@ -1,0 +1,28 @@
+[run]
+source = cont_synth
+omit =
+    # Reflex UI pages — event handlers require the full Reflex runtime
+    cont_synth/pages/*
+    # App entrypoint — just wires pages together
+    cont_synth/cont_synth.py
+    # Background ingestion script — requires real DB + file system
+    cont_synth/kb_ingest.py
+    # Reflex state mixin files — every method is an event handler that
+    # requires the Reflex runtime (rx.session(), self.xxx = ...).
+    # These cannot be exercised in isolation with pytest.
+    cont_synth/state/interviews.py
+    cont_synth/state/ledger.py
+    cont_synth/state/navigation.py
+    cont_synth/state/synthesis.py
+    cont_synth/state/participants.py
+    cont_synth/state/knowledge_base.py
+    cont_synth/state/pagination.py
+
+[report]
+exclude_lines =
+    # Standard pragma
+    pragma: no cover
+    # Abstract / protocol stubs
+    raise NotImplementedError
+    # Type-checking only blocks
+    if TYPE_CHECKING:

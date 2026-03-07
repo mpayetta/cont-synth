@@ -8,12 +8,17 @@ import pytest
 
 # conftest.py has mocked google.generativeai before this import.
 from cont_synth.state.core import (
+    BoardColumn,
+    CoachDetailItem,
+    CoachFreqItem,
+    CoachScorePoint,
     DashboardBarItem,
     DetailParticipantItem,
     ExperimentItem,
     InterviewHistoryItem,
     LedgerItem,
     LlmUsageItem,
+    MatrixCell,
     OppDetailSolution,
     OutcomeItem,
     ParticipantItem,
@@ -22,11 +27,14 @@ from cont_synth.state.core import (
     PendingParticipantItem,
     PersonaBadge,
     PrepExperimentItem,
+    PrepGuideItem,
     PrepOppItem,
     ProductItem,
     QuoteItem,
     RecentInterviewItem,
     SolutionItem,
+    ThemeGroup,
+    WorkspaceDocumentItem,
 )
 
 
@@ -880,3 +888,308 @@ class TestExperimentItemNewFields:
         resolved, other = _resolve_method_for_edit("   ")
         assert resolved == "Other"
         assert other == "   "
+
+
+# ---------------------------------------------------------------------------
+# WorkspaceDocumentItem
+# ---------------------------------------------------------------------------
+
+class TestWorkspaceDocumentItem:
+    def test_create(self):
+        item = WorkspaceDocumentItem(
+            id=1,
+            filename="requirements.pdf",
+            upload_date="2026-02-15 14:30",
+            chunk_count=42,
+            has_file=True,
+        )
+        assert item.id == 1
+        assert item.filename == "requirements.pdf"
+        assert item.chunk_count == 42
+        assert item.has_file is True
+
+    def test_has_file_defaults_false(self):
+        item = WorkspaceDocumentItem(
+            id=2,
+            filename="spec.docx",
+            upload_date="2026-01-01 10:00",
+            chunk_count=10,
+        )
+        assert item.has_file is False
+
+    def test_zero_chunks(self):
+        item = WorkspaceDocumentItem(
+            id=3,
+            filename="empty.txt",
+            upload_date="2026-03-01 09:00",
+            chunk_count=0,
+        )
+        assert item.chunk_count == 0
+
+    def test_filename_preserved(self):
+        for name in ["doc.pdf", "notes.txt", "spec with spaces.docx"]:
+            item = WorkspaceDocumentItem(id=1, filename=name, upload_date="2026-01-01", chunk_count=1)
+            assert item.filename == name
+
+
+# ---------------------------------------------------------------------------
+# ThemeGroup (grouped list view)
+# ---------------------------------------------------------------------------
+
+class TestThemeGroup:
+    def _make_ledger_item(self, opp_id: int, theme: str = "T") -> LedgerItem:
+        return LedgerItem(
+            opportunity_id=opp_id,
+            theme=theme,
+            personas_affected=[],
+            opportunity="Need something",
+            status="FRESH",
+            status_color="green",
+            days_old=5,
+            is_cross_functional=False,
+            evidence=[],
+        )
+
+    def test_create_empty(self):
+        group = ThemeGroup(theme="Billing", count=0, avg_priority=0)
+        assert group.theme == "Billing"
+        assert group.count == 0
+        assert group.opps == []
+        assert group.collapsed is False
+
+    def test_create_with_opps(self):
+        items = [self._make_ledger_item(i) for i in range(3)]
+        group = ThemeGroup(theme="Workflow", count=3, avg_priority=7, opps=items)
+        assert group.count == 3
+        assert len(group.opps) == 3
+
+    def test_collapsed_toggle(self):
+        group = ThemeGroup(theme="T", count=1, avg_priority=0, collapsed=True)
+        assert group.collapsed is True
+
+    def test_avg_priority_stored(self):
+        group = ThemeGroup(theme="T", count=2, avg_priority=12)
+        assert group.avg_priority == 12
+
+
+# ---------------------------------------------------------------------------
+# BoardColumn (Kanban view)
+# ---------------------------------------------------------------------------
+
+class TestBoardColumn:
+    def _make_ledger_item(self, opp_id: int) -> LedgerItem:
+        return LedgerItem(
+            opportunity_id=opp_id,
+            theme="T",
+            personas_affected=[],
+            opportunity="O",
+            status="FRESH",
+            status_color="green",
+            days_old=0,
+            is_cross_functional=False,
+            evidence=[],
+        )
+
+    def test_create_empty_column(self):
+        col = BoardColumn(label="High Priority", color="green")
+        assert col.label == "High Priority"
+        assert col.color == "green"
+        assert col.opps == []
+
+    def test_create_with_opps(self):
+        opps = [self._make_ledger_item(i) for i in range(2)]
+        col = BoardColumn(label="Medium Priority", color="yellow", opps=opps)
+        assert len(col.opps) == 2
+
+    def test_all_priority_tiers(self):
+        for label, color in [("High", "green"), ("Medium", "yellow"), ("Low", "orange"), ("Unrated", "gray")]:
+            col = BoardColumn(label=label, color=color)
+            assert col.label == label
+            assert col.color == color
+
+
+# ---------------------------------------------------------------------------
+# MatrixCell (5×5 Impact × Sat-Gap matrix)
+# ---------------------------------------------------------------------------
+
+class TestMatrixCell:
+    def test_create_basic(self):
+        cell = MatrixCell(sat_gap=3, impact=4)
+        assert cell.sat_gap == 3
+        assert cell.impact == 4
+        assert cell.opps == []
+        assert cell.is_sweet_spot is False
+
+    def test_sweet_spot_cell(self):
+        cell = MatrixCell(sat_gap=4, impact=5, is_sweet_spot=True)
+        assert cell.is_sweet_spot is True
+
+    def test_not_sweet_spot_below_threshold(self):
+        cell = MatrixCell(sat_gap=2, impact=5, is_sweet_spot=False)
+        assert cell.is_sweet_spot is False
+
+    def test_all_matrix_positions(self):
+        for i in range(1, 6):
+            for j in range(1, 6):
+                cell = MatrixCell(sat_gap=i, impact=j)
+                assert cell.sat_gap == i
+                assert cell.impact == j
+
+    def test_sweet_spot_logic(self):
+        """sweet spot = sat_gap >= 3 AND impact >= 3"""
+        sweet = [(sg, imp) for sg in range(1, 6) for imp in range(1, 6) if sg >= 3 and imp >= 3]
+        not_sweet = [(sg, imp) for sg in range(1, 6) for imp in range(1, 6) if sg < 3 or imp < 3]
+        assert len(sweet) == 9
+        assert len(not_sweet) == 16
+
+
+# ---------------------------------------------------------------------------
+# CoachScorePoint
+# ---------------------------------------------------------------------------
+
+class TestCoachScorePoint:
+    def test_create(self):
+        point = CoachScorePoint(date="2026-02-15", score=8, interview_id=42)
+        assert point.date == "2026-02-15"
+        assert point.score == 8
+        assert point.interview_id == 42
+
+    def test_score_range(self):
+        for score in [1, 5, 10]:
+            point = CoachScorePoint(date="2026-01-01", score=score, interview_id=1)
+            assert point.score == score
+
+    def test_date_is_str(self):
+        point = CoachScorePoint(date="2026-03-07", score=7, interview_id=99)
+        assert isinstance(point.date, str)
+
+    def test_interview_id_is_int(self):
+        point = CoachScorePoint(date="2026-01-01", score=6, interview_id=17)
+        assert isinstance(point.interview_id, int)
+
+
+# ---------------------------------------------------------------------------
+# CoachFreqItem
+# ---------------------------------------------------------------------------
+
+class TestCoachFreqItem:
+    def test_create(self):
+        item = CoachFreqItem(text="Ask more follow-up questions", count=5)
+        assert item.text == "Ask more follow-up questions"
+        assert item.count == 5
+
+    def test_count_of_one(self):
+        item = CoachFreqItem(text="Unique item", count=1)
+        assert item.count == 1
+
+    def test_text_is_str(self):
+        item = CoachFreqItem(text="Some coaching action", count=3)
+        assert isinstance(item.text, str)
+
+    def test_count_is_int(self):
+        item = CoachFreqItem(text="Action", count=7)
+        assert isinstance(item.count, int)
+
+    def test_high_count(self):
+        item = CoachFreqItem(text="Common behavior", count=100)
+        assert item.count == 100
+
+
+# ---------------------------------------------------------------------------
+# CoachDetailItem
+# ---------------------------------------------------------------------------
+
+class TestCoachDetailItem:
+    def test_create_with_defaults(self):
+        item = CoachDetailItem(text="Used silence effectively")
+        assert item.text == "Used silence effectively"
+        assert item.first_timestamp == ""
+        assert item.all_timestamps_str == ""
+
+    def test_create_with_timestamps(self):
+        item = CoachDetailItem(
+            text="Good follow-up at 0:47",
+            first_timestamp="0:47",
+            all_timestamps_str="0:47, 6:43",
+        )
+        assert item.first_timestamp == "0:47"
+        assert item.all_timestamps_str == "0:47, 6:43"
+
+    def test_text_preserved(self):
+        text = "Asked about workarounds for the billing flow at 2:13"
+        item = CoachDetailItem(text=text)
+        assert item.text == text
+
+    def test_multiple_timestamps_in_str(self):
+        item = CoachDetailItem(
+            text="Behavior observed",
+            first_timestamp="1:05",
+            all_timestamps_str="1:05, 3:22, 7:48",
+        )
+        assert "," in item.all_timestamps_str
+        assert item.all_timestamps_str.count(",") == 2
+
+
+# ---------------------------------------------------------------------------
+# PrepGuideItem
+# ---------------------------------------------------------------------------
+
+class TestPrepGuideItem:
+    def test_create_minimal(self):
+        item = PrepGuideItem(
+            id=1,
+            created_at="2026-02-15 14:30",
+            guide_type="battle_plan",
+            target_persona="VP of Engineering",
+            content="## Battle Plan\n...",
+            used_coach_feedback=True,
+        )
+        assert item.id == 1
+        assert item.guide_type == "battle_plan"
+        assert item.used_coach_feedback is True
+        assert item.input_opportunities == []
+        assert item.input_extra_context == ""
+        assert item.input_coach_score == 0
+        assert item.input_stop_doing == []
+
+    def test_create_interview_guide_type(self):
+        item = PrepGuideItem(
+            id=2,
+            created_at="2026-02-20 10:00",
+            guide_type="interview_guide",
+            target_persona="SMB Owner",
+            content="## Interview Guide\n...",
+            used_coach_feedback=False,
+            input_opportunities=[{"theme": "Billing", "statement": "Can't export invoices"}],
+        )
+        assert item.guide_type == "interview_guide"
+        assert len(item.input_opportunities) == 1
+        assert item.input_opportunities[0]["theme"] == "Billing"
+
+    def test_with_coach_context(self):
+        item = PrepGuideItem(
+            id=3,
+            created_at="2026-03-01 09:00",
+            guide_type="battle_plan",
+            target_persona="Enterprise Admin",
+            content="Guide with coach context",
+            used_coach_feedback=True,
+            input_coach_score=8,
+            input_stop_doing=["Leading questions", "Hypotheticals"],
+        )
+        assert item.input_coach_score == 8
+        assert len(item.input_stop_doing) == 2
+
+    def test_defaults(self):
+        item = PrepGuideItem(
+            id=4,
+            created_at="2026-01-01 00:00",
+            guide_type="battle_plan",
+            target_persona="",
+            content="Minimal",
+            used_coach_feedback=False,
+        )
+        assert item.input_extra_context == ""
+        assert item.input_coach_score == 0
+        assert item.input_opportunities == []
+        assert item.input_stop_doing == []

@@ -3,6 +3,7 @@ import pytest
 from pydantic import ValidationError
 
 from schema import (
+    CoachFeedback,
     OpportunityExtraction,
     QualityCheck,
     InterviewMetadata,
@@ -83,38 +84,72 @@ class TestInterviewMetadata:
         meta = InterviewMetadata(
             duration_minutes=45,
             interview_date="2025-01-15",
-            participants=["Alice", "Bob"],
+            participant_names=["Alice", "Bob"],
+            participant_roles=["interviewee", "interviewer"],
         )
         assert meta.duration_minutes == 45
         assert meta.interview_date == "2025-01-15"
-        assert meta.participants == ["Alice", "Bob"]
+        assert meta.participant_names == ["Alice", "Bob"]
+        assert meta.participant_roles == ["interviewer", "interviewee"] or \
+               meta.participant_roles == ["interviewee", "interviewer"]
 
     def test_all_none(self):
         meta = InterviewMetadata(
             duration_minutes=None,
             interview_date=None,
-            participants=None,
+            participant_names=None,
+            participant_roles=None,
         )
         assert meta.duration_minutes is None
         assert meta.interview_date is None
-        assert meta.participants is None
+        assert meta.participant_names is None
+        assert meta.participant_roles is None
 
     def test_empty_participants_list(self):
         meta = InterviewMetadata(
             duration_minutes=30,
             interview_date="2025-01-01",
-            participants=[],
+            participant_names=[],
+            participant_roles=[],
         )
-        assert meta.participants == []
+        assert meta.participant_names == []
+        assert meta.participant_roles == []
 
     def test_many_participants(self):
         names = ["Alice", "Bob", "Charlie", "Dave", "Eve"]
-        meta = InterviewMetadata(duration_minutes=60, interview_date="2025-06-01", participants=names)
-        assert len(meta.participants) == 5
+        roles = ["interviewee"] * 5
+        meta = InterviewMetadata(
+            duration_minutes=60,
+            interview_date="2025-06-01",
+            participant_names=names,
+            participant_roles=roles,
+        )
+        assert len(meta.participant_names) == 5
+        assert len(meta.participant_roles) == 5
 
     def test_iso_date_format_stored_as_string(self):
-        meta = InterviewMetadata(duration_minutes=None, interview_date="2025-12-31", participants=None)
+        meta = InterviewMetadata(
+            duration_minutes=None,
+            interview_date="2025-12-31",
+            participant_names=None,
+            participant_roles=None,
+        )
         assert meta.interview_date == "2025-12-31"
+
+    def test_parallel_names_and_roles(self):
+        """participant_names and participant_roles are parallel lists."""
+        meta = InterviewMetadata(
+            duration_minutes=45,
+            interview_date="2025-03-01",
+            participant_names=["Alice", "Bob"],
+            participant_roles=["interviewee", "interviewer"],
+        )
+        assert len(meta.participant_names) == len(meta.participant_roles)
+        assert meta.participant_roles[1] == "interviewer"
+
+    def test_missing_required_fields_raise(self):
+        with pytest.raises(ValidationError):
+            InterviewMetadata(duration_minutes=30, interview_date="2025-01-01")
 
 
 class TestInterviewSnapshot:
@@ -151,7 +186,8 @@ class TestInterviewSnapshot:
             metadata=InterviewMetadata(
                 duration_minutes=60,
                 interview_date="2025-03-01",
-                participants=["Charlie"],
+                participant_names=["Charlie"],
+                participant_roles=["interviewee"],
             ),
         )
         assert snapshot.metadata is not None
@@ -236,3 +272,93 @@ class TestDedupeResult:
     def test_missing_matches_field_raises(self):
         with pytest.raises(ValidationError):
             DedupeResult()
+
+
+class TestCoachFeedback:
+    def test_valid_creation(self):
+        feedback = CoachFeedback(
+            score=8,
+            keep_doing=["Used silence effectively", "Good follow-up questions"],
+            stop_doing=["Asked leading questions"],
+            start_doing=["Ask about workarounds"],
+            trend_analysis="Improving steadily over time.",
+        )
+        assert feedback.score == 8
+        assert len(feedback.keep_doing) == 2
+        assert len(feedback.stop_doing) == 1
+        assert len(feedback.start_doing) == 1
+        assert "Improving" in feedback.trend_analysis
+
+    def test_score_range_valid(self):
+        for score in [1, 5, 10]:
+            fb = CoachFeedback(
+                score=score,
+                keep_doing=[],
+                stop_doing=[],
+                start_doing=[],
+                trend_analysis="",
+            )
+            assert fb.score == score
+
+    def test_empty_lists_allowed(self):
+        fb = CoachFeedback(
+            score=5,
+            keep_doing=[],
+            stop_doing=[],
+            start_doing=[],
+            trend_analysis="No trend data.",
+        )
+        assert fb.keep_doing == []
+        assert fb.stop_doing == []
+        assert fb.start_doing == []
+
+    def test_missing_score_raises(self):
+        with pytest.raises(ValidationError):
+            CoachFeedback(
+                keep_doing=[],
+                stop_doing=[],
+                start_doing=[],
+                trend_analysis="",
+            )
+
+    def test_missing_keep_doing_raises(self):
+        with pytest.raises(ValidationError):
+            CoachFeedback(
+                score=7,
+                stop_doing=[],
+                start_doing=[],
+                trend_analysis="",
+            )
+
+    def test_many_items_in_lists(self):
+        items = [f"Action {i}" for i in range(10)]
+        fb = CoachFeedback(
+            score=9,
+            keep_doing=items,
+            stop_doing=items[:3],
+            start_doing=items[:2],
+            trend_analysis="Trending up",
+        )
+        assert len(fb.keep_doing) == 10
+
+    def test_trend_analysis_stored_as_string(self):
+        fb = CoachFeedback(
+            score=6,
+            keep_doing=[],
+            stop_doing=[],
+            start_doing=[],
+            trend_analysis="Score has been consistently above 7 in recent sessions.",
+        )
+        assert isinstance(fb.trend_analysis, str)
+
+    def test_all_three_sections_are_lists(self):
+        fb = CoachFeedback(
+            score=7,
+            keep_doing=["A"],
+            stop_doing=["B"],
+            start_doing=["C"],
+            trend_analysis="Stable.",
+        )
+        assert isinstance(fb.keep_doing, list)
+        assert isinstance(fb.stop_doing, list)
+        assert isinstance(fb.start_doing, list)

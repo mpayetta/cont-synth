@@ -175,7 +175,7 @@ def _inject_mark(escaped: str, escaped_quote: str) -> str:
     return escaped
 
 
-class State(
+class State(  # pragma: no cover
     NavigationStateMixin,
     InterviewSynthesisStateMixin,
     InterviewPrepStateMixin,
