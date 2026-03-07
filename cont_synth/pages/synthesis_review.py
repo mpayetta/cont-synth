@@ -472,7 +472,7 @@ def render_synthesis_review() -> rx.Component:
                         size="3",
                         width="100%",
                         on_click=State.confirm_synthesis,
-                        disabled=State.selected_opp_count == 0,
+                        disabled=(State.selected_opp_count == 0) | State.is_viewer,
                     ),
                     spacing="3",
                     padding="20px",

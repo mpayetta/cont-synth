@@ -145,29 +145,32 @@ def render_tree() -> rx.Component:
                     size="3",
                     width="250px",
                 ),
-                rx.dialog.root(
-                    rx.dialog.trigger(rx.button("+ New Outcome", variant="soft", size="3")),
-                    rx.dialog.content(
-                        rx.dialog.title("Define Business Outcome"),
-                        rx.dialog.description(
-                            "What metric are we trying to move?",
-                            margin_bottom="8px",
-                        ),
-                        rx.input(
-                            placeholder="e.g., Increase Q3 Retention",
-                            value=State.new_outcome_name,
-                            on_change=State.set_new_outcome_name,
-                            margin_bottom="12px",
-                        ),
-                        rx.flex(
-                            rx.dialog.close(rx.button("Cancel", variant="soft", color_scheme="gray")),
-                            rx.dialog.close(
-                                rx.button("Save Outcome", on_click=State.create_outcome, color_scheme="blue")
+                rx.cond(
+                    ~State.is_viewer,
+                    rx.dialog.root(
+                        rx.dialog.trigger(rx.button("+ New Outcome", variant="soft", size="3")),
+                        rx.dialog.content(
+                            rx.dialog.title("Define Business Outcome"),
+                            rx.dialog.description(
+                                "What metric are we trying to move?",
+                                margin_bottom="8px",
                             ),
-                            spacing="3",
-                            justify="end",
+                            rx.input(
+                                placeholder="e.g., Increase Q3 Retention",
+                                value=State.new_outcome_name,
+                                on_change=State.set_new_outcome_name,
+                                margin_bottom="12px",
+                            ),
+                            rx.flex(
+                                rx.dialog.close(rx.button("Cancel", variant="soft", color_scheme="gray")),
+                                rx.dialog.close(
+                                    rx.button("Save Outcome", on_click=State.create_outcome, color_scheme="blue")
+                                ),
+                                spacing="3",
+                                justify="end",
+                            ),
+                            max_width="450px",
                         ),
-                        max_width="450px",
                     ),
                 ),
                 spacing="3",

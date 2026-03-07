@@ -1,6 +1,6 @@
 import reflex as rx
 from sqlmodel import select
-from ..models import Participant, InterviewParticipantLink, Interview, Persona
+from ..models import Participant, InterviewParticipantLink, Interview, Persona, Product
 from .core import ParticipantItem
 
 
@@ -41,13 +41,15 @@ class ParticipantStateMixin(rx.State, mixin=True):
                 ).all()
                 product_participant_ids = {lnk.participant_id for lnk in links_in_product}
 
-            # Load all participants: those linked to this product OR team members
+            # Load participants: prefer product_id filter when set, fall back to interview-link scoping
             all_participants = session.exec(
                 select(Participant).order_by(Participant.name)
             ).all()
             relevant = [
                 p for p in all_participants
-                if p.id in product_participant_ids or p.is_team_member
+                if (p.product_id == prod_id)
+                or (p.product_id is None and p.id in product_participant_ids)
+                or (p.product_id is None and p.is_team_member)
             ]
 
             items: list[ParticipantItem] = []
@@ -108,6 +110,8 @@ class ParticipantStateMixin(rx.State, mixin=True):
 
     def save_participant(self):
         """Create or update a participant from the current form fields."""
+        if self.is_viewer:
+            return
         name = self.participant_form_name.strip()
         if not name:
             return
@@ -145,6 +149,7 @@ class ParticipantStateMixin(rx.State, mixin=True):
                     segment=self.participant_form_segment.strip(),
                     recruited_via=self.participant_form_recruited_via.strip(),
                     notes=self.participant_form_notes.strip(),
+                    product_id=int(self.active_product_id),
                 )
                 session.add(p)
                 session.commit()
@@ -153,6 +158,8 @@ class ParticipantStateMixin(rx.State, mixin=True):
 
     def delete_participant(self, participant_id: int):
         """Delete a participant and all their interview links."""
+        if self.is_viewer:
+            return
         with rx.session() as session:
             links = session.exec(
                 select(InterviewParticipantLink).where(

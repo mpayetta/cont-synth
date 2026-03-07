@@ -31,6 +31,8 @@ from .core import (
     CoachFreqItem,
     CoachDetailItem,
     WorkspaceDocumentItem,
+    WorkspaceMemberItem,
+    AuditLogItem,
     configure_genai,
 )
 from .auth import _hash_password, _verify_password
@@ -50,6 +52,8 @@ from ..models import (
     Participant,
     Persona,
     Product,
+    ProductMember,
+    AuditLog,
 )
 from .navigation import NavigationStateMixin
 from .synthesis import InterviewSynthesisStateMixin, _SCROLL_TO_MARK
@@ -215,6 +219,25 @@ class State(  # pragma: no cover
     active_product_id: str = "1"
     new_product_name: str = ""
     edit_product_name: str = ""
+
+    # --- Workspace membership ---
+    workspace_role: str = ""   # "admin" | "member" | "viewer" — scoped to active product
+    workspace_members: list[WorkspaceMemberItem] = []
+    invite_username: str = ""
+    invite_role: str = "member"
+    invite_error: str = ""
+    create_user_username: str = ""
+    create_user_fullname: str = ""
+    create_user_password: str = ""
+    create_user_workspace_role: str = "member"
+    create_user_error: str = ""
+
+    # --- Audit log ---
+    audit_logs: list[AuditLogItem] = []
+    audit_log_page: int = 0
+    audit_log_total: int = 0
+    audit_filter_action: str = ""
+    audit_filter_entity_type: str = ""
 
     # --- Interview & prep state ---
     is_processing: bool = False
@@ -711,25 +734,19 @@ class State(  # pragma: no cover
         self.settings_success = "Settings saved successfully."
 
     def wipe_database(self):
-        """Delete all data for the current user's workspaces. Other users are unaffected."""
+        """Delete all data in the active workspace. Workspace admins only."""
+        if not self.is_workspace_admin:
+            return
+        prod_id = int(self.active_product_id)
         with rx.session() as session:
-            # Gather current user's scope
-            user_prod_ids = [
-                p.id for p in session.exec(
-                    select(Product).where(Product.user_id == self.auth_user_id)
-                ).all()
-            ]
-            if not user_prod_ids:
-                return
-
             inv_ids = [
                 i.id for i in session.exec(
-                    select(Interview).where(Interview.product_id.in_(user_prod_ids))
+                    select(Interview).where(Interview.product_id == prod_id)
                 ).all()
             ]
             opp_ids = [
                 o.id for o in session.exec(
-                    select(Opportunity).where(Opportunity.product_id.in_(user_prod_ids))
+                    select(Opportunity).where(Opportunity.product_id == prod_id)
                 ).all()
             ]
             sol_ids = (
@@ -739,7 +756,7 @@ class State(  # pragma: no cover
                 if opp_ids else []
             )
 
-            # Delete in FK-safe order (children before parents), scoped to this user
+            # Delete in FK-safe order (children before parents)
             if sol_ids:
                 for row in session.exec(select(Experiment).where(Experiment.solution_id.in_(sol_ids))).all():
                     session.delete(row)
@@ -755,31 +772,27 @@ class State(  # pragma: no cover
             if opp_ids:
                 for row in session.exec(select(OutcomeOpportunityLink).where(OutcomeOpportunityLink.opportunity_id.in_(opp_ids))).all():
                     session.delete(row)
-                # Solutions: children (sub-solutions) first
                 for row in session.exec(select(Solution).where(Solution.opportunity_id.in_(opp_ids), Solution.parent_id != None)).all():
                     session.delete(row)
                 for row in session.exec(select(Solution).where(Solution.opportunity_id.in_(opp_ids))).all():
                     session.delete(row)
-                # Opportunities: children first
-                for row in session.exec(select(Opportunity).where(Opportunity.product_id.in_(user_prod_ids), Opportunity.parent_id != None)).all():
+                for row in session.exec(select(Opportunity).where(Opportunity.product_id == prod_id, Opportunity.parent_id != None)).all():
                     session.delete(row)
-                for row in session.exec(select(Opportunity).where(Opportunity.product_id.in_(user_prod_ids))).all():
+                for row in session.exec(select(Opportunity).where(Opportunity.product_id == prod_id)).all():
                     session.delete(row)
-            for row in session.exec(select(Outcome).where(Outcome.product_id.in_(user_prod_ids))).all():
+            for row in session.exec(select(Outcome).where(Outcome.product_id == prod_id)).all():
                 session.delete(row)
-            for row in session.exec(select(Interview).where(Interview.product_id.in_(user_prod_ids))).all():
+            for row in session.exec(select(Interview).where(Interview.product_id == prod_id)).all():
                 session.delete(row)
-            for row in session.exec(select(Product).where(Product.user_id == self.auth_user_id)).all():
+            # Scoped participants
+            for row in session.exec(select(Participant).where(Participant.product_id == prod_id)).all():
                 session.delete(row)
             session.commit()
 
-        # Reset all volatile state and return to the start
-        self.current_view = "synthesize"
+        # Reset volatile state for this workspace
         self.interview_history = []
         self.ledger_data = []
-        self.available_personas = []
         self.participants = []
-        self.llm_usage_logs = []
         self.outcomes = []
         self.outcome_names = ["All Outcomes"]
         self.active_outcome_name = "All Outcomes"
@@ -788,7 +801,6 @@ class State(  # pragma: no cover
         self.pending_synthesis_participant_roles = []
         self.prep_opportunities = []
         self.prep_running_experiments = []
-        self.active_product_id = "1"
         return rx.redirect("/synthesize")
 
     def toggle_show_team_members(self):
@@ -814,7 +826,10 @@ class State(  # pragma: no cover
 
     def load_synthesize_page(self):
         self.current_view = "synthesize"
-        return self._ensure_auth_and_load()
+        result = self._ensure_auth_and_load()
+        if self.is_viewer:
+            return rx.redirect("/opportunities")
+        return result
 
     def load_review_page(self):
         self.current_view = "synthesis_review"
@@ -853,7 +868,10 @@ class State(  # pragma: no cover
 
     def load_prep_page(self):
         self.current_view = "prep"
-        return self._ensure_auth_and_load()
+        result = self._ensure_auth_and_load()
+        if self.is_viewer:
+            return rx.redirect("/opportunities")
+        return result
 
     def load_participants_page(self):
         self.current_view = "participants"
@@ -866,6 +884,35 @@ class State(  # pragma: no cover
     def load_knowledge_base_page(self):
         self.current_view = "knowledge_base"
         return self._ensure_auth_and_load()
+
+    def load_members_page(self):
+        self.current_view = "members"
+        return self._ensure_auth_and_load()
+
+    def set_audit_filter_action(self, value: str):
+        self.audit_filter_action = value
+        self.audit_log_page = 0
+        self.load_audit_logs()
+
+    def set_audit_filter_entity_type(self, value: str):
+        self.audit_filter_entity_type = value
+        self.audit_log_page = 0
+        self.load_audit_logs()
+
+    def clear_audit_filters(self):
+        self.audit_filter_action = ""
+        self.audit_filter_entity_type = ""
+        self.audit_log_page = 0
+        self.load_audit_logs()
+
+    def audit_log_next_page(self):
+        self.audit_log_page += 1
+        self.load_audit_logs()
+
+    def audit_log_prev_page(self):
+        if self.audit_log_page > 0:
+            self.audit_log_page -= 1
+        self.load_audit_logs()
 
     def load_app(self):
         """Initial app load — check auth first; data loads only after session is verified."""

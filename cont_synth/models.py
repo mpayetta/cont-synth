@@ -2,7 +2,7 @@ import reflex as rx
 from sqlmodel import Field, SQLModel
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import Column, LargeBinary
+from sqlalchemy import Column, LargeBinary, UniqueConstraint
 from pgvector.sqlalchemy import Vector
 
 
@@ -28,6 +28,10 @@ class Interview(rx.Model, table=True):
     duration_minutes: int | None = Field(default=None)
     interview_date: str | None = Field(default=None)   # ISO format: YYYY-MM-DD
     participants: str | None = Field(default=None)     # JSON-encoded list of names
+    # Audit trail
+    created_by_user_id: int | None = Field(default=None, foreign_key="user.id")
+    updated_by_user_id: int | None = Field(default=None, foreign_key="user.id")
+    updated_at: datetime | None = Field(default=None)
 
 
 class Opportunity(rx.Model, table=True):
@@ -46,6 +50,10 @@ class Opportunity(rx.Model, table=True):
     # Teresa Torres prioritization scores (0 = unrated, 1–5)
     impact_score: int = Field(default=0)
     sat_gap_score: int = Field(default=0)
+    # Audit trail
+    created_by_user_id: int | None = Field(default=None, foreign_key="user.id")
+    updated_by_user_id: int | None = Field(default=None, foreign_key="user.id")
+    updated_at: datetime | None = Field(default=None)
 
 
 class InterviewOpportunityLink(SQLModel, table=True):
@@ -64,6 +72,10 @@ class Outcome(rx.Model, table=True):
     description: str
     target_metric: str = ""  # e.g., "Reduce churn by 5%"
     is_active: bool = True
+    # Audit trail
+    created_by_user_id: int | None = Field(default=None, foreign_key="user.id")
+    updated_by_user_id: int | None = Field(default=None, foreign_key="user.id")
+    updated_at: datetime | None = Field(default=None)
 
 
 class OutcomeOpportunityLink(SQLModel, table=True):
@@ -85,6 +97,10 @@ class Solution(rx.Model, table=True):
     status: str = (
         "Ideation"  # Status pipeline: Ideation -> Testing -> Discarded -> Shipped
     )
+    # Audit trail
+    created_by_user_id: int | None = Field(default=None, foreign_key="user.id")
+    updated_by_user_id: int | None = Field(default=None, foreign_key="user.id")
+    updated_at: datetime | None = Field(default=None)
 
 class Experiment(rx.Model, table=True):
     """Tests designed to validate assumptions behind a solution."""
@@ -103,6 +119,10 @@ class Experiment(rx.Model, table=True):
     # Telemetry & Proof
     evidence_notes: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Audit trail
+    created_by_user_id: int | None = Field(default=None, foreign_key="user.id")
+    updated_by_user_id: int | None = Field(default=None, foreign_key="user.id")
+    updated_at: datetime | None = Field(default=None)
 
 
 class Participant(rx.Model, table=True):
@@ -115,6 +135,7 @@ class Participant(rx.Model, table=True):
     recruited_via: str = Field(default="")  # e.g. "LinkedIn", "Customer Success"
     notes: str = Field(default="")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    product_id: int | None = Field(default=None, foreign_key="product.id")
 
 
 class InterviewParticipantLink(SQLModel, table=True):
@@ -132,6 +153,16 @@ class User(rx.Model, table=True):
     fullname: str
     gemini_api_key: Optional[str] = Field(default=None)
     role: str = Field(default="user")
+
+
+class ProductMember(rx.Model, table=True):
+    """Workspace membership: links users to products with a workspace-scoped role."""
+
+    product_id: int = Field(foreign_key="product.id", index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    role: str = Field(default="member")  # "admin" | "member" | "viewer"
+    invited_by_user_id: int | None = Field(default=None, foreign_key="user.id")
+    joined_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class InterviewFeedback(rx.Model, table=True):
@@ -171,6 +202,7 @@ class PrepGuideLog(rx.Model, table=True):
     input_extra_context: str = Field(default="")
     input_coach_score: int = Field(default=0)
     input_stop_doing: str = Field(default="")      # JSON list of strings
+    product_id: int | None = Field(default=None, foreign_key="product.id")
 
 
 class WorkspaceDocument(rx.Model, table=True):
@@ -191,3 +223,15 @@ class DocumentChunk(rx.Model, table=True):
     embedding: Optional[list] = Field(
         default=None, sa_column=Column(Vector(384))
     )
+
+
+class AuditLog(rx.Model, table=True):
+    """Immutable audit trail for significant data changes (deletes, status transitions)."""
+
+    user_id: int = Field(foreign_key="user.id", index=True)
+    product_id: int | None = Field(default=None, foreign_key="product.id", index=True)
+    entity_type: str   # "interview" | "opportunity" | "solution" | "experiment" | "outcome"
+    entity_id: int
+    action: str        # "delete" | "status_change" | "role_change"
+    detail: str = ""   # JSON with context (entity name/statement, before/after values)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

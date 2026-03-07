@@ -18,6 +18,7 @@ from ..models import (
     InterviewParticipantLink,
     Solution,
     Experiment,
+    AuditLog,
 )
 from .core import (
     InterviewHistoryItem,
@@ -253,6 +254,8 @@ class InterviewPrepStateMixin(rx.State, mixin=True):
 
     def delete_interview(self, interview_id: int):
         """Cascading delete for interviews and orphaned opportunities."""
+        if self.is_viewer:
+            return
         from ..models import InterviewOpportunityLink as IOL  # local alias
 
         with rx.session() as session:
@@ -264,6 +267,18 @@ class InterviewPrepStateMixin(rx.State, mixin=True):
                 select(IOL).where(IOL.interview_id == interview_id)
             ).all()
             opportunity_ids = {link.opportunity_id for link in links}
+
+            # Audit log before deletion
+            persona = session.get(Persona, interview.persona_id) if interview.persona_id else None
+            persona_name = persona.name if persona else "Unknown"
+            session.add(AuditLog(
+                user_id=self.auth_user_id,
+                product_id=interview.product_id,
+                entity_type="interview",
+                entity_id=interview_id,
+                action="delete",
+                detail=f'{{"persona": "{persona_name}", "date": "{interview.interview_date or str(interview.date_logged.date())}"}}',
+            ))
 
             # Phase 1: delete all rows that FK-reference this interview.
             # Committed before touching the interview row so the DB never sees
@@ -394,10 +409,15 @@ class InterviewPrepStateMixin(rx.State, mixin=True):
             self.last_stop_doing = []
 
     def load_guide_history(self):
-        """Fetches all PrepGuideLog records ordered newest-first."""
+        """Fetches PrepGuideLog records for the active product, ordered newest-first."""
+        prod_id = int(self.active_product_id)
         with rx.session() as session:
             rows = session.exec(
-                select(PrepGuideLog).order_by(PrepGuideLog.created_at.desc())
+                select(PrepGuideLog)
+                .where(
+                    (PrepGuideLog.product_id == prod_id) | (PrepGuideLog.product_id == None)
+                )
+                .order_by(PrepGuideLog.created_at.desc())
             ).all()
         self.guide_history = [
             PrepGuideItem(
@@ -458,6 +478,8 @@ class InterviewPrepStateMixin(rx.State, mixin=True):
 
     def generate_hostile_questions(self):
         """Generates interview guide — OST-based if opportunities are selected, else persona battle plan."""
+        if self.is_viewer:
+            return
         has_persona = bool(getattr(self, "target_persona", ""))
         selected_opps = [o for o in self.prep_opportunities if o.selected]
         has_extra_context = bool(self.prep_extra_context.strip())
@@ -539,6 +561,7 @@ class InterviewPrepStateMixin(rx.State, mixin=True):
                         input_extra_context=self.prep_extra_context.strip(),
                         input_coach_score=0,
                         input_stop_doing="[]",
+                        product_id=int(self.active_product_id),
                     ))
                     session.commit()
 
@@ -612,6 +635,7 @@ class InterviewPrepStateMixin(rx.State, mixin=True):
                         input_extra_context=self.prep_extra_context.strip(),
                         input_coach_score=self.last_interview_score if use_coaching else 0,
                         input_stop_doing=json.dumps(self.last_stop_doing) if use_coaching else "[]",
+                        product_id=int(self.active_product_id),
                     ))
                     session.commit()
                     existing_entry = session.get(PersonaPrep, self.target_persona)
@@ -729,6 +753,8 @@ class InterviewPrepStateMixin(rx.State, mixin=True):
 
     async def generate_coach_feedback(self):
         """Generate (or regenerate) coach feedback for the currently viewed interview."""
+        if self.is_viewer:
+            return
         interview_id = self.selected_interview_id
         transcript = self.interview_detail_transcript
         if not transcript or not interview_id:

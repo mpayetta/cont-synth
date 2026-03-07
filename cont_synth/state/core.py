@@ -210,6 +210,28 @@ class ParticipantItem(BaseModel):
     last_interviewed: str = ""  # ISO date of most recent linked interview
 
 
+class WorkspaceMemberItem(BaseModel):
+    """One member row for the workspace members management page."""
+    member_id: int       # ProductMember.id (0 for the product owner if not in ProductMember)
+    user_id: int
+    username: str
+    fullname: str
+    role: str            # "admin" | "member" | "viewer"
+    joined_at: str       # ISO date string
+    is_owner: bool = False  # True if this user is the Product.user_id owner
+
+
+class AuditLogItem(BaseModel):
+    """One row in the Audit Log tab on the workspace members page."""
+    id: int
+    username: str
+    entity_type: str   # "interview" | "opportunity" | "solution" | "experiment" | "outcome"
+    entity_id: int
+    action: str        # "delete" | "status_change" | "role_change"
+    detail: str
+    created_at: str    # formatted "YYYY-MM-DD HH:MM"
+
+
 class PendingParticipantItem(BaseModel):
     """One participant extracted from a pending synthesis, with an editable role."""
     index: int

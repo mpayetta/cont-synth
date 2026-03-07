@@ -14,6 +14,7 @@ from ..models import (
     Outcome,
     OutcomeOpportunityLink,
     Experiment,
+    AuditLog,
 )
 from .core import (
     ExperimentItem,
@@ -528,6 +529,8 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def delete_solution(self, solution_id: int):
         """Permanently removes a solution AND recursively deletes all its nested children."""
+        if self.is_viewer:
+            return
 
         def delete_recursive(session, sol_id):
             # Delete experiments first
@@ -548,6 +551,17 @@ class LedgerStateMixin(rx.State, mixin=True):
 
 
         with rx.session() as session:
+            sol = session.get(Solution, solution_id)
+            if sol:
+                opp = session.get(Opportunity, sol.opportunity_id) if sol.opportunity_id else None
+                session.add(AuditLog(
+                    user_id=self.auth_user_id,
+                    product_id=opp.product_id if opp else None,
+                    entity_type="solution",
+                    entity_id=solution_id,
+                    action="delete",
+                    detail=f'{{"name": "{sol.name[:120].replace(chr(34), chr(39))}"}}',
+                ))
             delete_recursive(session, solution_id)
             session.commit()
 
@@ -562,6 +576,8 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def add_manual_solution(self, opportunity_id: int):
         """Saves a human-brainstormed solution or updates an existing one."""
+        if self.is_viewer:
+            return
         if not self.new_solution_name.strip():
             return rx.window_alert("Solution name cannot be empty.")
 
@@ -569,20 +585,53 @@ class LedgerStateMixin(rx.State, mixin=True):
             if self.editing_solution_id != -1:
                 sol = session.get(Solution, self.editing_solution_id)
                 if sol:
+                    old_name = sol.name
+                    old_status = sol.status
                     sol.name = self.new_solution_name.strip()
                     sol.description = self.new_solution_desc.strip()
                     sol.status = self.new_solution_status
+                    sol.updated_by_user_id = self.auth_user_id
+                    sol.updated_at = datetime.now(timezone.utc)
                     session.add(sol)
+                    opp = session.get(Opportunity, sol.opportunity_id) if sol.opportunity_id else None
+                    changes: dict = {}
+                    if old_name != sol.name:
+                        changes["name"] = {"from": old_name[:80], "to": sol.name[:80]}
+                    if old_status != sol.status:
+                        changes["status"] = {"from": old_status, "to": sol.status}
+                    session.add(AuditLog(
+                        user_id=self.auth_user_id,
+                        product_id=opp.product_id if opp else None,
+                        entity_type="solution",
+                        entity_id=sol.id,
+                        action="update",
+                        detail=json.dumps({"opportunity_id": sol.opportunity_id, "changes": changes}),
+                    ))
             else:
+                parent_id_val = self.target_parent_id if self.target_parent_id != -1 else None
                 new_sol = Solution(
                     opportunity_id=opportunity_id,
-                    parent_id=(
-                        self.target_parent_id if self.target_parent_id != -1 else None
-                    ),
+                    parent_id=parent_id_val,
                     name=self.new_solution_name.strip(),
                     description=self.new_solution_desc.strip(),
+                    created_by_user_id=self.auth_user_id,
                 )
                 session.add(new_sol)
+                session.commit()
+                session.refresh(new_sol)
+                opp = session.get(Opportunity, opportunity_id)
+                session.add(AuditLog(
+                    user_id=self.auth_user_id,
+                    product_id=opp.product_id if opp else None,
+                    entity_type="solution",
+                    entity_id=new_sol.id,
+                    action="create",
+                    detail=json.dumps({
+                        "name": new_sol.name[:80],
+                        "opportunity_id": opportunity_id,
+                        "parent_id": parent_id_val,
+                    }),
+                ))
             session.commit()
 
         self.editing_solution_id = -1
@@ -596,6 +645,8 @@ class LedgerStateMixin(rx.State, mixin=True):
     # Outcomes
     def create_outcome(self):
         """Creates a new top-level business outcome."""
+        if self.is_viewer:
+            return
         if not self.new_outcome_name.strip():
             return
         with rx.session() as session:
@@ -603,6 +654,7 @@ class LedgerStateMixin(rx.State, mixin=True):
                 name=self.new_outcome_name.strip(),
                 description="",
                 product_id=int(self.active_product_id),
+                created_by_user_id=self.auth_user_id,
             )
             session.add(new_out)
             session.commit()
@@ -619,6 +671,8 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def set_primary_outcome(self, outcome_name: str):
         """Forces an opportunity to have only ONE primary outcome, or none."""
+        if self.is_viewer:
+            return
         if not self.selected_opportunity:
             return
 
@@ -707,6 +761,8 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def save_manual_opportunity(self):
         """Handles both creating a new opportunity and updating an existing one."""
+        if self.is_viewer:
+            return
         if not self.manual_opp_statement.strip():
             return rx.window_alert("Opportunity statement cannot be empty.")
 
@@ -738,10 +794,33 @@ class LedgerStateMixin(rx.State, mixin=True):
             if self.editing_opp_id != -1:
                 opp = session.get(Opportunity, self.editing_opp_id)
                 if opp:
+                    # Capture old values before overwriting
+                    old_statement = opp.statement
+                    old_theme = opp.theme
+                    old_parent_id = opp.parent_id
                     opp.theme = self.manual_opp_theme.strip()
                     opp.statement = self.manual_opp_statement.strip()
                     opp.parent_id = parent_id_val
                     session.add(opp)
+
+                    # Build diff detail
+                    changes: dict = {}
+                    new_stmt = self.manual_opp_statement.strip()
+                    new_theme = self.manual_opp_theme.strip()
+                    if old_statement != new_stmt:
+                        changes["statement"] = {"from": old_statement[:80].replace('"', "'"), "to": new_stmt[:80].replace('"', "'")}
+                    if old_theme != new_theme:
+                        changes["theme"] = {"from": old_theme, "to": new_theme}
+                    if old_parent_id != parent_id_val:
+                        changes["parent_id"] = {"from": old_parent_id, "to": parent_id_val}
+                    session.add(AuditLog(
+                        user_id=self.auth_user_id,
+                        product_id=opp.product_id,
+                        entity_type="opportunity",
+                        entity_id=opp.id,
+                        action="update",
+                        detail=json.dumps(changes),
+                    ))
 
                     # Apply dialog outcome selection (clears and re-sets)
                     existing_outcomes = session.exec(
@@ -770,10 +849,19 @@ class LedgerStateMixin(rx.State, mixin=True):
                     theme=self.manual_opp_theme.strip() or "Uncategorized",
                     statement=self.manual_opp_statement.strip(),
                     parent_id=parent_id_val,
+                    created_by_user_id=self.auth_user_id,
                 )
                 session.add(new_opp)
                 session.commit()
                 session.refresh(new_opp)
+                session.add(AuditLog(
+                    user_id=self.auth_user_id,
+                    product_id=new_opp.product_id,
+                    entity_type="opportunity",
+                    entity_id=new_opp.id,
+                    action="create",
+                    detail=f'{{"statement": "{new_opp.statement[:80].replace(chr(34), chr(39))}", "theme": "{new_opp.theme}"}}',
+                ))
 
                 if chosen_outcome:
                     session.add(
@@ -797,10 +885,22 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def delete_opportunity(self, opp_id: int):
         """Safely deletes an opportunity and all nested relationships."""
+        if self.is_viewer:
+            return
         with rx.session() as session:
             opp = session.get(Opportunity, opp_id)
             if not opp:
                 return
+
+            # Audit log before deletion
+            session.add(AuditLog(
+                user_id=self.auth_user_id,
+                product_id=opp.product_id,
+                entity_type="opportunity",
+                entity_id=opp_id,
+                action="delete",
+                detail=f'{{"statement": "{opp.statement[:120].replace(chr(34), chr(39))}", "theme": "{opp.theme}"}}',
+            ))
 
             int_links = session.exec(
                 select(InterviewOpportunityLink).where(
@@ -849,6 +949,8 @@ class LedgerStateMixin(rx.State, mixin=True):
     # Evidence mapping
     def add_real_evidence(self, opportunity_id: int):
         """Links a missed quote from a real interview to this opportunity."""
+        if self.is_viewer:
+            return
         if not self.selected_interview_choice or not self.manual_quote_text.strip():
             return rx.window_alert("Please select an interview and enter a quote.")
 
@@ -870,6 +972,15 @@ class LedgerStateMixin(rx.State, mixin=True):
                 source_quote=self.manual_quote_text.strip(),
             )
             session.add(new_link)
+            opp = session.get(Opportunity, opportunity_id)
+            session.add(AuditLog(
+                user_id=self.auth_user_id,
+                product_id=opp.product_id if opp else None,
+                entity_type="evidence",
+                entity_id=opportunity_id,
+                action="create",
+                detail=json.dumps({"opportunity_id": opportunity_id, "interview_id": inv_id, "quote": self.manual_quote_text.strip()[:120]}),
+            ))
             session.commit()
 
         self.manual_quote_text = ""
@@ -878,9 +989,20 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def delete_evidence(self, opportunity_id: int, interview_id: int):
         """Unlinks an interview quote from an opportunity."""
+        if self.is_viewer:
+            return
         with rx.session() as session:
             link = session.get(InterviewOpportunityLink, (interview_id, opportunity_id))
             if link:
+                opp = session.get(Opportunity, opportunity_id)
+                session.add(AuditLog(
+                    user_id=self.auth_user_id,
+                    product_id=opp.product_id if opp else None,
+                    entity_type="evidence",
+                    entity_id=opportunity_id,
+                    action="delete",
+                    detail=json.dumps({"opportunity_id": opportunity_id, "interview_id": interview_id}),
+                ))
                 session.delete(link)
                 session.commit()
 
@@ -973,6 +1095,8 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def add_experiment(self, opportunity_id: int):
         """Creates a new experiment (or saves an edit) and bumps the solution to 'Testing'."""
+        if self.is_viewer:
+            return
         if not self.new_experiment_name.strip():
             return rx.window_alert("Experiment name cannot be empty.")
         method = (
@@ -985,26 +1109,62 @@ class LedgerStateMixin(rx.State, mixin=True):
                 # Edit path: update existing experiment fields
                 exp = session.get(Experiment, self.editing_experiment_id)
                 if exp:
+                    old_name = exp.name
+                    old_method = exp.method
                     exp.name = self.new_experiment_name.strip()
                     exp.assumption = self.new_experiment_assumption.strip()
                     exp.description = self.new_experiment_description.strip()
                     exp.success_metric = self.new_experiment_success_metric.strip()
                     exp.method = method
+                    exp.updated_by_user_id = self.auth_user_id
+                    exp.updated_at = datetime.now(timezone.utc)
                     session.add(exp)
+                    sol = session.get(Solution, exp.solution_id)
+                    opp = session.get(Opportunity, sol.opportunity_id) if sol else None
+                    changes: dict = {}
+                    if old_name != exp.name:
+                        changes["name"] = {"from": old_name[:80], "to": exp.name[:80]}
+                    if old_method != exp.method:
+                        changes["method"] = {"from": old_method, "to": exp.method}
+                    session.add(AuditLog(
+                        user_id=self.auth_user_id,
+                        product_id=opp.product_id if opp else None,
+                        entity_type="experiment",
+                        entity_id=exp.id,
+                        action="update",
+                        detail=json.dumps({"solution_id": exp.solution_id, "changes": changes}),
+                    ))
             else:
                 # Create path: new experiment + auto-bump solution to Testing
-                session.add(Experiment(
+                new_exp = Experiment(
                     solution_id=self.experiment_target_solution_id,
                     name=self.new_experiment_name.strip(),
                     assumption=self.new_experiment_assumption.strip(),
                     description=self.new_experiment_description.strip(),
                     success_metric=self.new_experiment_success_metric.strip(),
                     method=method,
-                ))
+                    created_by_user_id=self.auth_user_id,
+                )
+                session.add(new_exp)
+                session.commit()
+                session.refresh(new_exp)
                 sol = session.get(Solution, self.experiment_target_solution_id)
                 if sol and sol.status == "Ideation":
                     sol.status = "Testing"
                     session.add(sol)
+                opp = session.get(Opportunity, sol.opportunity_id) if sol else None
+                session.add(AuditLog(
+                    user_id=self.auth_user_id,
+                    product_id=opp.product_id if opp else None,
+                    entity_type="experiment",
+                    entity_id=new_exp.id,
+                    action="create",
+                    detail=json.dumps({
+                        "name": new_exp.name[:80],
+                        "solution_id": new_exp.solution_id,
+                        "method": new_exp.method,
+                    }),
+                ))
             session.commit()
         # reset form
         self.editing_experiment_id = -1
@@ -1020,28 +1180,70 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def update_experiment_status(self, exp_id: int, status: str):
         """Advances Draft → Running → Concluded."""
+        if self.is_viewer:
+            return
         with rx.session() as session:
             exp = session.get(Experiment, exp_id)
             if exp:
+                old_status = exp.status
                 exp.status = status
+                exp.updated_by_user_id = self.auth_user_id
+                exp.updated_at = datetime.now(timezone.utc)
+                sol = session.get(Solution, exp.solution_id)
+                opp = session.get(Opportunity, sol.opportunity_id) if sol else None
                 session.add(exp)
+                session.add(AuditLog(
+                    user_id=self.auth_user_id,
+                    product_id=opp.product_id if opp else None,
+                    entity_type="experiment",
+                    entity_id=exp_id,
+                    action="status_change",
+                    detail=f'{{"from": "{old_status}", "to": "{status}"}}',
+                ))
                 session.commit()
         self._load_and_sync()
 
     def update_experiment_signal(self, exp_id: int, signal: str):
         """Marks an experiment as Validated or Invalidated."""
+        if self.is_viewer:
+            return
         with rx.session() as session:
             exp = session.get(Experiment, exp_id)
             if exp:
+                old_signal = exp.signal
                 exp.signal = signal
+                sol = session.get(Solution, exp.solution_id)
+                opp = session.get(Opportunity, sol.opportunity_id) if sol else None
                 session.add(exp)
+                session.add(AuditLog(
+                    user_id=self.auth_user_id,
+                    product_id=opp.product_id if opp else None,
+                    entity_type="experiment",
+                    entity_id=exp_id,
+                    action="status_change",
+                    detail=f'{{"field": "signal", "from": "{old_signal}", "to": "{signal}"}}',
+                ))
                 session.commit()
         self._load_and_sync()
 
     def delete_experiment(self, exp_id: int):
+        if self.is_viewer:
+            return
         with rx.session() as session:
             exp = session.get(Experiment, exp_id)
             if exp:
+                # Resolve product_id via solution → opportunity chain
+                sol = session.get(Solution, exp.solution_id)
+                opp = session.get(Opportunity, sol.opportunity_id) if sol else None
+                prod_id = opp.product_id if opp else None
+                session.add(AuditLog(
+                    user_id=self.auth_user_id,
+                    product_id=prod_id,
+                    entity_type="experiment",
+                    entity_id=exp_id,
+                    action="delete",
+                    detail=f'{{"name": "{exp.name[:120].replace(chr(34), chr(39))}"}}',
+                ))
                 session.delete(exp)
                 session.commit()
         self._load_and_sync()
@@ -1067,6 +1269,8 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def update_experiment_evidence(self, exp_id: int, notes: str):
         """Saves evidence notes for a concluded experiment."""
+        if self.is_viewer:
+            return
         with rx.session() as session:
             exp = session.get(Experiment, exp_id)
             if exp:
@@ -1077,18 +1281,32 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def apply_solution_outcome(self, exp_id: int):
         """Applies the experiment's signal as the solution's outcome status (user-confirmed)."""
+        if self.is_viewer:
+            return
         with rx.session() as session:
             exp = session.get(Experiment, exp_id)
             if exp:
                 sol = session.get(Solution, exp.solution_id)
                 if sol:
+                    old_status = sol.status
                     sol.status = "Shipped" if exp.signal == "Validated" else "Discarded"
                     session.add(sol)
+                    opp = session.get(Opportunity, sol.opportunity_id) if sol.opportunity_id else None
+                    session.add(AuditLog(
+                        user_id=self.auth_user_id,
+                        product_id=opp.product_id if opp else None,
+                        entity_type="solution",
+                        entity_id=sol.id,
+                        action="status_change",
+                        detail=json.dumps({"from": old_status, "to": sol.status, "via_experiment_id": exp_id}),
+                    ))
                     session.commit()
         self._load_and_sync()
 
     def update_opp_score(self, opp_id: int, field: str, score_str: str):
         """Updates impact_score or sat_gap_score for an opportunity (1-5, 0 = unrated)."""
+        if self.is_viewer:
+            return
         try:
             score = int(score_str)
         except ValueError:
@@ -1183,6 +1401,8 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def confirm_merge(self):
         """Merges source opportunity into target, transferring all evidence, solutions, and outcome links."""
+        if self.is_viewer:
+            return
         src_id = self.merge_source_opp_id
         tgt_id = self.merge_target_opp_id
         if src_id == -1 or tgt_id == -1:

@@ -180,6 +180,8 @@ class InterviewSynthesisStateMixin(rx.State, mixin=True):
     @rx.event(background=True)
     async def run_synthesis(self):
         """Runs synthesis as a non-blocking background task so the UI stays responsive."""
+        if self.is_viewer:
+            return
         import asyncio
 
         # --- Validate & capture inputs atomically ---
@@ -574,6 +576,8 @@ class InterviewSynthesisStateMixin(rx.State, mixin=True):
 
     def confirm_synthesis(self):
         """Write the confirmed (selected) opportunities and interview to the database."""
+        if self.is_viewer:
+            return
         selected_opps = [opp for opp in self.pending_synthesis_opps if opp.selected]
 
         with rx.session() as session:
@@ -598,6 +602,7 @@ class InterviewSynthesisStateMixin(rx.State, mixin=True):
                 duration_minutes=self.pending_synthesis_duration or None,
                 interview_date=self.pending_synthesis_interview_date or None,
                 participants=json.dumps(self.pending_synthesis_participants) if self.pending_synthesis_participants else None,
+                created_by_user_id=self.auth_user_id,
             )
             session.add(interview)
             session.commit()
@@ -697,6 +702,7 @@ class InterviewSynthesisStateMixin(rx.State, mixin=True):
                             theme=opp_item.theme,
                             statement=opp_item.opportunity_statement,
                             product_id=int(self.active_product_id),
+                            created_by_user_id=self.auth_user_id,
                         )
                         session.add(master_opp)
                         session.commit()
@@ -706,6 +712,7 @@ class InterviewSynthesisStateMixin(rx.State, mixin=True):
                         theme=opp_item.theme,
                         statement=opp_item.opportunity_statement,
                         product_id=int(self.active_product_id),
+                        created_by_user_id=self.auth_user_id,
                     )
                     session.add(master_opp)
                     session.commit()

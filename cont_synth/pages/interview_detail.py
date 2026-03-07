@@ -471,6 +471,8 @@ def render_interview_detail() -> rx.Component:
             margin_right="8px",
             width="140px",
         ),
+        rx.cond(
+            ~State.is_viewer,
         rx.alert_dialog.root(
                 rx.alert_dialog.trigger(
                     rx.button(
@@ -505,7 +507,8 @@ def render_interview_detail() -> rx.Component:
                     ),
                 ),
             ),
-        ),
+        ),  # end rx.cond(~is_viewer)
+        ),  # end rx.hstack (nav row)
         # Header: persona badge + created-at date + interview ID + quality score
         rx.hstack(
             rx.badge(

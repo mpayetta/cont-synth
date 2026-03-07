@@ -581,18 +581,22 @@ def render_prep() -> rx.Component:
                             align="center",
                         ),
                     ),
-                    rx.button(
-                        rx.cond(
-                            State.prep_questions != "",
-                            "Regenerate Interview Guide",
-                            "Generate Interview Guide",
+                    rx.hstack(
+                        rx.spacer(),
+                        rx.button(
+                            rx.cond(
+                                State.prep_questions != "",
+                                "Regenerate Interview Guide",
+                                "Generate Interview Guide",
+                            ),
+                            on_click=State.generate_hostile_questions,
+                            loading=State.is_prepping,
+                            disabled=State.is_viewer,
+                            size="3",
+                            color_scheme="blue",
+                            variant=rx.cond(State.prep_questions != "", "outline", "solid"),
                         ),
-                        on_click=State.generate_hostile_questions,
-                        loading=State.is_prepping,
-                        size="4",
                         width="100%",
-                        color_scheme="blue",
-                        variant=rx.cond(State.prep_questions != "", "outline", "solid"),
                     ),
                     spacing="3",
                     align_items="start",

@@ -64,6 +64,8 @@ def render_detail_quote(q: QuoteItem) -> rx.Component:
         rx.vstack(
             rx.flex(
                 rx.badge(q.persona_name, color_scheme=q.persona_color, variant="soft", size="2"),
+                rx.cond(
+                    ~State.is_viewer,
                 rx.alert_dialog.root(
                     rx.alert_dialog.trigger(
                         rx.icon_button(
@@ -95,6 +97,7 @@ def render_detail_quote(q: QuoteItem) -> rx.Component:
                         max_width="420px",
                     ),
                 ),
+                ),  # end rx.cond(~is_viewer)
                 justify="between", width="100%", align="center",
             ),
             # Quote text is the clickable area for opening the transcript drawer
@@ -133,33 +136,36 @@ def render_evidence_panel() -> rx.Component:
             ),
             rx.text("No evidence logged yet.", color="gray", size="2"),
         ),
-        # Map missed evidence form
-        rx.box(
-            rx.vstack(
-                rx.text("🔗 Map Missed Evidence", size="2", weight="bold", color="gray"),
-                rx.select(
-                    State.available_interview_choices,
-                    value=State.selected_interview_choice,
-                    on_change=State.set_selected_interview_choice,
-                    placeholder="Select Source Interview...",
-                    width="100%",
-                    size="1",
-                ),
-                rx.button(
-                    rx.icon("file-text", size=14),
-                    "Open in Transcript",
-                    on_click=State.open_transcript_for_selection(
-                        State.selected_opportunity.opportunity_id
+        # Map missed evidence form — hidden for viewers
+        rx.cond(
+            ~State.is_viewer,
+            rx.box(
+                rx.vstack(
+                    rx.text("🔗 Map Missed Evidence", size="2", weight="bold", color="gray"),
+                    rx.select(
+                        State.available_interview_choices,
+                        value=State.selected_interview_choice,
+                        on_change=State.set_selected_interview_choice,
+                        placeholder="Select Source Interview...",
+                        width="100%",
+                        size="1",
                     ),
-                    color_scheme="blue", variant="soft", size="1", width="100%",
+                    rx.button(
+                        rx.icon("file-text", size=14),
+                        "Open in Transcript",
+                        on_click=State.open_transcript_for_selection(
+                            State.selected_opportunity.opportunity_id
+                        ),
+                        color_scheme="blue", variant="soft", size="1", width="100%",
+                    ),
+                    spacing="2",
                 ),
-                spacing="2",
+                padding="12px",
+                background_color="var(--gray-3)",
+                border_radius="8px",
+                margin_top="4",
+                width="100%",
             ),
-            padding="12px",
-            background_color="var(--gray-3)",
-            border_radius="8px",
-            margin_top="4",
-            width="100%",
         ),
         spacing="4",
         width="100%",
@@ -186,43 +192,49 @@ def render_detail_experiment(exp: ExperimentItem) -> rx.Component:
                     rx.badge(exp.method, color_scheme="purple", variant="soft", size="1"),
                     rx.badge(exp.status, color_scheme="orange", variant="soft", size="1"),
                     rx.badge(exp.signal, color_scheme=signal_color, variant="soft", size="1"),
-                    # Edit button — only available before concluding
+                    # Edit/delete — hidden for viewers
                     rx.cond(
-                        exp.status != "Concluded",
-                        rx.icon_button(
-                            rx.icon("pencil", size=12),
-                            size="1", variant="ghost", color_scheme="gray",
-                            on_click=lambda: State.start_edit_experiment(exp),
-                        ),
-                        rx.fragment(),
-                    ),
-                    rx.alert_dialog.root(
-                        rx.alert_dialog.trigger(
-                            rx.icon_button(
-                                rx.icon("trash", size=12),
-                                size="1", variant="ghost", color_scheme="red",
-                            ),
-                        ),
-                        rx.alert_dialog.content(
-                            rx.alert_dialog.title("Delete Experiment"),
-                            rx.alert_dialog.description(
-                                f'Delete the experiment "{exp.name}"? All progress and results will be permanently lost.',
-                                size="2",
-                            ),
-                            rx.flex(
-                                rx.alert_dialog.cancel(
-                                    rx.button("Cancel", variant="soft", color_scheme="gray"),
+                        ~State.is_viewer,
+                        rx.flex(
+                            rx.cond(
+                                exp.status != "Concluded",
+                                rx.icon_button(
+                                    rx.icon("pencil", size=12),
+                                    size="1", variant="ghost", color_scheme="gray",
+                                    on_click=lambda: State.start_edit_experiment(exp),
                                 ),
-                                rx.alert_dialog.action(
-                                    rx.button(
-                                        "Delete Experiment",
-                                        color_scheme="red",
-                                        on_click=lambda: State.delete_experiment(exp.id),
+                                rx.fragment(),
+                            ),
+                            rx.alert_dialog.root(
+                                rx.alert_dialog.trigger(
+                                    rx.icon_button(
+                                        rx.icon("trash", size=12),
+                                        size="1", variant="ghost", color_scheme="red",
                                     ),
                                 ),
-                                spacing="3", justify="end", margin_top="16px",
+                                rx.alert_dialog.content(
+                                    rx.alert_dialog.title("Delete Experiment"),
+                                    rx.alert_dialog.description(
+                                        f'Delete the experiment "{exp.name}"? All progress and results will be permanently lost.',
+                                        size="2",
+                                    ),
+                                    rx.flex(
+                                        rx.alert_dialog.cancel(
+                                            rx.button("Cancel", variant="soft", color_scheme="gray"),
+                                        ),
+                                        rx.alert_dialog.action(
+                                            rx.button(
+                                                "Delete Experiment",
+                                                color_scheme="red",
+                                                on_click=lambda: State.delete_experiment(exp.id),
+                                            ),
+                                        ),
+                                        spacing="3", justify="end", margin_top="16px",
+                                    ),
+                                    max_width="420px",
+                                ),
                             ),
-                            max_width="420px",
+                            spacing="1", align="center",
                         ),
                     ),
                     spacing="1", align="center",
@@ -247,48 +259,51 @@ def render_detail_experiment(exp: ExperimentItem) -> rx.Component:
                 ),
                 rx.fragment(),
             ),
-            # Progress action buttons
-            rx.flex(
-                rx.cond(
-                    exp.status == "Draft",
-                    rx.button(
-                        "▶ Start Running", size="1", variant="soft",
-                        on_click=lambda: State.update_experiment_status(exp.id, "Running"),
-                    ),
-                    rx.fragment(),
-                ),
-                rx.cond(
-                    exp.status == "Running",
-                    rx.button(
-                        "✓ Conclude", size="1", variant="soft", color_scheme="orange",
-                        on_click=lambda: State.update_experiment_status(exp.id, "Concluded"),
-                    ),
-                    rx.fragment(),
-                ),
-                rx.cond(
-                    exp.status == "Concluded",
+            # Progress action buttons — hidden for viewers
+            rx.cond(
+                ~State.is_viewer,
+                rx.flex(
                     rx.cond(
-                        exp.signal == "Pending",
-                        rx.flex(
-                            rx.button(
-                                "✅ Validated", size="1", variant="soft", color_scheme="green",
-                                on_click=lambda: State.update_experiment_signal(exp.id, "Validated"),
-                            ),
-                            rx.button(
-                                "❌ Invalidated", size="1", variant="soft", color_scheme="red",
-                                on_click=lambda: State.update_experiment_signal(exp.id, "Invalidated"),
-                            ),
-                            spacing="2",
+                        exp.status == "Draft",
+                        rx.button(
+                            "▶ Start Running", size="1", variant="soft",
+                            on_click=lambda: State.update_experiment_status(exp.id, "Running"),
                         ),
                         rx.fragment(),
                     ),
-                    rx.fragment(),
+                    rx.cond(
+                        exp.status == "Running",
+                        rx.button(
+                            "✓ Conclude", size="1", variant="soft", color_scheme="orange",
+                            on_click=lambda: State.update_experiment_status(exp.id, "Concluded"),
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        exp.status == "Concluded",
+                        rx.cond(
+                            exp.signal == "Pending",
+                            rx.flex(
+                                rx.button(
+                                    "✅ Validated", size="1", variant="soft", color_scheme="green",
+                                    on_click=lambda: State.update_experiment_signal(exp.id, "Validated"),
+                                ),
+                                rx.button(
+                                    "❌ Invalidated", size="1", variant="soft", color_scheme="red",
+                                    on_click=lambda: State.update_experiment_signal(exp.id, "Invalidated"),
+                                ),
+                                spacing="2",
+                            ),
+                            rx.fragment(),
+                        ),
+                        rx.fragment(),
+                    ),
+                    spacing="2",
                 ),
-                spacing="2",
             ),
-            # Suggestion button: appears after signal is set
+            # Suggestion button — hidden for viewers
             rx.cond(
-                exp.signal != "Pending",
+                (~State.is_viewer) & (exp.signal != "Pending"),
                 rx.button(
                     rx.cond(exp.signal == "Validated", "→ Ship solution", "→ Discard solution"),
                     size="1",
@@ -298,18 +313,22 @@ def render_detail_experiment(exp: ExperimentItem) -> rx.Component:
                 ),
                 rx.fragment(),
             ),
-            # Evidence notes: editable textarea when Concluded, read-only display otherwise
+            # Evidence notes: editable textarea when Concluded (read-only for viewers)
             rx.cond(
                 exp.status == "Concluded",
                 rx.vstack(
                     rx.text("Evidence / Learnings", size="1", weight="bold", color="gray"),
-                    rx.text_area(
-                        default_value=exp.evidence_notes,
-                        placeholder="What did you observe? What did you learn?",
-                        on_blur=lambda v: State.update_experiment_evidence(exp.id, v),
-                        size="1",
-                        width="100%",
-                        rows="3",
+                    rx.cond(
+                        ~State.is_viewer,
+                        rx.text_area(
+                            default_value=exp.evidence_notes,
+                            placeholder="What did you observe? What did you learn?",
+                            on_blur=lambda v: State.update_experiment_evidence(exp.id, v),
+                            size="1",
+                            width="100%",
+                            rows="3",
+                        ),
+                        rx.text(exp.evidence_notes, size="1", color="gray", font_style="italic"),
                     ),
                     spacing="1",
                     width="100%",
@@ -429,52 +448,58 @@ def render_solution_detail_card(sol: OppDetailSolution) -> rx.Component:
                     ),
                     rx.flex(
                         rx.badge(sol.status, color_scheme=status_color, variant="soft", size="1"),
-                        rx.icon_button(
-                            rx.icon("flask-conical", size=14),
-                            size="1", variant="ghost", color_scheme="purple",
-                            title="Design an experiment",
-                            on_click=lambda: State.open_add_experiment(sol.id, sol.name),
-                        ),
-                        rx.icon_button(
-                            rx.icon("git-branch", size=14),
-                            size="1", variant="ghost", color_scheme="blue",
-                            title="Add sub-solution",
-                            on_click=lambda: State.set_target_parent(sol.id, sol.name),
-                        ),
-                        rx.icon_button(
-                            rx.icon("pencil", size=14),
-                            size="1", variant="ghost", color_scheme="gray",
-                            on_click=lambda: State.start_edit_solution_from_detail(
-                                sol.id, sol.name, sol.description, sol.status
-                            ),
-                        ),
-                        rx.alert_dialog.root(
-                            rx.alert_dialog.trigger(
+                        rx.cond(
+                            ~State.is_viewer,
+                            rx.flex(
                                 rx.icon_button(
-                                    rx.icon("trash", size=14),
-                                    size="1", variant="ghost", color_scheme="red",
+                                    rx.icon("flask-conical", size=14),
+                                    size="1", variant="ghost", color_scheme="purple",
+                                    title="Design an experiment",
+                                    on_click=lambda: State.open_add_experiment(sol.id, sol.name),
                                 ),
-                            ),
-                            rx.alert_dialog.content(
-                                rx.alert_dialog.title("Delete Solution"),
-                                rx.alert_dialog.description(
-                                    f'Delete "{sol.name}" along with all its sub-solutions and experiments? This is irreversible.',
-                                    size="2",
+                                rx.icon_button(
+                                    rx.icon("git-branch", size=14),
+                                    size="1", variant="ghost", color_scheme="blue",
+                                    title="Add sub-solution",
+                                    on_click=lambda: State.set_target_parent(sol.id, sol.name),
                                 ),
-                                rx.flex(
-                                    rx.alert_dialog.cancel(
-                                        rx.button("Cancel", variant="soft", color_scheme="gray"),
+                                rx.icon_button(
+                                    rx.icon("pencil", size=14),
+                                    size="1", variant="ghost", color_scheme="gray",
+                                    on_click=lambda: State.start_edit_solution_from_detail(
+                                        sol.id, sol.name, sol.description, sol.status
                                     ),
-                                    rx.alert_dialog.action(
-                                        rx.button(
-                                            "Delete Solution",
-                                            color_scheme="red",
-                                            on_click=lambda: State.delete_solution(sol.id),
+                                ),
+                                rx.alert_dialog.root(
+                                    rx.alert_dialog.trigger(
+                                        rx.icon_button(
+                                            rx.icon("trash", size=14),
+                                            size="1", variant="ghost", color_scheme="red",
                                         ),
                                     ),
-                                    spacing="3", justify="end", margin_top="16px",
+                                    rx.alert_dialog.content(
+                                        rx.alert_dialog.title("Delete Solution"),
+                                        rx.alert_dialog.description(
+                                            f'Delete "{sol.name}" along with all its sub-solutions and experiments? This is irreversible.',
+                                            size="2",
+                                        ),
+                                        rx.flex(
+                                            rx.alert_dialog.cancel(
+                                                rx.button("Cancel", variant="soft", color_scheme="gray"),
+                                            ),
+                                            rx.alert_dialog.action(
+                                                rx.button(
+                                                    "Delete Solution",
+                                                    color_scheme="red",
+                                                    on_click=lambda: State.delete_solution(sol.id),
+                                                ),
+                                            ),
+                                            spacing="3", justify="end", margin_top="16px",
+                                        ),
+                                        max_width="420px",
+                                    ),
                                 ),
-                                max_width="420px",
+                                spacing="2", align="center",
                             ),
                         ),
                         spacing="2", align="center",
@@ -496,15 +521,18 @@ def render_solution_detail_card(sol: OppDetailSolution) -> rx.Component:
                     ),
                     rx.fragment(),
                 ),
-                # Inline experiment form OR "Design Experiment" button
+                # Inline experiment form OR "Design Experiment" button — hidden for viewers
                 rx.cond(
-                    State.experiment_target_solution_id == sol.id,
-                    render_inline_experiment_form(),
-                    rx.button(
-                        rx.icon("flask-conical", size=13),
-                        "Design Experiment",
-                        size="1", variant="soft", color_scheme="purple",
-                        on_click=lambda: State.open_add_experiment(sol.id, sol.name),
+                    ~State.is_viewer,
+                    rx.cond(
+                        State.experiment_target_solution_id == sol.id,
+                        render_inline_experiment_form(),
+                        rx.button(
+                            rx.icon("flask-conical", size=13),
+                            "Design Experiment",
+                            size="1", variant="soft", color_scheme="purple",
+                            on_click=lambda: State.open_add_experiment(sol.id, sol.name),
+                        ),
                     ),
                 ),
                 spacing="3", width="100%",
@@ -534,7 +562,9 @@ def render_solutions_panel() -> rx.Component:
             ),
             rx.text("No solutions brainstormed yet.", color="gray", size="2"),
         ),
-        # Add / Edit solution form
+        # Add / Edit solution form — hidden for viewers
+        rx.cond(
+            ~State.is_viewer,
         rx.box(
             rx.vstack(
                 rx.text(
@@ -609,6 +639,7 @@ def render_solutions_panel() -> rx.Component:
             margin_top="2",
             width="100%",
         ),
+        ),  # end rx.cond(~is_viewer)
         spacing="5",
         width="100%",
         align_items="start",
@@ -657,6 +688,7 @@ def render_opp_view_header() -> rx.Component:
                     ),
                     value=State.selected_opp_outcome_name,
                     on_change=State.set_primary_outcome,
+                    disabled=State.is_viewer,
                 ),
                 spacing="2", align="center",
             ),
@@ -811,7 +843,7 @@ def render_opportunity_detail() -> rx.Component:
                 on_click=State.handle_navigation("ledger"),
             ),
             rx.cond(
-                State.is_editing_opp_detail,
+                State.is_editing_opp_detail | State.is_viewer,
                 rx.fragment(),
                 rx.flex(
                     rx.button(
@@ -965,9 +997,9 @@ def transcript_drawer_panel() -> rx.Component:
                             width="100%",
                         ),
                         rx.divider(),
-                        # Instruction banner — select mode only
+                        # Instruction banner — select mode only, hidden for viewers
                         rx.cond(
-                            State.transcript_drawer_mode == "select",
+                            (~State.is_viewer) & (State.transcript_drawer_mode == "select"),
                             rx.callout.root(
                                 rx.callout.icon(rx.icon("mouse-pointer-2", size=16)),
                                 rx.callout.text(
@@ -978,9 +1010,10 @@ def transcript_drawer_panel() -> rx.Component:
                                 size="1",
                             ),
                         ),
-                        # Confirmation bar — shown when text is captured in select mode
+                        # Confirmation bar — shown when text is captured in select mode, hidden for viewers
                         rx.cond(
-                            (State.transcript_drawer_mode == "select")
+                            (~State.is_viewer)
+                            & (State.transcript_drawer_mode == "select")
                             & (State.transcript_drawer_selection != ""),
                             rx.box(
                                 rx.vstack(
@@ -998,6 +1031,7 @@ def transcript_drawer_panel() -> rx.Component:
                                             size="2",
                                             flex="1",
                                             on_click=State.confirm_drawer_evidence,
+                                            disabled=State.is_viewer,
                                         ),
                                         rx.button(
                                             "Clear",

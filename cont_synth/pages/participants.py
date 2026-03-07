@@ -140,7 +140,7 @@ def _participant_form_card() -> rx.Component:
             ),
             # Actions
             rx.hstack(
-                rx.button("Save", color_scheme="blue", size="2", on_click=State.save_participant),
+                rx.button("Save", color_scheme="blue", size="2", on_click=State.save_participant, disabled=State.is_viewer),
                 rx.button("Cancel", variant="soft", color_scheme="gray", size="2", on_click=State.cancel_participant_form),
                 spacing="3",
             ),
@@ -230,13 +230,18 @@ def _participant_row(item: ParticipantItem) -> rx.Component:
         ),
         rx.table.cell(
             rx.hstack(
-                rx.icon_button(
-                    rx.icon("pencil", size=14),
-                    variant="ghost",
-                    color_scheme="gray",
-                    size="1",
-                    on_click=lambda: State.start_edit_participant(item.id),
+                rx.cond(
+                    ~State.is_viewer,
+                    rx.icon_button(
+                        rx.icon("pencil", size=14),
+                        variant="ghost",
+                        color_scheme="gray",
+                        size="1",
+                        on_click=lambda: State.start_edit_participant(item.id),
+                    ),
                 ),
+                rx.cond(
+                    ~State.is_viewer,
                 rx.alert_dialog.root(
                     rx.alert_dialog.trigger(
                         rx.icon_button(
@@ -269,6 +274,7 @@ def _participant_row(item: ParticipantItem) -> rx.Component:
                         ),
                     ),
                 ),
+                ),  # end rx.cond(~is_viewer)
                 spacing="1",
             ),
             padding_right="8px",
@@ -438,13 +444,16 @@ def render_participants() -> rx.Component:
                     size="3",
                 ),
             ),
-            rx.button(
-                rx.icon("user-plus", size=14),
-                "Add Participant",
-                color_scheme="blue",
-                variant="soft",
-                size="3",
-                on_click=State.open_add_participant,
+            rx.cond(
+                ~State.is_viewer,
+                rx.button(
+                    rx.icon("user-plus", size=14),
+                    "Add Participant",
+                    color_scheme="blue",
+                    variant="soft",
+                    size="3",
+                    on_click=State.open_add_participant,
+                ),
             ),
             justify="between",
             align="center",

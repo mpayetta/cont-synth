@@ -58,22 +58,25 @@ def render_synthesize() -> rx.Component:
                 spacing="2",
             ),
         ),
-        rx.button(
-            rx.cond(
-                State.is_processing,
-                rx.spinner(size="2"),
-                rx.icon("sparkles", size=16),
+        rx.hstack(
+            rx.spacer(),
+            rx.button(
+                rx.cond(
+                    State.is_processing,
+                    rx.spinner(size="2"),
+                    rx.icon("sparkles", size=16),
+                ),
+                rx.cond(
+                    State.is_processing,
+                    State.synthesis_status,
+                    "Run Synthesis",
+                ),
+                on_click=State.run_synthesis,
+                disabled=State.is_processing | State.is_viewer,
+                size="3",
+                color_scheme="violet",
             ),
-            rx.cond(
-                State.is_processing,
-                State.synthesis_status,
-                "Run Synthesis",
-            ),
-            on_click=State.run_synthesis,
-            disabled=State.is_processing,
-            size="4",
             width="100%",
-            color_scheme="violet",
         ),
         rx.cond(
             State.is_processing,

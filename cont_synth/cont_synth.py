@@ -15,6 +15,7 @@ from .pages.participants import render_participants
 from .pages.login import login_page
 from .pages.account import render_account
 from .pages.knowledge_base import render_knowledge_base
+from .pages.workspace_members import render_workspace_members
 
 
 # --- SIDEBAR COMPONENT ---
@@ -118,103 +119,26 @@ def _workspace_section() -> rx.Component:
                 ),
                 # New Workspace + Manage row
                 rx.grid(
-                    # Create Product Dialog
-                    rx.dialog.root(
-                        rx.dialog.trigger(
-                            rx.button(
-                                rx.icon("plus", size=14),
-                                "New",
-                                variant="ghost",
-                                size="2",
-                                color_scheme="gray",
-                                width="100%",
-                            )
-                        ),
-                        rx.dialog.content(
-                            rx.dialog.title("Create New Product Workspace"),
-                            rx.input(
-                                placeholder="e.g., Mobile App, Admin Dashboard...",
-                                value=State.new_product_name,
-                                on_change=State.set_new_product_name,
+                    # Create Product Dialog (app admins only)
+                    rx.cond(
+                        State.is_admin,
+                        rx.dialog.root(
+                            rx.dialog.trigger(
+                                rx.button(
+                                    rx.icon("plus", size=14),
+                                    "New",
+                                    variant="outline",
+                                    size="2",
+                                    color_scheme="green",
+                                    width="100%",
+                                )
                             ),
-                            rx.flex(
-                                rx.dialog.close(
-                                    rx.button("Cancel", variant="soft", color_scheme="gray")
-                                ),
-                                rx.dialog.close(
-                                    rx.button(
-                                        "Create Workspace",
-                                        on_click=State.create_product,
-                                        color_scheme="blue",
-                                    )
-                                ),
-                                spacing="3",
-                                justify="end",
-                                margin_top="16px",
-                            ),
-                            max_width="400px",
-                        ),
-                    ),
-                    # Manage / Edit / Delete Dialog
-                    rx.dialog.root(
-                        rx.dialog.trigger(
-                            rx.button(
-                                rx.icon("settings", size=14),
-                                "Manage",
-                                variant="ghost",
-                                size="2",
-                                color_scheme="gray",
-                                width="100%",
-                                on_click=State.open_manage_product,
-                            )
-                        ),
-                        rx.dialog.content(
-                            rx.dialog.title("Manage Product Workspace"),
-                            rx.text("Workspace Name", size="2", weight="bold"),
-                            rx.input(
-                                value=State.edit_product_name,
-                                on_change=State.set_edit_product_name,
-                                margin_top="8px",
-                                margin_bottom="8px",
-                            ),
-                            rx.flex(
-                                rx.alert_dialog.root(
-                                    rx.alert_dialog.trigger(
-                                        rx.button(
-                                            rx.icon("trash", size=14),
-                                            "Delete Workspace",
-                                            color_scheme="red",
-                                            variant="soft",
-                                        )
-                                    ),
-                                    rx.alert_dialog.content(
-                                        rx.alert_dialog.title("Delete Workspace"),
-                                        rx.alert_dialog.description(
-                                            "Are you absolutely sure? This will permanently wipe this workspace and ALL of its nested opportunities, outcomes, solutions, and evidence. This cannot be undone.",
-                                            size="2",
-                                        ),
-                                        rx.flex(
-                                            rx.alert_dialog.cancel(
-                                                rx.button(
-                                                    "Cancel",
-                                                    variant="soft",
-                                                    color_scheme="gray",
-                                                )
-                                            ),
-                                            rx.alert_dialog.action(
-                                                rx.dialog.close(
-                                                    rx.button(
-                                                        "Yes, delete it",
-                                                        color_scheme="red",
-                                                        on_click=State.delete_current_product,
-                                                    )
-                                                )
-                                            ),
-                                            spacing="3",
-                                            margin_top="16px",
-                                            justify="end",
-                                        ),
-                                    ),
+                            rx.dialog.content(
+                                rx.dialog.title("Create New Product Workspace"),
+                                rx.input(
+                                    placeholder="e.g., Mobile App, Admin Dashboard...",
+                                    value=State.new_product_name,
+                                    on_change=State.set_new_product_name,
                                 ),
                                 rx.flex(
                                     rx.dialog.close(
@@ -222,19 +146,32 @@ def _workspace_section() -> rx.Component:
                                     ),
                                     rx.dialog.close(
                                         rx.button(
-                                            "Save Name",
-                                            on_click=State.update_current_product,
+                                            "Create Workspace",
+                                            on_click=State.create_product,
                                             color_scheme="blue",
                                         )
                                     ),
                                     spacing="3",
+                                    justify="end",
+                                    margin_top="16px",
                                 ),
-                                justify="between",
-                                width="100%",
+                                max_width="400px",
                             ),
-                            max_width="450px",
                         ),
                     ),
+                    # Manage Workspace button (workspace admins only)
+                    rx.cond(
+                        State.is_workspace_admin,
+                        rx.button(
+                            rx.icon("settings", size=14),
+                            "Manage",
+                            variant="outline",
+                            size="2",
+                            color_scheme="amber",
+                            width="100%",
+                            on_click=State.handle_navigation("members"),
+                        ),
+                    ),  # end rx.cond(is_workspace_admin)
                     columns="2",
                     spacing="2",
                     width="100%",
@@ -313,9 +250,15 @@ def sidebar() -> rx.Component:
         ),
         # Navigation items
         sidebar_item("Home", "house", "home"),
-        sidebar_item("Synthesize", "sparkles", "synthesize"),
+        rx.cond(
+            ~State.is_viewer,
+            sidebar_item("Synthesize", "sparkles", "synthesize"),
+        ),
         sidebar_item("Opportunities", "table", "ledger"),
-        sidebar_item("Pre-Meeting Prep", "target", "prep"),
+        rx.cond(
+            ~State.is_viewer,
+            sidebar_item("Pre-Meeting Prep", "target", "prep"),
+        ),
         sidebar_item("Interviews", "archive", "logs"),
         sidebar_item("Participants", "users", "participants"),
         sidebar_item("Product Context", "book-open", "knowledge_base"),
@@ -461,6 +404,10 @@ def knowledge_base_page() -> rx.Component:
     return _page_layout(render_knowledge_base(), State.load_knowledge_base_page)
 
 
+def workspace_members_page() -> rx.Component:
+    return _page_layout(render_workspace_members(), State.load_members_page)
+
+
 def login_route() -> rx.Component:
     return rx.box(login_page(), on_mount=State.load_app)
 
@@ -479,4 +426,5 @@ app.add_page(participants_page, route="/participants")
 app.add_page(llm_usage_page, route="/llm-usage")
 app.add_page(account_page, route="/account")
 app.add_page(knowledge_base_page, route="/knowledge-base")
+app.add_page(workspace_members_page, route="/workspace/members")
 app.add_page(login_route, route="/login")

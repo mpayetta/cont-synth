@@ -39,7 +39,6 @@ def _secondary_nav() -> rx.Component:
             State.is_admin,
             _nav_item("LLM Usage", "bar-chart-2", "llm_usage"),
         ),
-        _nav_item("Danger Zone", "shield-alert", "danger_zone"),
         spacing="1",
         width="180px",
         flex_shrink="0",
@@ -227,7 +226,7 @@ def _settings_view() -> rx.Component:
     return rx.vstack(
         rx.text("Settings", size="5", weight="bold", color="var(--gray-12)"),
         _profile_section(),
-        _api_keys_section(),
+        rx.cond(State.is_admin, _api_keys_section()),
         _security_section(),
         _settings_feedback(),
         rx.flex(
@@ -362,77 +361,6 @@ def _llm_usage_view() -> rx.Component:
 
 
 # ---------------------------------------------------------------------------
-# Danger Zone view
-# ---------------------------------------------------------------------------
-
-def _danger_zone_view() -> rx.Component:
-    return rx.vstack(
-        rx.text("Danger Zone", size="5", weight="bold", color="#E5484D"),
-        rx.box(
-            rx.vstack(
-                rx.hstack(
-                    rx.vstack(
-                        rx.text("Wipe All Data", size="3", weight="medium", color="var(--gray-12)"),
-                        rx.text(
-                            "Permanently delete all interviews, opportunities, solutions, outcomes, participants, and personas. Your user account is preserved.",
-                            size="2",
-                            color="var(--gray-12)",
-                        ),
-                        spacing="1",
-                        flex="1",
-                    ),
-                    rx.alert_dialog.root(
-                        rx.alert_dialog.trigger(
-                            rx.button(
-                                rx.icon("trash-2", size=14),
-                                "Wipe All Data",
-                                color_scheme="red",
-                                variant="soft",
-                                size="2",
-                            ),
-                        ),
-                        rx.alert_dialog.content(
-                            rx.alert_dialog.title("Wipe all data?"),
-                            rx.alert_dialog.description(
-                                "This permanently deletes every interview, opportunity, solution, outcome, participant, persona, and workspace. Your login is preserved. This cannot be undone.",
-                                size="2",
-                            ),
-                            rx.flex(
-                                rx.alert_dialog.cancel(
-                                    rx.button("Cancel", variant="soft", color_scheme="gray"),
-                                ),
-                                rx.alert_dialog.action(
-                                    rx.button(
-                                        "Yes, wipe everything",
-                                        color_scheme="red",
-                                        on_click=State.wipe_database,
-                                    ),
-                                ),
-                                gap="3",
-                                justify="end",
-                                margin_top="16px",
-                            ),
-                        ),
-                    ),
-                    spacing="4",
-                    align="center",
-                    width="100%",
-                ),
-                spacing="3",
-                width="100%",
-            ),
-            padding="24px",
-            border_radius="8px",
-            border="1px solid var(--red-6)",
-            background_color="var(--red-1)",
-            width="100%",
-        ),
-        spacing="4",
-        width="100%",
-    )
-
-
-# ---------------------------------------------------------------------------
 # Full page
 # ---------------------------------------------------------------------------
 
@@ -466,7 +394,6 @@ def render_account() -> rx.Component:
                     rx.cond(
                         (State.account_section == "llm_usage") & State.is_admin,
                         _llm_usage_view(),
-                        _danger_zone_view(),
                     ),
                 ),
                 flex="1",

@@ -126,17 +126,20 @@ def show_ledger_row(item: LedgerItem):
                             rx.fragment(),
                         ),
                         rx.separator(orientation="vertical", size="1"),
-                        # Merge button
-                        rx.button(
-                            rx.icon("git-merge", size=12),
-                            "Merge",
-                            size="1",
-                            variant="ghost",
-                            color_scheme="gray",
-                            on_click=lambda: State.open_merge_dialog(
-                                item.opportunity_id
+                        # Merge button — hidden for viewers
+                        rx.cond(
+                            ~State.is_viewer,
+                            rx.button(
+                                rx.icon("git-merge", size=12),
+                                "Merge",
+                                size="1",
+                                variant="ghost",
+                                color_scheme="gray",
+                                on_click=lambda: State.open_merge_dialog(
+                                    item.opportunity_id
+                                ),
+                                height="20px",
                             ),
-                            height="20px",
                         ),
                         spacing="2",
                         align="center",
@@ -360,25 +363,50 @@ def show_opportunity_table_row(item: LedgerItem) -> rx.Component:
             vertical_align="middle",
             padding_y="6px",
         ),
-        # Metrics (I / G / F)
+        # Metrics — stacked dot rows (I / G) + frequency
         rx.table.cell(
-            rx.text(
-                rx.cond(
-                    item.impact_score > 0,
-                    rx.cond(
-                        item.sat_gap_score > 0,
-                        f"I:{item.impact_score} | G:{item.sat_gap_score} | F:{item.evidence.length()}",
-                        f"I:{item.impact_score} | G:— | F:{item.evidence.length()}",
+            rx.vstack(
+                rx.flex(
+                    rx.tooltip(
+                        rx.text("I", size="1", color="var(--blue-11)", weight="bold"),
+                        content="Impact (1–5): how much solving this drives the target outcome",
                     ),
-                    rx.cond(
-                        item.sat_gap_score > 0,
-                        f"I:— | G:{item.sat_gap_score} | F:{item.evidence.length()}",
-                        f"I:— | G:— | F:{item.evidence.length()}",
+                    rx.flex(
+                        _score_dot(item, "impact", 1),
+                        _score_dot(item, "impact", 2),
+                        _score_dot(item, "impact", 3),
+                        _score_dot(item, "impact", 4),
+                        _score_dot(item, "impact", 5),
+                        spacing="1",
+                        align="center",
                     ),
+                    rx.box(width="6px", flex_shrink="0"),
+                    rx.tooltip(
+                        rx.text("G", size="1", color="var(--violet-11)", weight="bold"),
+                        content="Satisfaction Gap (1–5): how much pain users feel with the current situation",
+                    ),
+                    rx.flex(
+                        _score_dot(item, "sat_gap", 1),
+                        _score_dot(item, "sat_gap", 2),
+                        _score_dot(item, "sat_gap", 3),
+                        _score_dot(item, "sat_gap", 4),
+                        _score_dot(item, "sat_gap", 5),
+                        spacing="1",
+                        align="center",
+                    ),
+                    spacing="1",
+                    align="center",
                 ),
-                size="1",
-                color="var(--gray-12)",
-                white_space="nowrap",
+                rx.tooltip(
+                    rx.text(
+                        f"F: {item.evidence.length()}",
+                        size="1",
+                        color="var(--gray-10)",
+                    ),
+                    content="Frequency: interview mentions auto-counted from linked quotes",
+                ),
+                spacing="1",
+                align_items="start",
             ),
             vertical_align="middle",
             padding_y="6px",
@@ -405,16 +433,35 @@ def show_opportunity_table_row(item: LedgerItem) -> rx.Component:
             vertical_align="middle",
             padding_y="6px",
         ),
-        # Metadata (quotes + solutions)
+        # Evidence — colored badges (quotes + solutions), 2-line, clickable
         rx.table.cell(
-            rx.flex(
-                rx.text("Quotes", size="1"),
-                rx.text(item.evidence.length(), size="1", color="gray"),
-                rx.text(" | ", size="1", color="gray"),
-                rx.text("Solutions", size="1"),
-                rx.text(item.solutions.length(), size="1", color="gray"),
+            rx.vstack(
+                rx.tooltip(
+                    rx.badge(
+                        rx.icon("quote", size=10),
+                        item.evidence.length(),
+                        color_scheme=rx.cond(item.evidence.length() > 0, "indigo", "gray"),
+                        variant="soft",
+                        size="1",
+                        cursor="pointer",
+                        on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
+                    ),
+                    content="Quotes — click to view",
+                ),
+                rx.tooltip(
+                    rx.badge(
+                        rx.icon("lightbulb", size=10),
+                        item.solutions.length(),
+                        color_scheme=rx.cond(item.solutions.length() > 0, "teal", "gray"),
+                        variant="soft",
+                        size="1",
+                        cursor="pointer",
+                        on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
+                    ),
+                    content="Solutions — click to view",
+                ),
                 spacing="1",
-                align="center",
+                align_items="start",
             ),
             vertical_align="middle",
             padding_y="6px",
@@ -438,27 +485,32 @@ def show_opportunity_table_row(item: LedgerItem) -> rx.Component:
                             item.opportunity_id
                         ),
                     ),
-                    rx.dropdown_menu.item(
-                        rx.icon("pencil", size=14),
-                        "Edit",
-                        on_click=lambda: State.start_edit_opportunity(
-                            item.opportunity_id,
-                            item.theme,
-                            item.opportunity,
-                            item.parent_id,
+                    rx.cond(
+                        ~State.is_viewer,
+                        rx.fragment(
+                            rx.dropdown_menu.item(
+                                rx.icon("pencil", size=14),
+                                "Edit",
+                                on_click=lambda: State.start_edit_opportunity(
+                                    item.opportunity_id,
+                                    item.theme,
+                                    item.opportunity,
+                                    item.parent_id,
+                                ),
+                            ),
+                            rx.dropdown_menu.item(
+                                rx.icon("git-merge", size=14),
+                                "Merge",
+                                on_click=lambda: State.open_merge_dialog(item.opportunity_id),
+                            ),
+                            rx.dropdown_menu.separator(),
+                            rx.dropdown_menu.item(
+                                rx.icon("trash-2", size=14),
+                                "Delete",
+                                color="red",
+                                on_click=lambda: State.open_delete_confirm(item.opportunity_id),
+                            ),
                         ),
-                    ),
-                    rx.dropdown_menu.item(
-                        rx.icon("git-merge", size=14),
-                        "Merge",
-                        on_click=lambda: State.open_merge_dialog(item.opportunity_id),
-                    ),
-                    rx.dropdown_menu.separator(),
-                    rx.dropdown_menu.item(
-                        rx.icon("trash-2", size=14),
-                        "Delete",
-                        color="red",
-                        on_click=lambda: State.open_delete_confirm(item.opportunity_id),
                     ),
                     size="1",
                 ),
@@ -1084,6 +1136,8 @@ def render_ledger() -> rx.Component:
                     size="3",
                     width="250px",
                 ),
+                rx.cond(
+                    ~State.is_viewer,
                 rx.dialog.root(
                     rx.dialog.trigger(
                         rx.button("+ New Outcome", variant="soft", size="3")
@@ -1116,6 +1170,7 @@ def render_ledger() -> rx.Component:
                         max_width="450px",
                     ),
                 ),
+                ),  # end rx.cond(~is_viewer)
                 spacing="3",
                 align="center",
             ),
@@ -1127,6 +1182,8 @@ def render_ledger() -> rx.Component:
         rx.divider(),
         # --- Action Bar: New Opportunity + View Mode Toggle ---
         rx.flex(
+            rx.cond(
+                ~State.is_viewer,
             rx.dialog.root(
                 rx.dialog.trigger(
                     rx.button(
@@ -1207,6 +1264,7 @@ def render_ledger() -> rx.Component:
                 open=State.is_opp_dialog_open,
                 on_open_change=State.handle_opp_dialog_change,
             ),
+            ),  # end rx.cond(~is_viewer)
             # View mode toggle buttons
             rx.flex(
                 rx.button(

@@ -500,21 +500,27 @@ def _priority_matrix_widget() -> rx.Component:
 def _quick_actions() -> rx.Component:
     """Primary CTA buttons."""
     return rx.hstack(
-        rx.button(
-            rx.icon("sparkles", size=15),
-            "Synthesize Interview",
-            color_scheme="blue",
-            variant="solid",
-            size="2",
-            on_click=State.handle_navigation("synthesize"),
+        rx.cond(
+            ~State.is_viewer,
+            rx.button(
+                rx.icon("sparkles", size=15),
+                "Synthesize Interview",
+                color_scheme="blue",
+                variant="solid",
+                size="2",
+                on_click=State.handle_navigation("synthesize"),
+            ),
         ),
-        rx.button(
-            rx.icon("target", size=15),
-            "Interview Prep",
-            color_scheme="gray",
-            variant="soft",
-            size="2",
-            on_click=State.handle_navigation("prep"),
+        rx.cond(
+            ~State.is_viewer,
+            rx.button(
+                rx.icon("target", size=15),
+                "Interview Prep",
+                color_scheme="gray",
+                variant="soft",
+                size="2",
+                on_click=State.handle_navigation("prep"),
+            ),
         ),
         rx.button(
             rx.icon("table", size=15),
