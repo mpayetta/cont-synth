@@ -144,6 +144,9 @@ class NavigationStateMixin(rx.State, mixin=True):
         # Refresh workspace role for the newly selected product
         with rx.session() as session:
             self._load_workspace_role_in_session(session)
+        # Always reload home data — redirect to "/" won't re-mount if already on home
+        self.current_view = "home"
+        self.load_data_for_current_view()
         return rx.redirect("/")
 
     def handle_navigation(self, view_name: str):
