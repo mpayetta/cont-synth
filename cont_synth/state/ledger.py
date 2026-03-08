@@ -1321,7 +1321,21 @@ class LedgerStateMixin(rx.State, mixin=True):
                     opp.sat_gap_score = score
                 session.add(opp)
                 session.commit()
-        self._load_and_sync()
+        # In-place update: preserve list order, just recalculate scores on the affected item
+        updated = []
+        for item in self.ledger_data:
+            if item.opportunity_id == opp_id:
+                new_impact = score if field == "impact" else item.impact_score
+                new_gap = score if field == "sat_gap" else item.sat_gap_score
+                new_priority = new_impact + new_gap + min(len(item.evidence), 5)
+                updated.append(item.model_copy(update={
+                    "impact_score": new_impact,
+                    "sat_gap_score": new_gap,
+                    "priority_score": new_priority,
+                }))
+            else:
+                updated.append(item)
+        self.ledger_data = updated
 
     # ── Evidence dropdown filter ──────────────────────────────────────────────
 

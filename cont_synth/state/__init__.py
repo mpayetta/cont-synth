@@ -276,7 +276,7 @@ class State(  # pragma: no cover
     ledger_data: list[LedgerItem] = []
     available_personas: list[str] = []
     target_persona: str = ""
-    ledger_view_mode: str = "table"  # "table" | "list" | "board" | "matrix"
+    ledger_view_mode: str = "list"  # "table" | "list" | "board" | "matrix"
     collapsed_themes: list[str] = []
 
     # --- Opportunity list filters ---

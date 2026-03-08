@@ -92,10 +92,9 @@ def show_ledger_row(item: LedgerItem):
                         rx.badge(
                             f"P: {item.priority_score}",
                             color_scheme=priority_color,
-                            variant=rx.cond(item.priority_score > 0, "soft", "outline"),
-                            size="1",
+                            variant=rx.cond(item.priority_score > 0, "solid", "outline"),
+                            size="2",
                             title="Priority = Impact + Satisfaction Gap + Frequency (evidence count)",
-                            height="20px",
                         ),
                         rx.cond(
                             item.is_cross_functional,
@@ -111,7 +110,7 @@ def show_ledger_row(item: LedgerItem):
                         align="center",
                         flex="1",
                     ),
-                    # Right: running experiments + priority score + actions
+                    # Right: running experiments + actions dropdown
                     rx.flex(
                         # Running experiments pill (only shown when > 0)
                         rx.cond(
@@ -125,20 +124,50 @@ def show_ledger_row(item: LedgerItem):
                             ),
                             rx.fragment(),
                         ),
-                        rx.separator(orientation="vertical", size="1"),
-                        # Merge button — hidden for viewers
-                        rx.cond(
-                            ~State.is_viewer,
-                            rx.button(
-                                rx.icon("git-merge", size=12),
-                                "Merge",
-                                size="1",
-                                variant="ghost",
-                                color_scheme="gray",
-                                on_click=lambda: State.open_merge_dialog(
-                                    item.opportunity_id
+                        # 3-dot actions dropdown
+                        rx.dropdown_menu.root(
+                            rx.dropdown_menu.trigger(
+                                rx.icon_button(
+                                    rx.icon("ellipsis-vertical", size=14),
+                                    variant="ghost",
+                                    color_scheme="gray",
+                                    size="1",
                                 ),
-                                height="20px",
+                            ),
+                            rx.dropdown_menu.content(
+                                rx.dropdown_menu.item(
+                                    rx.icon("eye", size=14),
+                                    "View",
+                                    on_click=lambda: State.navigate_to_opportunity(item.opportunity_id),
+                                ),
+                                rx.cond(
+                                    ~State.is_viewer,
+                                    rx.fragment(
+                                        rx.dropdown_menu.item(
+                                            rx.icon("pencil", size=14),
+                                            "Edit",
+                                            on_click=lambda: State.start_edit_opportunity(
+                                                item.opportunity_id,
+                                                item.theme,
+                                                item.opportunity,
+                                                item.parent_id,
+                                            ),
+                                        ),
+                                        rx.dropdown_menu.item(
+                                            rx.icon("git-merge", size=14),
+                                            "Merge",
+                                            on_click=lambda: State.open_merge_dialog(item.opportunity_id),
+                                        ),
+                                        rx.dropdown_menu.separator(),
+                                        rx.dropdown_menu.item(
+                                            rx.icon("trash-2", size=14),
+                                            "Delete",
+                                            color="red",
+                                            on_click=lambda: State.open_delete_confirm(item.opportunity_id),
+                                        ),
+                                    ),
+                                ),
+                                size="1",
                             ),
                         ),
                         spacing="2",
@@ -201,20 +230,22 @@ def show_ledger_row(item: LedgerItem):
                             align="center",
                         ),
                         rx.text("·", size="1", color="var(--gray-6)"),
-                        rx.text(
-                            f"{item.days_old}d",
-                            size="1",
-                            weight="medium",
-                            color=rx.cond(
-                                item.status_color == "green",
-                                "var(--green-9)",
-                                rx.cond(
-                                    item.status_color == "yellow",
-                                    "var(--amber-9)",
-                                    "var(--red-9)",
+                        rx.tooltip(
+                            rx.text(
+                                f"{item.days_old}d",
+                                size="1",
+                                weight="medium",
+                                color=rx.cond(
+                                    item.status_color == "green",
+                                    "var(--green-9)",
+                                    rx.cond(
+                                        item.status_color == "yellow",
+                                        "var(--amber-9)",
+                                        "var(--red-9)",
+                                    ),
                                 ),
                             ),
-                            title=item.status,
+                            content=f"{item.days_old} days old",
                         ),
                         spacing="2",
                         align="center",
@@ -224,54 +255,61 @@ def show_ledger_row(item: LedgerItem):
                     align="center",
                 ),
                 # ── Row 4: Compact Torres scoring (single row) ───────────────
-                rx.flex(
-                    _info_label(
-                        "Impact",
-                        "Impact (1–5): How much does solving this opportunity move your target business outcome? 5 = critical driver, 1 = marginal effect.",
-                    ),
+                rx.box(
                     rx.flex(
-                        _score_dot(item, "impact", 1),
-                        _score_dot(item, "impact", 2),
-                        _score_dot(item, "impact", 3),
-                        _score_dot(item, "impact", 4),
-                        _score_dot(item, "impact", 5),
-                        spacing="1",
+                        _info_label(
+                            "Impact",
+                            "Impact (1–5): How much does solving this opportunity move your target business outcome? 5 = critical driver, 1 = marginal effect.",
+                        ),
+                        rx.flex(
+                            _score_dot(item, "impact", 1),
+                            _score_dot(item, "impact", 2),
+                            _score_dot(item, "impact", 3),
+                            _score_dot(item, "impact", 4),
+                            _score_dot(item, "impact", 5),
+                            spacing="1",
+                            align="center",
+                        ),
+                        rx.box(
+                            width="1px",
+                            height="12px",
+                            background_color="var(--gray-6)",
+                            flex_shrink="0",
+                            margin_x="2",
+                        ),
+                        _info_label(
+                            "Gap",
+                            "Satisfaction Gap (1–5): How unhappy are users with the current situation? 5 = severe pain / no workaround, 1 = mild annoyance. High gap means users urgently want a better solution.",
+                        ),
+                        rx.flex(
+                            _score_dot(item, "sat_gap", 1),
+                            _score_dot(item, "sat_gap", 2),
+                            _score_dot(item, "sat_gap", 3),
+                            _score_dot(item, "sat_gap", 4),
+                            _score_dot(item, "sat_gap", 5),
+                            spacing="1",
+                            align="center",
+                        ),
+                        rx.box(
+                            width="1px",
+                            height="12px",
+                            background_color="var(--gray-6)",
+                            flex_shrink="0",
+                            margin_x="2",
+                        ),
+                        _info_label(
+                            f"Freq {item.evidence.length()}/5",
+                            "Frequency: How many interviews mentioned this opportunity (auto-counted from linked quotes, capped at 5). Combined with Impact and Gap to form the Priority score: Impact + Gap + Freq (max 15).",
+                        ),
+                        spacing="2",
                         align="center",
+                        flex_wrap="wrap",
                     ),
-                    rx.box(
-                        width="1px",
-                        height="12px",
-                        background_color="var(--gray-6)",
-                        flex_shrink="0",
-                        margin_x="2",
-                    ),
-                    _info_label(
-                        "Gap",
-                        "Satisfaction Gap (1–5): How unhappy are users with the current situation? 5 = severe pain / no workaround, 1 = mild annoyance. High gap means users urgently want a better solution.",
-                    ),
-                    rx.flex(
-                        _score_dot(item, "sat_gap", 1),
-                        _score_dot(item, "sat_gap", 2),
-                        _score_dot(item, "sat_gap", 3),
-                        _score_dot(item, "sat_gap", 4),
-                        _score_dot(item, "sat_gap", 5),
-                        spacing="1",
-                        align="center",
-                    ),
-                    rx.box(
-                        width="1px",
-                        height="12px",
-                        background_color="var(--gray-6)",
-                        flex_shrink="0",
-                        margin_x="2",
-                    ),
-                    _info_label(
-                        f"Freq {item.evidence.length()}/5",
-                        "Frequency: How many interviews mentioned this opportunity (auto-counted from linked quotes, capped at 5). Combined with Impact and Gap to form the Priority score: Impact + Gap + Freq (max 15).",
-                    ),
-                    spacing="2",
-                    align="center",
-                    flex_wrap="wrap",
+                    background_color="var(--gray-3)",
+                    border_radius="6px",
+                    padding="6px 10px",
+                    border="1px solid var(--gray-5)",
+                    width="100%",
                 ),
                 spacing="3",
                 width="100%",
@@ -323,12 +361,6 @@ def show_ledger_row(item: LedgerItem):
 def show_opportunity_table_row(item: LedgerItem) -> rx.Component:
     """Renders a single opportunity as a high-density table row."""
     return rx.table.row(
-        # ID
-        rx.table.cell(
-            rx.text(item.opportunity_id, size="1", color="gray"),
-            vertical_align="middle",
-            padding_y="6px",
-        ),
         # Theme
         rx.table.cell(
             rx.badge(item.theme, size="1", variant="solid", color_scheme="gray"),
@@ -413,22 +445,18 @@ def show_opportunity_table_row(item: LedgerItem) -> rx.Component:
         ),
         # Priority score
         rx.table.cell(
-            rx.text(
+            rx.badge(
                 f"P:{item.priority_score}",
-                size="2",
-                weight="bold",
-                color=rx.cond(
-                    item.priority_score >= 11,
-                    "var(--green-11)",
+                color_scheme=rx.cond(
+                    item.priority_score >= 11, "green",
                     rx.cond(
-                        item.priority_score >= 6,
-                        "var(--amber-11)",
-                        rx.cond(
-                            item.priority_score >= 1, "var(--blue-11)", "var(--gray-9)"
-                        ),
+                        item.priority_score >= 6, "amber",
+                        rx.cond(item.priority_score >= 1, "blue", "gray"),
                     ),
                 ),
-                white_space="nowrap",
+                variant="solid",
+                size="2",
+                title="Priority = Impact + Satisfaction Gap + Frequency (evidence count)",
             ),
             vertical_align="middle",
             padding_y="6px",
@@ -528,11 +556,10 @@ def show_table_view() -> rx.Component:
     return rx.table.root(
         rx.table.header(
             rx.table.row(
-                rx.table.column_header_cell(rx.text("#", size="1", weight="medium", color="gray")),
                 rx.table.column_header_cell(rx.text("Theme", size="1", weight="medium", color="gray")),
                 rx.table.column_header_cell(rx.text("Opportunity", size="1", weight="medium", color="gray")),
                 rx.table.column_header_cell(rx.text("Personas", size="1", weight="medium", color="gray")),
-                rx.table.column_header_cell(rx.text("Metrics", size="1", weight="medium", color="gray")),
+                rx.table.column_header_cell(rx.text("Impact / Gap", size="1", weight="medium", color="gray")),
                 rx.table.column_header_cell(rx.text("Priority", size="1", weight="medium", color="gray")),
                 rx.table.column_header_cell(rx.text("Evidence", size="1", weight="medium", color="gray")),
                 rx.table.column_header_cell(""),
@@ -563,16 +590,16 @@ def show_theme_group(group: ThemeGroup) -> rx.Component:
                     rx.cond(group.collapsed, "chevron-right", "chevron-down"),
                     size=14, color="var(--gray-12)",
                 ),
-                rx.text(group.theme, weight="bold", size="3"),
+                rx.text(group.theme, weight="bold", size="4"),
                 rx.badge(
                     f"{group.count}",
-                    color_scheme="gray", variant="surface", size="1",
+                    color_scheme="gray", variant="solid", size="1",
                 ),
                 spacing="2", align="center",
             ),
             rx.badge(
                 f"avg P:{group.avg_priority}",
-                color_scheme=priority_color, variant="soft", size="1",
+                color_scheme=priority_color, variant="solid", size="1",
             ),
             justify="between",
             width="100%",
@@ -582,6 +609,7 @@ def show_theme_group(group: ThemeGroup) -> rx.Component:
             border_radius="6px",
             background_color="var(--gray-3)",
             border="1px solid var(--gray-5)",
+            border_bottom="2px solid var(--gray-6)",
             _hover={"background_color": "var(--gray-4)"},
             transition="background-color 0.1s ease",
         ),
@@ -1115,6 +1143,174 @@ def _merge_dialog() -> rx.Component:
     )
 
 
+def _cards_filter_panel() -> rx.Component:
+    """Left filter sidebar for the Cards view, JIRA-style."""
+    return rx.box(
+        rx.vstack(
+            # Header row
+            rx.flex(
+                rx.text("Filters", weight="bold", size="2", color="var(--gray-12)"),
+                rx.cond(
+                    State.opp_filters_active,
+                    rx.button(
+                        "Clear all",
+                        variant="ghost",
+                        color_scheme="gray",
+                        size="1",
+                        on_click=State.clear_opp_filters,
+                    ),
+                    rx.fragment(),
+                ),
+                justify="between",
+                width="100%",
+                align="center",
+            ),
+            rx.divider(),
+            # Search
+            rx.vstack(
+                rx.text("Search", size="1", weight="medium", color="var(--gray-11)"),
+                rx.input(
+                    placeholder="Search...",
+                    value=State.opp_filter_search,
+                    on_change=State.set_opp_filter_search,
+                    size="2",
+                    width="100%",
+                ),
+                spacing="1",
+                width="100%",
+            ),
+            # Priority
+            rx.vstack(
+                rx.text("Priority", size="1", weight="medium", color="var(--gray-11)"),
+                rx.select.root(
+                    rx.select.trigger(placeholder="All Priorities", width="100%"),
+                    rx.select.content(
+                        rx.select.item("All Priorities", value="__all__"),
+                        rx.select.item("High (≥11)", value="high"),
+                        rx.select.item("Medium (6–10)", value="medium"),
+                        rx.select.item("Low (1–5)", value="low"),
+                        rx.select.item("Unrated", value="unrated"),
+                    ),
+                    value=rx.cond(State.opp_filter_priority == "", "__all__", State.opp_filter_priority),
+                    on_change=State.set_opp_filter_priority,
+                    size="2",
+                    width="100%",
+                ),
+                spacing="1",
+                width="100%",
+            ),
+            # Theme checkboxes
+            rx.vstack(
+                rx.flex(
+                    rx.text("Theme", size="1", weight="medium", color="var(--gray-11)"),
+                    rx.cond(
+                        State.opp_filter_themes.length() > 0,
+                        rx.badge(
+                            State.opp_filter_themes.length().to_string(),
+                            size="1",
+                            color_scheme="blue",
+                            variant="soft",
+                        ),
+                        rx.fragment(),
+                    ),
+                    justify="between",
+                    width="100%",
+                    align="center",
+                ),
+                rx.foreach(
+                    State.available_themes,
+                    lambda t: rx.flex(
+                        rx.checkbox(
+                            checked=State.opp_filter_themes.contains(t),
+                            on_change=lambda _: State.toggle_opp_filter_theme(t),
+                            size="1",
+                        ),
+                        rx.text(
+                            t, size="2", color="var(--gray-12)",
+                            cursor="pointer",
+                            on_click=State.toggle_opp_filter_theme(t),
+                            flex="1",
+                        ),
+                        spacing="2",
+                        align="center",
+                        width="100%",
+                        padding_y="3px",
+                        border_radius="4px",
+                        _hover={"background_color": "var(--gray-3)"},
+                        padding_x="4px",
+                    ),
+                ),
+                spacing="1",
+                width="100%",
+            ),
+            # Persona checkboxes
+            rx.vstack(
+                rx.flex(
+                    rx.text("Persona", size="1", weight="medium", color="var(--gray-11)"),
+                    rx.cond(
+                        State.opp_filter_personas.length() > 0,
+                        rx.badge(
+                            State.opp_filter_personas.length().to_string(),
+                            size="1",
+                            color_scheme="blue",
+                            variant="soft",
+                        ),
+                        rx.fragment(),
+                    ),
+                    justify="between",
+                    width="100%",
+                    align="center",
+                ),
+                rx.foreach(
+                    State.available_personas_in_ledger,
+                    lambda p: rx.flex(
+                        rx.checkbox(
+                            checked=State.opp_filter_personas.contains(p),
+                            on_change=lambda _: State.toggle_opp_filter_persona(p),
+                            size="1",
+                        ),
+                        rx.text(
+                            p, size="2", color="var(--gray-12)",
+                            cursor="pointer",
+                            on_click=State.toggle_opp_filter_persona(p),
+                            flex="1",
+                        ),
+                        spacing="2",
+                        align="center",
+                        width="100%",
+                        padding_y="3px",
+                        border_radius="4px",
+                        _hover={"background_color": "var(--gray-3)"},
+                        padding_x="4px",
+                    ),
+                ),
+                spacing="1",
+                width="100%",
+            ),
+            # Results count
+            rx.divider(),
+            rx.text(
+                State.filtered_ledger_data.length().to_string() + " opportunities",
+                size="1",
+                color="var(--gray-10)",
+            ),
+            spacing="4",
+            width="100%",
+        ),
+        width="280px",
+        flex_shrink="0",
+        padding="16px",
+        background_color="var(--gray-2)",
+        border_right="1px solid var(--gray-4)",
+        border_radius="8px",
+        position="sticky",
+        top="16px",
+        align_self="start",
+        max_height="calc(100vh - 220px)",
+        overflow_y="auto",
+    )
+
+
 def render_ledger() -> rx.Component:
     """The main view for the Global Ledger."""
     return rx.vstack(
@@ -1268,14 +1464,6 @@ def render_ledger() -> rx.Component:
             # View mode toggle buttons
             rx.flex(
                 rx.button(
-                    rx.icon("table", size=14),
-                    "Table",
-                    variant=rx.cond(State.ledger_view_mode == "table", "solid", "outline"),
-                    color_scheme="blue",
-                    size="2",
-                    on_click=State.set_ledger_view_mode("table"),
-                ),
-                rx.button(
                     rx.icon("list", size=14),
                     "Cards",
                     variant=rx.cond(State.ledger_view_mode == "list", "solid", "outline"),
@@ -1284,12 +1472,12 @@ def render_ledger() -> rx.Component:
                     on_click=State.set_ledger_view_mode("list"),
                 ),
                 rx.button(
-                    rx.icon("columns-3", size=14),
-                    "Board",
-                    variant=rx.cond(State.ledger_view_mode == "board", "solid", "outline"),
+                    rx.icon("table", size=14),
+                    "Table",
+                    variant=rx.cond(State.ledger_view_mode == "table", "solid", "outline"),
                     color_scheme="blue",
                     size="2",
-                    on_click=State.set_ledger_view_mode("board"),
+                    on_click=State.set_ledger_view_mode("table"),
                 ),
                 rx.button(
                     rx.icon("grid-2x2", size=14),
@@ -1307,7 +1495,9 @@ def render_ledger() -> rx.Component:
             align="center",
             margin_bottom="4",
         ),
-        # --- Filter Bar ---
+        # --- Filter Bar (hidden for Cards view; that view uses the left panel instead) ---
+        rx.cond(
+            State.ledger_view_mode != "list",
         rx.flex(
             rx.input(
                 placeholder="Search opportunities...",
@@ -1439,6 +1629,8 @@ def render_ledger() -> rx.Component:
             align="center",
             wrap="wrap",
         ),
+        rx.fragment(),
+        ),
         # --- Main Content (view-mode conditional) ---
         rx.cond(
             State.ledger_data.length() == 0,
@@ -1456,38 +1648,69 @@ def render_ledger() -> rx.Component:
                 width="100%",
             ),
             rx.cond(
-                State.filtered_ledger_data.length() == 0,
-                rx.center(
-                    rx.vstack(
-                        rx.icon("search-x", size=36, color="var(--gray-12)"),
-                        rx.text("No results match your filters.", weight="medium", color="gray"),
-                        rx.button(
-                            "Clear filters",
-                            variant="soft",
-                            color_scheme="gray",
-                            size="2",
-                            on_click=State.clear_opp_filters,
-                        ),
-                        spacing="3", align="center",
-                    ),
-                    padding_y="80px",
-                    width="100%",
-                ),
-                rx.cond(
-                    State.ledger_view_mode == "table",
-                    show_table_view(),
-                    rx.cond(
-                        State.ledger_view_mode == "board",
-                        show_board_view(),
+                State.ledger_view_mode == "list",
+                # Cards view: JIRA-style left filter panel + right cards area
+                rx.flex(
+                    _cards_filter_panel(),
+                    rx.box(
                         rx.cond(
-                            State.ledger_view_mode == "matrix",
-                            show_matrix_view(),
-                            # Default: grouped cards view
+                            State.filtered_ledger_data.length() == 0,
+                            rx.center(
+                                rx.vstack(
+                                    rx.icon("search-x", size=36, color="var(--gray-12)"),
+                                    rx.text("No results match your filters.", weight="medium", color="gray"),
+                                    rx.button(
+                                        "Clear filters",
+                                        variant="soft",
+                                        color_scheme="gray",
+                                        size="2",
+                                        on_click=State.clear_opp_filters,
+                                    ),
+                                    spacing="3", align="center",
+                                ),
+                                padding_y="80px",
+                                width="100%",
+                            ),
                             rx.vstack(
                                 rx.foreach(State.ledger_data_by_theme, show_theme_group),
                                 spacing="3",
                                 width="100%",
                             ),
+                        ),
+                        flex="1",
+                        min_width="0",
+                        padding_left="24px",
+                    ),
+                    align="start",
+                    width="100%",
+                    spacing="0",
+                ),
+                # Table / Board / Matrix views (filter bar shown above)
+                rx.cond(
+                    State.filtered_ledger_data.length() == 0,
+                    rx.center(
+                        rx.vstack(
+                            rx.icon("search-x", size=36, color="var(--gray-12)"),
+                            rx.text("No results match your filters.", weight="medium", color="gray"),
+                            rx.button(
+                                "Clear filters",
+                                variant="soft",
+                                color_scheme="gray",
+                                size="2",
+                                on_click=State.clear_opp_filters,
+                            ),
+                            spacing="3", align="center",
+                        ),
+                        padding_y="80px",
+                        width="100%",
+                    ),
+                    rx.cond(
+                        State.ledger_view_mode == "table",
+                        show_table_view(),
+                        rx.cond(
+                            State.ledger_view_mode == "board",
+                            show_board_view(),
+                            show_matrix_view(),
                         ),
                     ),
                 ),
