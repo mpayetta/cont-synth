@@ -62,6 +62,7 @@ _URL_MAP: dict[str, str] = {
     "account": "/account",
     "knowledge_base": "/knowledge-base",
     "members": "/workspace/members",
+    "about": "/about",
 }
 
 

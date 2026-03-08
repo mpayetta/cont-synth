@@ -16,6 +16,7 @@ from .pages.login import login_page
 from .pages.account import render_account
 from .pages.knowledge_base import render_knowledge_base
 from .pages.workspace_members import render_workspace_members
+from .pages.about import render_about
 
 
 # --- SIDEBAR COMPONENT ---
@@ -264,6 +265,7 @@ def sidebar() -> rx.Component:
         sidebar_item("Product Context", "book-open", "knowledge_base"),
         # Push workspace section to the bottom
         rx.spacer(),
+        sidebar_item("About PRISMA", "info", "about"),
         _workspace_section(),
         _user_section(),
         width="300px",
@@ -408,6 +410,10 @@ def workspace_members_page() -> rx.Component:
     return _page_layout(render_workspace_members(), State.load_members_page)
 
 
+def about_page() -> rx.Component:
+    return _page_layout(render_about(), State.load_about_page)
+
+
 def login_route() -> rx.Component:
     return rx.box(login_page(), on_mount=State.load_app)
 
@@ -427,4 +433,5 @@ app.add_page(llm_usage_page, route="/llm-usage", title="PRISMA - LLM Usage")
 app.add_page(account_page, route="/account", title="PRISMA - Account Settings")
 app.add_page(knowledge_base_page, route="/knowledge-base", title="PRISMA - Knowledge Base")
 app.add_page(workspace_members_page, route="/workspace/members", title="PRISMA - Workspace Members")
+app.add_page(about_page, route="/about", title="PRISMA - About")
 app.add_page(login_route, route="/login", title="PRISMA")

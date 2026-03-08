@@ -889,6 +889,10 @@ class State(  # pragma: no cover
         self.current_view = "members"
         return self._ensure_auth_and_load()
 
+    def load_about_page(self):
+        self.current_view = "about"
+        return self._ensure_auth_and_load()
+
     def set_audit_filter_action(self, value: str):
         self.audit_filter_action = value
         self.audit_log_page = 0
