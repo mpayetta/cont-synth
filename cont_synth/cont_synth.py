@@ -335,6 +335,26 @@ def _page_layout(content: rx.Component, on_mount) -> rx.Component:
         rx.cond(
             State.is_authenticated,
             rx.fragment(
+                # Navigation loading bar — visible between handle_navigation and load_data_for_current_view
+                rx.cond(
+                    State.is_navigating,
+                    rx.box(
+                        rx.box(
+                            class_name="nav-loader",
+                            height="100%",
+                            width="45%",
+                            background="var(--blue-9)",
+                            border_radius="0 3px 3px 0",
+                        ),
+                        position="fixed",
+                        top="0",
+                        left="0",
+                        right="0",
+                        height="3px",
+                        overflow="hidden",
+                        z_index="9999",
+                    ),
+                ),
                 rx.hstack(
                     sidebar(),
                     rx.box(

@@ -159,6 +159,7 @@ class NavigationStateMixin(rx.State, mixin=True):
         if self.current_view == "prep":
             self.prep_questions = ""
             self.prep_extra_context = ""
+        self.is_navigating = True
         return rx.redirect(_URL_MAP.get(view_name, "/"))
 
     def load_llm_usage(self):
@@ -227,6 +228,7 @@ class NavigationStateMixin(rx.State, mixin=True):
             self.load_kb_documents()
         elif self.current_view == "members":
             self.load_workspace_members()
+        self.is_navigating = False
 
     def load_coach_data(self):
         """Loads all InterviewFeedback records for the coaching dashboard."""

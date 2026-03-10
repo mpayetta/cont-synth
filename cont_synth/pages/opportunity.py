@@ -66,37 +66,49 @@ def render_detail_quote(q: QuoteItem) -> rx.Component:
                 rx.badge(q.persona_name, color_scheme=q.persona_color, variant="soft", size="2"),
                 rx.cond(
                     ~State.is_viewer,
-                rx.alert_dialog.root(
-                    rx.alert_dialog.trigger(
+                    rx.flex(
                         rx.icon_button(
-                            rx.icon("trash", size=14),
-                            size="1", variant="ghost", color_scheme="red",
-                        ),
-                    ),
-                    rx.alert_dialog.content(
-                        rx.alert_dialog.title("Remove Evidence"),
-                        rx.alert_dialog.description(
-                            f'Remove the quote from {q.persona_name}? This unlinks the interview from this opportunity but does not delete the interview itself.',
-                            size="2",
-                        ),
-                        rx.flex(
-                            rx.alert_dialog.cancel(
-                                rx.button("Cancel", variant="soft", color_scheme="gray"),
+                            rx.icon("arrow-right-left", size=14),
+                            size="1", variant="ghost", color_scheme="blue",
+                            title="Reassign to another opportunity",
+                            on_click=State.open_reassign_evidence_dialog(
+                                q.interview_id, State.selected_opportunity.opportunity_id
                             ),
-                            rx.alert_dialog.action(
-                                rx.button(
-                                    "Remove",
-                                    color_scheme="red",
-                                    on_click=lambda: State.delete_evidence(
-                                        State.selected_opportunity.opportunity_id, q.interview_id
-                                    ),
+                        ),
+                        rx.alert_dialog.root(
+                            rx.alert_dialog.trigger(
+                                rx.icon_button(
+                                    rx.icon("trash", size=14),
+                                    size="1", variant="ghost", color_scheme="red",
                                 ),
                             ),
-                            spacing="3", justify="end", margin_top="16px",
+                            rx.alert_dialog.content(
+                                rx.alert_dialog.title("Remove Evidence"),
+                                rx.alert_dialog.description(
+                                    f'Remove the quote from {q.persona_name}? This unlinks the interview from this opportunity but does not delete the interview itself.',
+                                    size="2",
+                                ),
+                                rx.flex(
+                                    rx.alert_dialog.cancel(
+                                        rx.button("Cancel", variant="soft", color_scheme="gray"),
+                                    ),
+                                    rx.alert_dialog.action(
+                                        rx.button(
+                                            "Remove",
+                                            color_scheme="red",
+                                            on_click=lambda: State.delete_evidence(
+                                                State.selected_opportunity.opportunity_id, q.interview_id
+                                            ),
+                                        ),
+                                    ),
+                                    spacing="3", justify="end", margin_top="16px",
+                                ),
+                                max_width="420px",
+                            ),
                         ),
-                        max_width="420px",
+                        spacing="1",
+                        align="center",
                     ),
-                ),
                 ),  # end rx.cond(~is_viewer)
                 justify="between", width="100%", align="center",
             ),
@@ -646,6 +658,65 @@ def render_solutions_panel() -> rx.Component:
     )
 
 
+# --- REASSIGN EVIDENCE DIALOG ---
+
+def _reassign_evidence_dialog() -> rx.Component:
+    """State-controlled dialog for reassigning an evidence fragment to a different opportunity."""
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.vstack(
+                rx.vstack(
+                    rx.dialog.title("Reassign Evidence"),
+                    rx.text(
+                        "Move this evidence fragment to a different opportunity. The quote and its source interview link will be transferred.",
+                        size="2",
+                        color="var(--gray-11)",
+                    ),
+                    spacing="1",
+                ),
+                rx.divider(),
+                rx.vstack(
+                    rx.text(
+                        "DESTINATION OPPORTUNITY",
+                        size="1",
+                        weight="bold",
+                        color="var(--blue-11)",
+                        letter_spacing="0.05em",
+                    ),
+                    rx.select(
+                        State.reassign_evidence_choices,
+                        placeholder="Select destination opportunity...",
+                        on_change=State.set_reassign_evidence_target,
+                        width="100%",
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+                rx.flex(
+                    rx.dialog.close(
+                        rx.button("Cancel", variant="soft", color_scheme="gray"),
+                    ),
+                    rx.button(
+                        rx.icon("arrow-right-left", size=14),
+                        "Reassign",
+                        color_scheme="blue",
+                        disabled=State.reassign_evidence_target_choice == "",
+                        on_click=State.confirm_reassign_evidence,
+                    ),
+                    spacing="3",
+                    justify="end",
+                    margin_top="8px",
+                ),
+                spacing="4",
+                width="100%",
+            ),
+            max_width="480px",
+        ),
+        open=State.is_reassign_evidence_open,
+        on_open_change=State.close_reassign_evidence_dialog,
+    )
+
+
 # --- MAIN PAGE ---
 
 def render_opp_view_header() -> rx.Component:
@@ -955,6 +1026,7 @@ def render_opportunity_detail() -> rx.Component:
         ),
         transcript_drawer_panel(),
         _merge_dialog(),
+        _reassign_evidence_dialog(),
         width="100%",
         max_width="1400px",
         spacing="5",

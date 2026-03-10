@@ -1363,6 +1363,88 @@ class LedgerStateMixin(rx.State, mixin=True):
             if int(choice.split(" - ")[0]) not in linked_ids
         ]
 
+    # ── Reassign evidence ─────────────────────────────────────────────────────
+
+    @rx.var
+    def reassign_evidence_choices(self) -> list[str]:
+        """All opportunities except the source of the reassignment, formatted as 'id - statement'."""
+        return [
+            f"{item.opportunity_id} - {item.opportunity}"
+            for item in self.ledger_data
+            if item.opportunity_id != self.reassign_evidence_from_opp_id
+        ]
+
+    def open_reassign_evidence_dialog(self, interview_id: int, from_opp_id: int):
+        self.reassign_evidence_interview_id = interview_id
+        self.reassign_evidence_from_opp_id = from_opp_id
+        self.reassign_evidence_target_choice = ""
+        self.is_reassign_evidence_open = True
+
+    def close_reassign_evidence_dialog(self, _open: bool = False):
+        self.is_reassign_evidence_open = False
+        self.reassign_evidence_interview_id = -1
+        self.reassign_evidence_from_opp_id = -1
+        self.reassign_evidence_target_choice = ""
+
+    def set_reassign_evidence_target(self, val: str):
+        self.reassign_evidence_target_choice = val
+
+    def confirm_reassign_evidence(self):
+        """Moves an evidence fragment (InterviewOpportunityLink) from one opportunity to another."""
+        if self.is_viewer:
+            return
+        interview_id = self.reassign_evidence_interview_id
+        from_opp_id = self.reassign_evidence_from_opp_id
+        if interview_id == -1 or from_opp_id == -1 or not self.reassign_evidence_target_choice:
+            return
+        try:
+            to_opp_id = int(self.reassign_evidence_target_choice.split(" - ")[0])
+        except Exception:
+            return
+
+        with rx.session() as session:
+            link = session.get(InterviewOpportunityLink, (interview_id, from_opp_id))
+            if not link:
+                return
+
+            existing = session.get(InterviewOpportunityLink, (interview_id, to_opp_id))
+            if existing:
+                return rx.window_alert(
+                    "This interview is already linked to the target opportunity."
+                )
+
+            source_quote = link.source_quote
+            session.delete(link)
+            session.flush()
+
+            new_link = InterviewOpportunityLink(
+                interview_id=interview_id,
+                opportunity_id=to_opp_id,
+                source_quote=source_quote,
+            )
+            session.add(new_link)
+
+            from_opp = session.get(Opportunity, from_opp_id)
+            to_opp = session.get(Opportunity, to_opp_id)
+            session.add(AuditLog(
+                user_id=self.auth_user_id,
+                product_id=from_opp.product_id if from_opp else None,
+                entity_type="evidence",
+                entity_id=from_opp_id,
+                action="update",
+                detail=json.dumps({
+                    "action": "reassign",
+                    "interview_id": interview_id,
+                    "from_opportunity_id": from_opp_id,
+                    "to_opportunity_id": to_opp_id,
+                    "to_opportunity_statement": to_opp.statement if to_opp else "",
+                }),
+            ))
+            session.commit()
+
+        self.close_reassign_evidence_dialog()
+        self._load_and_sync()
+
     # ── Merge opportunity ─────────────────────────────────────────────────────
 
     @rx.var

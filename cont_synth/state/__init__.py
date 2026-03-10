@@ -213,6 +213,7 @@ class State(  # pragma: no cover
 
     # --- Navigation ---
     current_view: str = "synthesize"
+    is_navigating: bool = False
 
     # --- Products ---
     products: list[ProductItem] = []
@@ -332,6 +333,12 @@ class State(  # pragma: no cover
     interview_choices: list[str] = []
     selected_interview_choice: str = ""
     manual_quote_text: str = ""
+
+    # --- Reassign evidence state ---
+    is_reassign_evidence_open: bool = False
+    reassign_evidence_interview_id: int = -1
+    reassign_evidence_from_opp_id: int = -1
+    reassign_evidence_target_choice: str = ""
 
     # --- Interview detail view ---
     selected_interview_id: int = 0
