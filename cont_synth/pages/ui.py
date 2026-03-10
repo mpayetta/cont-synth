@@ -59,7 +59,8 @@ def combo_box(
         rx.box(
             rx.el.input(
                 placeholder=placeholder,
-                value=value,
+                default_value=value,
+                key=State.combo_refresh_key,
                 on_change=on_change,
                 on_focus=State.open_combo_box(field_id),
                 style=merged_style,

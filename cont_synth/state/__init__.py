@@ -220,6 +220,14 @@ class State(  # pragma: no cover
     new_product_name: str = ""
     edit_product_name: str = ""
 
+    # --- Performance cache flags (backend-only, not synced to frontend) ---
+    _products_loaded: bool = False
+    _ledger_cache_valid: bool = False
+    _ledger_cache_product: str = ""
+
+    # --- Combo-box selection key: increment to force input remount after selection ---
+    combo_refresh_key: int = 0
+
     # --- Workspace membership ---
     workspace_role: str = ""   # "admin" | "member" | "viewer" — scoped to active product
     workspace_members: list[WorkspaceMemberItem] = []
@@ -515,6 +523,8 @@ class State(  # pragma: no cover
         self.login_error = ""
         self.login_username = ""
         self.login_password = ""
+        self._products_loaded = False
+        self._ledger_cache_valid = False
         configure_genai(user.gemini_api_key or "")
         yield rx.call_script(f"localStorage.setItem('auth_user_id', '{user.id}')")
         yield rx.call_script(
@@ -530,6 +540,8 @@ class State(  # pragma: no cover
         self.auth_username = ""
         self.auth_fullname = ""
         self.auth_user_role = ""
+        self._products_loaded = False
+        self._ledger_cache_valid = False
         yield rx.call_script("localStorage.removeItem('auth_user_id')")
         yield rx.redirect("/login")
 
@@ -640,6 +652,7 @@ class State(  # pragma: no cover
     def close_combo_box(self): self.open_combo = ""
     def select_combo_option(self, field_id: str, value: str):
         self.open_combo = ""
+        self.combo_refresh_key += 1  # force combo inputs to remount with the new default_value
         if field_id == "synthesize_persona":
             self.persona_input = value
         elif field_id == "participant_persona":

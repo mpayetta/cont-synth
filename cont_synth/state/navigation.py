@@ -80,6 +80,8 @@ class NavigationStateMixin(rx.State, mixin=True):
 
     def load_products(self):
         """Fetches all products accessible to the current user (owned + shared via ProductMember)."""
+        if self._products_loaded and self.products:
+            return  # cache hit — skip DB query
         with rx.session() as session:
             # Products owned by this user
             owned = session.exec(
@@ -122,6 +124,7 @@ class NavigationStateMixin(rx.State, mixin=True):
 
             # Load workspace role for the active product
             self._load_workspace_role_in_session(session)
+        self._products_loaded = True
 
     def _load_workspace_role_in_session(self, session) -> None:
         """Sets self.workspace_role based on the active product and current user."""
@@ -410,6 +413,7 @@ class NavigationStateMixin(rx.State, mixin=True):
             self.workspace_role = "admin"
 
         self.new_product_name = ""
+        self._products_loaded = False
         self.load_data_for_current_view()
 
     def open_manage_product(self):
@@ -429,7 +433,8 @@ class NavigationStateMixin(rx.State, mixin=True):
                 prod.name = self.edit_product_name.strip()
                 session.add(prod)
                 session.commit()
-        self.load_data_for_current_view() 
+        self._products_loaded = False
+        self.load_data_for_current_view()
 
     def delete_current_product(self):
         """Performs a massive cascading delete to wipe the workspace completely."""
@@ -490,6 +495,7 @@ class NavigationStateMixin(rx.State, mixin=True):
             session.commit()
 
         # 6. Fallback to the first available product
+        self._products_loaded = False
         self.load_products()
         if self.products:
             self.active_product_id = str(self.products[0].id)

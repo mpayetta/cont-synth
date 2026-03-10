@@ -84,10 +84,10 @@ def _workspace_section() -> rx.Component:
                 text_overflow="ellipsis",
                 white_space="nowrap",
             ),
-            rx.icon(
-                rx.cond(State.workspace_menu_open, "chevron-down", "chevron-right"),
-                size=14,
-                color="var(--gray-9)",
+            rx.cond(
+                State.workspace_menu_open,
+                rx.icon("chevron-down", size=14, color="var(--gray-9)"),
+                rx.icon("chevron-right", size=14, color="var(--gray-9)"),
             ),
             align="center",
             width="100%",

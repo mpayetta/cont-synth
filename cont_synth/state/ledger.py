@@ -203,6 +203,11 @@ class LedgerStateMixin(rx.State, mixin=True):
 
     def load_ledger(self):
         """Loads the global opportunity ledger with evidence, solutions, and outcomes."""
+        if (
+            self._ledger_cache_valid
+            and self._ledger_cache_product == self.active_product_id
+        ):
+            return  # cache hit — skip DB query
         self.load_outcomes()
         with rx.session() as session:
             opportunities = session.exec(
@@ -501,8 +506,12 @@ class LedgerStateMixin(rx.State, mixin=True):
                 choices.append(f"{inv.id} - {p.name} ({date_str})")
             self.interview_choices = choices[::-1]
 
+        self._ledger_cache_valid = True
+        self._ledger_cache_product = self.active_product_id
+
     def _load_and_sync(self):
         """Reloads ledger data and refreshes selected_opportunity when on the detail page."""
+        self._ledger_cache_valid = False
         self.load_ledger()
         if self.current_view == "opportunity":
             for item in self.ledger_data:
@@ -1336,6 +1345,12 @@ class LedgerStateMixin(rx.State, mixin=True):
             else:
                 updated.append(item)
         self.ledger_data = updated
+        # Sync selected_opportunity so the detail page reflects the new score immediately
+        if self.selected_opportunity.opportunity_id == opp_id:
+            for item in self.ledger_data:
+                if item.opportunity_id == opp_id:
+                    self.selected_opportunity = item
+                    break
 
     # ── Evidence dropdown filter ──────────────────────────────────────────────
 

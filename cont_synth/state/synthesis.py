@@ -743,6 +743,7 @@ class InterviewSynthesisStateMixin(rx.State, mixin=True):
         self.pending_synthesis_participants = []
         self.pending_synthesis_participant_roles = []
 
+        self._ledger_cache_valid = False
         self.load_ledger()
         self.load_history()
         return rx.redirect("/interviews")
