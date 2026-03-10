@@ -28,6 +28,11 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
     op.execute("INSERT INTO product (id, name, created_at) VALUES (1, 'Default Product', CURRENT_TIMESTAMP)")
+    # Advance the PostgreSQL sequence so auto-generated IDs don't collide with the
+    # explicit id=1 we just inserted. Safe to ignore on SQLite (no sequences).
+    conn = op.get_bind()
+    if conn.dialect.name == "postgresql":
+        conn.execute(sa.text("SELECT setval(pg_get_serial_sequence('product', 'id'), MAX(id)) FROM product"))
     with op.batch_alter_table('interview', schema=None) as batch_op:
         batch_op.add_column(sa.Column('product_id', sa.Integer(), server_default=sa.text('1'), nullable=True))
         batch_op.create_foreign_key('fk_interview_id', 'product', ['product_id'], ['id'])
